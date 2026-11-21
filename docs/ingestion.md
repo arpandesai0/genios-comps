@@ -123,7 +123,7 @@ Records are grouped by key and sorted by (`price_date`, position in the input). 
 
 - An older value that changed gives `text_updated` (info). All versions are kept in `text_history`.
 - If two records on the **latest** date disagree, the later record in the input wins, with `conflicting_attributes` (warning).
-- If the latest value is empty, the most recent non-empty value is used, with `text_from_older_record` (info). This handles append-style updates.
+- If the latest value is empty, the most recent non-empty value is used, with `text_from_older_record` (info). This handles append-style updates. Because the empty value counts as a different value, the field also gets `text_updated` (info), whose message says the most recent non-empty value is used.
 
 **d. Aliases.** Every distinct name seen for the key is kept, for search.
 
@@ -254,7 +254,7 @@ Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `
 
 Finance adds `nonpositive_ev` and `non_finite_result`. See [finance.md](finance.md).
 
-**How the catalogue is tested.** Besides the unit tests for each rule, `tests/test_planted_defects.py` runs the whole pipeline, from the files through finance, on a synthetic universe in `tests/fixtures/planted_defects/` where each company carries one known defect. The test checks the result against `expected.json`, which was derived by hand from the rules on this page, and requires an exact match. Every planted defect must be caught with the right code, severity, fields, records and metric status, and no other finding may appear. The test also fails if a code in this table has no planted defect, or if a planted code is missing from this table.
+**How the catalogue is tested.** Besides the unit tests for each rule, `tests/test_planted_defects.py` runs the whole pipeline, from the files through finance, on a synthetic universe in `tests/fixtures/planted_defects/` where each company carries one known defect. The test checks the result against `expected.json`, which was derived by hand from the rules on this page, and requires an exact match. Every planted defect must be caught with the right code, severity, fields, records and metric status, and no other finding may appear. A second check compares three lists of finding codes: the ones in this catalogue (the table plus the two finance codes named above it), the ones the source code can raise, and the planted ones. It fails if any code is missing from one of them.
 
 ## Rounding
 

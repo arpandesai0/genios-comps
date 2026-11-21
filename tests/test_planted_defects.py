@@ -92,15 +92,24 @@ def _documented_codes() -> set[str]:
     text = (DOCS / "ingestion.md").read_text()
     catalogue = text.split("## Findings catalogue", 1)[1].split("\n## ", 1)[0]
     codes = set(re.findall(r"^\| `([a-z_]+)` \|", catalogue, flags=re.MULTILINE))
-    codes |= set(re.findall(r"Finance adds `([a-z_]+)` and `([a-z_]+)`", catalogue)[0])
-    return codes
+    finance = re.search(r"Finance adds `([a-z_]+)` and `([a-z_]+)`", catalogue)
+    assert finance, "docs/ingestion.md no longer names the finance codes as 'Finance adds `a` and `b`'"
+    return codes | set(finance.groups())
 
 
-def test_every_documented_finding_code_is_planted():
+def _emitted_codes() -> set[str]:
+    """Finding codes the source can raise: ``code="..."`` arguments and ``f.add("...", ...)`` calls."""
+    src = "\n".join(p.read_text() for p in sorted((Path(__file__).parent.parent / "src" / "comps").glob("*.py")))
+    return set(re.findall(r'\bcode="([a-z_]+)"', src)) | set(re.findall(r'\bf\.add\(\s*"([a-z_]+)"', src))
+
+
+def test_catalogue_source_and_fixture_agree_on_finding_codes():
     planted = {s["code"] for s in EXPECTED["dataset_findings"]}
     for spec in EXPECTED["companies"].values():
         planted |= {s["code"] for s in spec["findings"]}
     documented = _documented_codes()
-    assert len(documented) > 20  # guard against the parser silently matching nothing
+    emitted = _emitted_codes()
+    assert emitted - documented == set(), "codes the source can raise that the catalogue does not document"
+    assert documented - emitted == set(), "documented codes the source never raises"
     assert documented - planted == set(), "documented finding codes with no planted defect"
     assert planted - documented == set(), "planted finding codes missing from the catalogue"
