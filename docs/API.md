@@ -112,14 +112,14 @@ interface RawRecord {
 Returns `{ "status": "ok", "dataset_version": string, "currency": string, "entities": number, "records": number, "reference_date": string | null }` (`reference_date` as in `/api/dataset`).
 
 ### `GET /api/companies`
-Search and list companies. Used both for target search (with ambiguity) and for the data table.
+Find companies by **text matching** on key, ticker or name. Used both for target search (with ambiguity) and for the data table. This is not similarity search: it never returns peers.
 
-Query parameters: `q` (key, ticker or name; optional), `sector`, `has_findings` (`error|limitation|warning|info`), `limit` (default 20, max 200), `offset`.
+Query parameters: `q` (optional; case-insensitive; matches the key `COUNTRY:TICKER`, the ticker, the current name or an old name exactly, or a substring of a current or old name), `sector`, `has_findings` (`error|limitation|warning|info`), `limit` (default 20, max 200), `offset`.
 
 Returns `{ "dataset_version", "total": number, "items": (EntitySummary & { "match": "key" | "ticker" | "name_exact" | "name_partial" | null })[] }`. When a query matches several companies, return all of them; the UI asks the analyst to choose.
 
 ### `GET /api/companies/{key}`
-Returns `EntityDetail`, or 404.
+Exact lookup of one company by its key `COUNTRY:TICKER` (e.g. `GB:IROV`), ignoring case. Returns `EntityDetail`, or 404 if no company has that key. A bare ticker or a name is not a key: use `GET /api/companies?q=` to find one.
 
 ### `GET /api/comps`
 Builds the comps table.
