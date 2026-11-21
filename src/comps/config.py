@@ -9,7 +9,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class IngestConfig:
-    # A price older than this many days before the reference date gets a "stale_price" warning.
+    # A price older than this many days before the latest valid price_date in the dataset gets a "stale_price" warning.
     # (a warning only; stale companies are still served)
     stale_after_days: int = 90
 
