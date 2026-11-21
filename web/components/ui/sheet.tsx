@@ -18,7 +18,7 @@ export function SheetContent({
         {children}
         <Dialog.Close
           className="sheet-close button button-ghost button-icon"
-          aria-label="Close panel"
+          aria-label="Close Panel"
         >
           <X size={20} />
         </Dialog.Close>

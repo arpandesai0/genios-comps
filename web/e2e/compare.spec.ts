@@ -4,8 +4,8 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByLabel("Number of peers")).toHaveValue("10");
-  await page.getByLabel("Target company").fill("NOMA");
+  await expect(page.getByLabel("Number of Peers")).toHaveValue("10");
+  await page.getByLabel("Target Company").fill("NOMA");
   await expect(
     page.getByRole("button", { name: /Noma Analytics.*GB:NOMA/ }),
   ).toBeVisible();
@@ -16,7 +16,7 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
     page.getByRole("heading", { name: /Noma Cloud Systems US:NOMA/ }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Valuation summary" }),
+    page.getByRole("heading", { name: "Valuation Summary" }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Evidence", exact: true })
@@ -24,34 +24,34 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
     .click();
   const dialog = page.getByRole("dialog");
   await expect(
-    dialog.getByRole("heading", { name: "Peer evidence" }),
+    dialog.getByRole("heading", { name: "Peer Evidence" }),
   ).toBeVisible();
   await expect(
     dialog.getByText("A similarity score, not a probability."),
   ).toBeVisible();
   await expect(
-    dialog.getByRole("heading", { name: "Shared terms" }),
+    dialog.getByRole("heading", { name: "Shared Terms" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await page
-    .getByRole("button", { name: "Calculation trace", exact: true })
+    .getByRole("button", { name: "Calculation Trace", exact: true })
     .click();
   await expect(
-    dialog.getByRole("heading", { name: "Unrounded metric values" }),
+    dialog.getByRole("heading", { name: "Unrounded Metric Values" }),
   ).toBeVisible();
   await expect(
-    dialog.getByRole("heading", { name: "Observation history" }),
+    dialog.getByRole("heading", { name: "Observation History" }),
   ).toBeVisible();
   await expect(
     dialog.getByText("Noma Software, Noma Cloud Systems", { exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByLabel("Target company").fill("US:NOMA");
+  await page.getByLabel("Target Company").fill("US:NOMA");
   await page
     .getByRole("button", { name: /Noma Cloud Systems.*US:NOMA$/ })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Valuation summary" }),
+    page.getByRole("heading", { name: "Valuation Summary" }),
   ).toBeVisible();
   const removal = page.waitForResponse(
     (response) =>
@@ -73,7 +73,7 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
   await expect(
     page.getByRole("button", { name: "Remove Noma Analytics", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Number of peers").fill("3");
+  await page.getByLabel("Number of Peers").fill("3");
   await expect(
     page.getByRole("button", { name: "Evidence", exact: true }),
   ).toHaveCount(3);
@@ -96,7 +96,7 @@ test("Compare surfaces API errors without replacing them with mock data", async 
     }),
   );
   await page.goto("/");
-  await page.getByLabel("Target company").fill("NOMA");
+  await page.getByLabel("Target Company").fill("NOMA");
   await expect(
     page.getByRole("alert").filter({ hasText: "Synthetic request failure" }),
   ).toHaveText("Synthetic request failure");

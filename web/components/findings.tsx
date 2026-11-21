@@ -1,4 +1,4 @@
-import { sentenceLabel } from "@/lib/utils";
+import { titleLabel } from "@/lib/utils";
 import type { Finding } from "@/lib/api-types";
 import { Badge } from "@/components/ui/badge";
 export function Findings({ findings }: { findings: Finding[] }) {
@@ -8,11 +8,11 @@ export function Findings({ findings }: { findings: Finding[] }) {
         <li key={`${f.code}-${i}`}>
           <div className="badge-row">
             <Badge className={`severity-${f.severity}`}>
-              {sentenceLabel(f.severity)}
+              {titleLabel(f.severity)}
             </Badge>
             <strong>{f.code}</strong>
             {f.source === "derived" && (
-              <Badge className="derived">Model-derived</Badge>
+              <Badge className="derived">Model-Derived</Badge>
             )}
           </div>
           <p>{f.message}</p>

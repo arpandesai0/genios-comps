@@ -163,7 +163,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Remove the `REFERENCE_DATE` setting and the `future_price_date` finding. Staleness is always measured from the dataset's latest valid `price_date`. |
 | 2026-11-21 | **Three distinct API roles.** (1) `GET /api/companies/{key}`: exact lookup by `COUNTRY:TICKER`, **case-insensitive**; record `id`s are not accepted. (2) `GET /api/companies?q=`: text matching on key, ticker and names, kept for picking a target and documented as not similarity. (3) A separate retrieval (peers) endpoint, company key → `k` similar companies with explanations, ships with stage 4. It is in addition to `/api/comps`, which remains the comps-table endpoint and does not replace it. Every endpoint gets a Swagger description. |
 | 2026-11-21 | Sequencing: the Swagger descriptions and this contract wording land first. The peers endpoint is added to `API.md` (next to the existing `/api/comps` section) in stage 4's contract PR. Whether comps take a free-text query is decided separately. |
-| 2026-11-21 | UI headings and labels use sentence case, preserving acronyms, company names and exact technical identifiers. |
+| 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
 
