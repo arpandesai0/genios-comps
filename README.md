@@ -41,8 +41,14 @@ Where the brief is silent, the service assumes the following:
 7. **Missing takes precedence over NM.** The glossary says both "a missing input gives blank, not NM" and "a zero or negative denominator gives NM". When both apply, the multiple is reported as missing (blank), with the missing fields listed. NM is used only when every input is present.
 8. **A zero or negative enterprise value is used as given.** EV multiples are shown as computed, so they can be negative, and they are included in the summary statistics. An info finding (`nonpositive_ev`) flags it. The glossary defines NM only for denominators.
 9. **Rounding.** Every value, including the summary statistics, is computed unrounded (apart from cleaning floating-point noise at 9 decimal places) and rounded to one decimal place only for display. A tie rounds half away from zero (12.25x → 12.3x).
-11. **Extreme inputs never break a comps table.** If a value overflows (it is too large to represent), it is shown as blank, excluded from the statistics, and flagged with a `non_finite_result` warning.
 10. **Summary statistics.** They cover the three multiples only. With an even number of peers, the median is the average of the two middle values. When no peer has a usable value, the statistics are blank.
+11. **Extreme inputs never break a comps table.** If a value overflows (it is too large to represent), it is shown as blank, excluded from the statistics, and flagged with a `non_finite_result` warning.
+12. **Money is shown in USD whenever the rates allow it.** The glossary says to convert everything to USD, but `fx_rates.json` has a `base` field, so a data file may use another base.
+    - Each rate is read as "units of the base per one unit of that currency". With base USD this is exactly the glossary's definition. The base itself is 1.0, whether or not it is listed; listing it at any other value is a blocking error.
+    - If the file gives a valid USD rate, values are converted to USD: a value `v` in currency `X` becomes `v × rate[X] / rate[USD]`. For example, with base EUR, `GBP: 1.17` and `USD: 0.93`, one GBP is 1.17 / 0.93 ≈ 1.26 USD.
+    - Otherwise, values are converted into the base currency (`v × rate[X]`). Market cap and EV are then shown in that currency and labelled with it, and a `currency_not_usd` warning says so. A USD rate that is zero, negative or not a number also raises `invalid_fx_rate`. The multiples are unchanged, because they are ratios.
+    - A currency with no rate in the file is a data issue: values in it are blank, with an `unknown_currency` finding.
+    - Only ingestion handles currency. Later stages use whatever currency it reports.
 
 ## Development
 
