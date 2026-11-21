@@ -16,7 +16,7 @@ Each stage talks to the next only through plain data types from `src/comps/model
 |---|---|---|---|---|---|
 | 1 | **Ingestion**: validate, normalize to USD, group by `COUNTRY:TICKER`, build time series | JSON files → `Dataset` of `Entity` + `Observation` + `Finding` | ✅ done | `ingest.py` | [ingestion.md](ingestion.md) |
 | 2 | **Quality**: checks across companies (same issuer, shared names, freshness) | entities → extra findings | ✅ done | `quality.py` | [ingestion.md § 6](ingestion.md#6-checks-across-companies-qualitypy) |
-| 3 | **Resolve**: turn an analyst's query (key, ticker or name) into one company, or a list to choose from | query → entity key(s) | ⏳ planned | `resolve.py` | |
+| 3 | **Resolve**: turn an analyst's query (key, ticker, exact name or alias, partial name) into the matching companies, best match first; the analyst always chooses the target, and comps take a key | query → entity key(s) with match type | ✅ done | `service.search`, served by `GET /api/companies` | [API.md](API.md#get-apicompanies) |
 | 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ⏳ planned | `retrieval/` | |
 | 5 | **Finance**: glossary metrics (ok, NM or missing), rounding, peer summary stats | `Observation` → `Metrics`; peers' `Metrics` → `Summary` | ✅ done | `finance.py` | [finance.md](finance.md) |
 | 6 | **Service**: build an immutable snapshot, swap it atomically, assemble comps responses | dataset → snapshot; request → comps response | 🟡 snapshot built at start-up and read-only queries; no swap, no comps yet | `service.py` | |
@@ -55,4 +55,5 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | #9 | Accuracy fixes: `missing_inputs` names every cause; the `text_updated` message says which value is used. |
 | #10 | Stages 6–7 (partial): read-only API on an immutable snapshot; `make start DIR=...` runs API + web with docker compose. |
 | #11 | Tests: end-to-end planted-defects acceptance test for ingestion and finance (no behaviour change). |
-| this PR | Stage 2: remove the `REFERENCE_DATE` setting and the `future_price_date` check; staleness is always measured from the latest `price_date` in the data. |
+| #13 | Stage 2: remove the `REFERENCE_DATE` setting and the `future_price_date` check; staleness is always measured from the latest `price_date` in the data. |
+| this PR | Stage 3: marked done as it is. Resolution is `service.search` behind `GET /api/companies`; the separate `resolve.py` module is dropped from the plan (docs only, no behaviour change). |
