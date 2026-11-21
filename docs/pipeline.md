@@ -53,4 +53,5 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | #7 | Pipeline, ingestion and finance docs. |
 | #8 | API contract: precise wording for `raw` and NM versus missing. |
 | #9 | Accuracy fixes: `missing_inputs` names every cause; the `text_updated` message says which value is used. |
-| this PR | Stages 6–7 (partial): read-only API on an immutable snapshot; `make start DIR=...` runs API + web with docker compose. |
+| #10 | Stages 6–7 (partial): read-only API on an immutable snapshot; `make start DIR=...` runs API + web with docker compose. |
+| this PR | Tests: end-to-end planted-defects acceptance test for ingestion and finance (no behaviour change). |

@@ -156,6 +156,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Until comps and ingest exist, the UI in API mode hides the Compare page and the "Add company" form, and `/` redirects to `/data`. Mock mode still shows everything. |
 | 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. A share-class sibling's mirror-image finding is not repeated. |
 | 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
+| 2026-11-21 | **Priorities: data normalization (input) and retrieval (output) matter most.** The pipeline's outputs must match the expected results exactly. Findings are supporting statistics: keep them accurate, but don't spend effort polishing their granularity. |
+| 2026-11-21 | An empty latest text value keeps raising both `text_from_older_record` and `text_updated` (current behaviour). Lower-case currency codes in `fx_rates.json` are upper-cased without a finding. |
 
 ## 5. Directory map
 
@@ -188,6 +190,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `scripts/dev/` | Developer notebooks and scripts for exploring modules against a local `DATA_DIR`. Commit notebooks with outputs cleared, because outputs would contain the supplied data. |
 | `web/` | Next.js + shadcn/ui front end, currently running on synthetic mocks. It talks to the API over HTTP only. |
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
+| `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
 | `eval/fixtures/` | Synthetic evaluation universe and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
 | `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=...` validates the data folder and runs the API (port 8000) and web (port 3000) containers. Data is mounted read-only. |
