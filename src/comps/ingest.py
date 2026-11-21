@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from comps import quality
 from comps.config import IngestConfig
@@ -41,6 +41,7 @@ SCHEMA_FIELDS = (
 TEXT_FIELDS = ("name", "description", "sector", "industry", "sub_industry", "fiscal_year_end")
 MONEY_FIELDS = ("total_debt", "cash", "revenue", "ebitda", "net_income")
 UNIT_FACTORS = {"millions": 1.0, "thousands": 0.001}
+UNKNOWN_COUNTRY = "*"
 
 _ALL_METRICS = ("market_cap_usd_m", "enterprise_value_usd_m", "ev_revenue", "ev_ebitda", "pe")
 _EV_METRICS = ("enterprise_value_usd_m", "ev_revenue", "ev_ebitda")
@@ -140,12 +141,21 @@ def build_dataset(
                 affects=("ingestion",),
             ))
             continue
-        normalized.append(normalize_record(raw, index=index, origin=origin, rates=rates, config=config))
+        record = normalize_record(raw, index=index, origin=origin, rates=rates)
+        if record.ticker is None:
+            # Assumption: the universe is public companies, so a record without a ticker is treated
+            # as not listed. There is no offline way to verify it, so it is excluded.
+            dataset_findings.append(Finding(
+                code="unlisted_excluded", severity="warning", fields=("ticker",),
+                message=f"Record {record.observation.record_id} has no ticker, so it is treated as not listed "
+                        "and excluded from the universe.",
+                affects=("universe",), record_ids=(record.observation.record_id,),
+            ))
+            continue
+        normalized.append(record)
 
     if not normalized:
         raise DatasetError("no usable company records", dataset_findings)
-
-    dataset_findings.extend(_duplicate_record_ids(normalized))
     entities = resolve_entities(normalized)
 
     reference_date = config.reference_date or max(
@@ -228,18 +238,14 @@ def normalize_record(
     index: int,
     origin: Origin,
     rates: Mapping[str, float],
-    config: IngestConfig,
 ) -> _Normalized:
     """Validate one record and normalize its values to USD. Never raises for bad values."""
     rid_raw = raw.get("id")
     record_id = rid_raw.strip() if isinstance(rid_raw, str) and rid_raw.strip() else f"#{index}"
     f = _FindingSink(record_id)
 
-    if record_id.startswith("#"):
-        f.add("missing_value" if rid_raw is None else "invalid_value", "limitation", ("id",),
-              f"Record #{index} has no usable id; it is referred to as {record_id}.", ("provenance",))
     for name in SCHEMA_FIELDS:
-        if name not in raw:
+        if name not in raw and name != "id":  # ids are internal provenance only
             f.add("missing_field", _severity(name), (name,), f"Field '{name}' is absent.", AFFECTS.get(name, ()))
     for name in raw:
         if name not in SCHEMA_FIELDS:
@@ -276,18 +282,8 @@ def normalize_record(
                  for k, v in raw_money.items()}
     usd = UsdValues(price=price * price_fx if price is not None and price_fx is not None else None, **usd_money)
 
-    too_big = [k for k, v in usd_money.items() if v is not None and abs(v) > config.implausible_money_usd_m]
-    if too_big:
-        f.add("implausible_scale", "warning", tuple(too_big),
-              f"{', '.join(too_big)} {'exceeds' if len(too_big) == 1 else 'exceed'} "
-              f"USD {config.implausible_money_usd_m:,.0f}m; possibly the wrong units. "
-              "Values are used as given, not rescaled.",
-              ("market_cap_usd_m", "enterprise_value_usd_m", "size_evidence"))
-
-    key = f"{country}:{ticker}" if ticker and country else f"RECORD:{record_id}"
-    if key.startswith("RECORD:"):
-        f.add("missing_identity", "limitation", ("ticker", "country"),
-              f"No usable ticker/country; kept as a standalone company under {key}.", ("identity",))
+    # A missing country gets the placeholder "*"; records without a ticker are dropped by the caller.
+    key = f"{country or UNKNOWN_COUNTRY}:{ticker}"
     findings = tuple(replace(x, entity_keys=(key,)) for x in f.items)
 
     observation = Observation(
@@ -429,19 +425,6 @@ def _units(raw, f) -> float | None:
 
 def _signature(obj: Mapping[str, Any]) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
-
-
-def _duplicate_record_ids(records: Iterable[_Normalized]) -> list[Finding]:
-    seen: dict[str, list[_Normalized]] = {}
-    for r in records:
-        if not r.observation.record_id.startswith("#"):
-            seen.setdefault(r.observation.record_id, []).append(r)
-    return [
-        Finding(code="duplicate_record_id", severity="warning", fields=("id",),
-                message=f"Record id {rid} appears {len(group)} times; provenance by id is ambiguous.",
-                affects=("provenance",), record_ids=(rid,), entity_keys=tuple(sorted({g.key for g in group})))
-        for rid, group in seen.items() if len(group) > 1
-    ]
 
 
 # --------------------------------------------------------------------------- entity resolution

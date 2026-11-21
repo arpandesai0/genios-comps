@@ -15,10 +15,8 @@ class IngestConfig:
     # service runs.
     reference_date: date | None = None
     # A price older than this many days before the reference date gets a "stale_price" warning.
+    # (a warning only; stale companies are still served)
     stale_after_days: int = 90
-    # Any USD money value above this (USD millions; 1,000,000 = USD 1 trillion) is flagged
-    # as a suspected unit/scale error. Values are flagged only, never rescaled.
-    implausible_money_usd_m: float = 1_000_000.0
 
 
 @dataclass(frozen=True)
@@ -35,6 +33,5 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         ingest=IngestConfig(
             reference_date=date.fromisoformat(ref) if ref else None,
             stale_after_days=int(env.get("STALE_AFTER_DAYS", "90")),
-            implausible_money_usd_m=float(env.get("IMPLAUSIBLE_MONEY_USD_M", "1000000")),
         ),
     )

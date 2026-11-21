@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from comps.ingest import build_dataset
+from comps.ingest import DatasetError, build_dataset
 from conftest import make_record
 
 
@@ -114,11 +114,11 @@ def test_nonpositive_denominators_are_kept_and_noted(fx):
     assert all(f.severity == "info" for f in notes)
 
 
-def test_implausible_scale_is_flagged_not_rescaled(fx):
+def test_large_numbers_are_taken_as_given(fx):
+    # Assumption: supplied numbers are the source of truth; no magnitude checks, no rescaling.
     o = only(ingest([make_record(revenue=3_000_000.0)], fx)).latest
     assert o.usd.revenue == 3_000_000.0
-    (f,) = [f for f in o.findings if f.code == "implausible_scale"]
-    assert f.fields == ("revenue",) and f.severity == "warning"
+    assert o.findings == ()
 
 
 def test_bad_dates_and_fiscal_year_end(fx):
@@ -133,10 +133,30 @@ def test_unexpected_field_is_preserved_and_noted(fx):
     assert codes(o.findings) == ["unexpected_field"]
 
 
-def test_missing_identity_keeps_record_standalone(fx):
-    ds = ingest([make_record(id="x1", ticker=None), make_record(id="x2", ticker=None)], fx)
-    assert sorted(ds.entities) == ["RECORD:x1", "RECORD:x2"]
-    assert "missing_identity" in codes(ds.entities["RECORD:x1"].latest.findings)
+@pytest.mark.parametrize("country", ["US", None])
+def test_record_without_ticker_is_treated_as_unlisted_and_excluded(fx, country):
+    ds = ingest([make_record(), make_record(id="x1", ticker=None, country=country, name="No Ticker Co")], fx)
+    assert list(ds.entities) == ["US:ACME"]
+    (f,) = ds.findings
+    assert (f.code, f.record_ids) == ("unlisted_excluded", ("x1",))
+
+
+def test_only_unlisted_records_is_blocking(fx):
+    with pytest.raises(DatasetError, match="no usable"):
+        ingest([make_record(ticker=None)], fx)
+
+
+def test_missing_country_uses_placeholder(fx):
+    e = only(ingest([make_record(country=None)], fx))
+    assert (e.key, e.country) == ("*:ACME", "")
+    assert [f.code for f in e.latest.findings] == ["missing_value"]
+
+
+def test_missing_id_is_not_a_finding(fx):
+    rec = make_record()
+    del rec["id"]
+    o = only(ingest([rec], fx)).latest
+    assert o.record_id == "#0" and o.findings == ()
 
 
 def test_missing_description_limits_retrieval(fx):

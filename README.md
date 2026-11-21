@@ -11,3 +11,15 @@ An analyst names the company they want to research. The service picks that compa
 The service reads its data from a folder it is given at start-up. It runs fully offline and starts with a single command.
 
 This project is under active development. Setup instructions, design notes and evaluation results will be added as each part lands.
+
+## Assumptions
+
+Where the brief is silent, the service assumes the following:
+
+1. **Identity is `country:ticker`.** Record `id`s are internal provenance only, so an `id` reused across records is not treated as a conflict.
+2. **A record without a ticker is not a listed company.** The brief describes a universe of public companies, and nothing available offline (no web search or LLM) can verify such a record, so it is excluded and reported as `unlisted_excluded`. This applies whether or not the record has a country.
+3. **A missing country becomes the placeholder `*`**, giving keys like `*:ACME`. The company is still served.
+4. **Records with the same key are appends to one company.** Each `price_date` is one observation in a time series, and comps use the latest observation. Text fields (name, description, classification) take the latest value; if the latest value is empty, the most recent non-empty value is used and flagged. Numbers are never carried over from another date. Records that are identical apart from their `id` collapse into one.
+5. **Supplied numbers are the source of truth.** Unusually large values are used as given. They are not flagged or rescaled. In production, values like these would go through human or automated review.
+6. **Stale prices are a warning, not a blocker.** A price more than 90 days older than the latest `price_date` in the dataset is flagged, and the company is still served. The reference date can be fixed with `REFERENCE_DATE` so results are reproducible.
+7. **NM takes precedence over missing.** When a multiple's denominator is zero or negative, it is reported as NM even if another input is missing, which is consistent with finance convention.

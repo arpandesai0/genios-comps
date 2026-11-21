@@ -108,10 +108,11 @@ def test_explicit_reference_date_and_future_prices(fx):
     assert codes(ds.entities["US:ACME"].findings) == ["future_price_date"]
 
 
-def test_duplicate_record_id_with_different_content_is_flagged(fx):
-    ds = build_dataset([make_record(id="dup", ticker="AAA"), make_record(id="dup", ticker="BBB", revenue=5.0)], fx)
-    (f,) = [f for f in ds.findings if f.code == "duplicate_record_id"]
-    assert f.entity_keys == ("US:AAA", "US:BBB")
+def test_reused_record_id_is_not_a_conflict(fx):
+    ds = build_dataset([make_record(id="dup", ticker="AAA", name="A Co"),
+                        make_record(id="dup", ticker="BBB", name="B Co", revenue=5.0)], fx)
+    assert sorted(ds.entities) == ["US:AAA", "US:BBB"]
+    assert ds.findings == ()
 
 
 def _view(ds):

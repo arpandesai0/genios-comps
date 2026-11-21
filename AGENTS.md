@@ -121,14 +121,18 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Same key with different content → text fields (name, description, labels) take the value with the latest `price_date`. A tie goes to the later record in the file and is logged as a conflict finding. A text-only change raises an info finding and keeps the previous value in provenance. |
 | 2026-11-21 | Numeric fields are kept as a **time series** of observations keyed by `price_date`. Comps use the **latest observation only**; fields are never mixed across dates. |
 | 2026-11-21 | Different keys with identical content → separate entities flagged **possible same issuer** (e.g. share classes). They are excluded from each other's peer lists and the reason is shown. |
-| 2026-11-21 | Suspected unit or scale errors (e.g. revenue above USD 1T): **flag only**, never rescale. |
+| 2026-11-21 | Supplied numbers are the source of truth: no magnitude or unit-error checks, never rescaled. |
+| 2026-11-21 | No ticker → treated as **not listed** and excluded (finding `unlisted_excluded`). Missing country → placeholder `*` (key `*:TICKER`). |
+| 2026-11-21 | Record `id`s may repeat; this is not a conflict. |
+| 2026-11-21 | Latest text value is empty → use the most recent non-empty value, with a finding (an append-style update). |
+| 2026-11-21 | Stale price (> 90 days before the dataset's latest price date) is a warning only; never blocks serving. |
 | 2026-11-21 | The user picks `k`. There is **no similarity floor or abstention**. |
 | 2026-11-21 | Retrieval = TF-IDF on descriptions. Size and geography are evidence, not ranking inputs. No hard industry filter. Valuation multiples are never used to select peers. |
 | 2026-11-21 | A derived classification-conflict warning comes from description neighbours. It is marked model-derived, and labels are never rewritten. |
 | 2026-11-21 | Manual company additions are **in-memory only**. They never touch the input files. |
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence. Push once each step is built and evaluated; the owner decides the next step after reviewing the results. |
-| 2026-11-21 | Glossary NM/missing precedence: if a required input is missing, the result is **missing** even when the denominator is ≤ 0. *(Proposed in the handoff; confirm with the owner before relying on it.)* |
+| 2026-11-21 | Glossary precedence: a zero or negative denominator gives **NM** even when another input is missing. |
 
 ## 5. Directory map
 
