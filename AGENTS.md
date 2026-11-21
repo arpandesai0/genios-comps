@@ -81,7 +81,14 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 
 ### Git and PRs
 
-- Use small PRs, one per step, each with a clear description, and merge each before the next builds on it. Work on a branch, never directly on `main`.
+- Use small PRs, one per step, each with a clear description. Work on a branch, never directly on `main`.
+- **Agents never merge PRs.** The owner reviews and merges every PR by hand. Agents must not run `gh pr merge`, enable auto-merge, add a PR to a merge queue, push to `main`, or merge one PR branch into another to get around this.
+- Work that depends on an unmerged PR waits. Tell the owner what is blocked and stop, unless the owner explicitly says to stack the next branch on the unmerged one. Elsewhere in this file, "fixed" or "landed" means merged to `main`.
+- Review loop for every PR:
+  1. **Open.** The authoring agent opens the PR once the step is complete and `make check` passes. If the step changes what is served, the PR must also include the updated eval result in `eval/results/` and its interpretation (see "Measure, don't assume").
+  2. **Review.** The authoring agent spawns a reviewer sub-agent on a smaller model than its own. The reviewer posts one GitHub review with event `COMMENT` (never `APPROVE` or `REQUEST_CHANGES`) and inline comments where possible. It never edits files, pushes or merges.
+  3. **Address.** The authoring agent answers every comment *in its thread*: either it pushes a fix and says which commit fixed it, or it explains why no change is needed. It reruns `make check` after the fixes. There is no second automated review unless the owner asks for one.
+  4. **Hand off.** The authoring agent tells the owner the PR is ready, summarising what was fixed and what was declined, and stops. The owner reviews manually and merges.
 - End every commit message with the trailer of the agent that actually wrote the change:
   - Claude: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
   - Codex: `Co-authored-by: Codex <codex@openai.com>`
@@ -131,7 +138,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | A derived classification-conflict warning comes from description neighbours. It is marked model-derived, and labels are never rewritten. |
 | 2026-11-21 | Manual company additions are **in-memory only**. They never touch the input files. |
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
-| 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence. Push once each step is built and evaluated; the owner decides the next step after reviewing the results. |
+| 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence **by the owner**. A PR is opened once its step is built (and, if it changes what is served, evaluated); the owner decides the next step after reviewing the results. |
+| 2026-11-21 | Agents never merge. Each PR gets a smaller-model sub-agent review; the authoring agent addresses the comments; the owner reviews and merges by hand. |
 | 2026-11-21 | Glossary precedence: a zero or negative denominator gives **NM** even when another input is missing. |
 
 ## 5. Directory map
