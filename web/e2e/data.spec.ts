@@ -4,7 +4,7 @@ test("manual record requires preview and persists only after Save", async ({
   page,
   request,
 }) => {
-  const key = `US:QA${Date.now()}`;
+  const key = `*:QA${Date.now()}`;
   const ticker = key.split(":")[1];
   await page.goto("/data");
   await page.getByRole("button", { name: "Add company", exact: true }).click();
@@ -12,7 +12,6 @@ test("manual record requires preview and persists only after Save", async ({
     "Record ID": `qa-${ticker}`,
     Ticker: ticker,
     "Company name": "QA Synthetic Software",
-    Country: "US",
     Sector: "Information Technology",
     Industry: "Software",
     "Sub-industry": "Application Software",

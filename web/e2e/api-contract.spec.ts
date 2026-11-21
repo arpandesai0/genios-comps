@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import fixture from "../mocks/synthetic-companies.json";
 import { expect, test } from "@playwright/test";
 
 test("mock search preserves ambiguous keys and rejects invalid peer counts", async ({
@@ -47,4 +50,29 @@ test("mock excludes siblings and computes peer-only summary after removal", asyn
   expect(text).toContain("US:NOMA");
   expect(text).not.toContain(removed);
   expect(text).toContain(updated.summary.ev_revenue.display.mean);
+});
+
+test("dataset hashes match fixture files and simultaneous duplicate saves add one record", async ({
+  request,
+}) => {
+  const before = await (await request.get("/api/dataset")).json();
+  for (const file of before.source.files) {
+    const bytes = readFileSync(`mocks/${file.name}`);
+    expect(file.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
+  }
+  const ticker = `RACE${Date.now()}`;
+  const data = { ...fixture[0], id: ticker, ticker };
+  const saved = await Promise.all(
+    [1, 2].map(async () => {
+      const response = await request.post("/api/ingest/records", { data });
+      expect(response.ok()).toBeTruthy();
+      return (await response.json()).resolution.action;
+    }),
+  );
+  expect(saved.sort()).toEqual(["create", "duplicate"]);
+  const after = await (await request.get("/api/dataset")).json();
+  expect(after.counts.manual_additions).toBe(
+    before.counts.manual_additions + 1,
+  );
+  expect(after.dataset_version).not.toBe(before.dataset_version);
 });

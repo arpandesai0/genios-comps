@@ -1,5 +1,7 @@
 /** Synthetic HTTP test double. Never imported by client components. Not the production ingestion/retrieval implementation. */
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import recordsJson from "./synthetic-companies.json";
 import fxRates from "./fx-rates.json";
 import type {
@@ -68,14 +70,20 @@ const stateKey = globalThis as typeof globalThis & {
 const additions = (stateKey.__geniosMockRecords ??= []);
 const hash = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const version = () => hash([fixtureRecords, additions]).slice(0, 12);
+const files = ["synthetic-companies.json", "fx-rates.json"].map((name) => ({
+  name,
+  sha256: createHash("sha256")
+    .update(readFileSync(join(process.cwd(), "mocks", name)))
+    .digest("hex"),
+}));
+const version = () => hash([files, additions]).slice(0, 12);
 const counts = (): Record<Severity, number> => ({
   error: 0,
   limitation: 0,
   warning: 0,
   info: 0,
 });
-const keyOf = (r: RawRecord) => `${r.country}:${r.ticker}`;
+const keyOf = (r: RawRecord) => `${r.country.trim() || "*"}:${r.ticker}`;
 const financialKeys = [
   "market_cap_usd_m",
   "enterprise_value_usd_m",
@@ -234,6 +242,18 @@ function buildEntities(extra?: RawRecord): EntityDetail[] {
     const latest = observations.at(-1)!;
     const resultMetrics = metrics(r, latest);
     const findings: Finding[] = [];
+    if (!r.country.trim()) {
+      findings.push(
+        finding(
+          r,
+          "missing_value",
+          "warning",
+          "Country is missing; the key uses *.",
+          ["country"],
+          [],
+        ),
+      );
+    }
     for (const f of numericFields)
       if (r[f] === null)
         findings.push(
@@ -328,7 +348,7 @@ function buildEntities(extra?: RawRecord): EntityDetail[] {
     return {
       key,
       ticker: r.ticker,
-      country: r.country,
+      country: r.country.trim() || "*",
       name: r.name,
       sector: r.sector,
       industry: r.industry,
@@ -475,19 +495,14 @@ function comps(
 function preview(record: RawRecord, entities: EntityDetail[]): IngestResult {
   const key = keyOf(record);
   const invalid: Finding[] = [];
-  if (
-    !record.country.trim() ||
-    !record.ticker.trim() ||
-    !record.id.trim() ||
-    !record.name.trim()
-  )
+  if (!record.ticker.trim() || !record.id.trim() || !record.name.trim())
     invalid.push(
       finding(
         record,
         "invalid_identity",
         "error",
-        "ID, country, ticker and name are required.",
-        ["id", "country", "ticker", "name"],
+        "ID, ticker and name are required.",
+        ["id", "ticker", "name"],
         [],
       ),
     );
@@ -632,9 +647,9 @@ export async function handleMock(
   const json = (body: unknown, status = 200) =>
     Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
   try {
-    const entities = buildEntities();
-    const params = new URL(request.url).searchParams;
     if (request.method === "GET") {
+      const entities = buildEntities();
+      const params = new URL(request.url).searchParams;
       if (path === "health")
         return json({
           status: "ok",
@@ -716,13 +731,7 @@ export async function handleMock(
           reference_date: referenceDate,
           source: {
             data_dir: "web/mocks (synthetic)",
-            files: [
-              {
-                name: "synthetic-companies.json",
-                sha256: hash(fixtureRecords),
-              },
-              { name: "fx-rates.json", sha256: hash(fxRates) },
-            ],
+            files,
           },
           counts: {
             records: fixtureRecords.length + additions.length,
@@ -768,7 +777,7 @@ export async function handleMock(
           422,
           "All RawRecord fields are required with the documented types.",
         );
-      const result = preview(body, entities);
+      const result = preview(body, buildEntities());
       if (path === "ingest/preview")
         return json({ ...result, dataset_version: version() });
       if (!result.accepted)

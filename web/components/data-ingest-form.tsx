@@ -13,7 +13,7 @@ const textFields = [
   ["id", "Record ID", "text"],
   ["ticker", "Ticker", "text"],
   ["name", "Company name", "text"],
-  ["country", "Country", "text"],
+  ["country", "Country (optional)", "text"],
   ["sector", "Sector", "text"],
   ["industry", "Industry", "text"],
   ["sub_industry", "Sub-industry", "text"],
@@ -149,7 +149,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
                   type={type}
                   value={values[key]}
                   onChange={(event) => update(key, event.target.value)}
-                  required
+                  required={key !== "country"}
                 />
               </label>
             ))}

@@ -130,7 +130,8 @@ export default function ComparePage() {
     },
     ...(Object.keys(metricLabels) as (keyof Metrics)[]).map((key) => ({
       id: key,
-      accessorFn: (p: Peer) => p.metrics[key].raw,
+      accessorFn: (p: Peer) => p.metrics[key].value ?? undefined,
+      sortUndefined: "last" as const,
       header: key === "enterprise_value_usd_m" ? "EV" : metricLabels[key],
       cell: ({ row }: { row: { original: Peer } }) => (
         <Metric metric={row.original.metrics[key]} />
