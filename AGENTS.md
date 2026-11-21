@@ -87,7 +87,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 - Review loop for every PR:
   1. **Open.** The authoring agent opens the PR once the step is complete and `make check` passes. If the step changes what is served, the PR must also include the updated eval result in `eval/results/` and its interpretation (see "Measure, don't assume").
   2. **Review.** The authoring agent spawns a reviewer sub-agent on a smaller model than its own. The reviewer posts one GitHub review with event `COMMENT` (never `APPROVE` or `REQUEST_CHANGES`) and inline comments where possible. It never edits files, pushes or merges.
-  3. **Address.** The authoring agent answers every comment *in its thread*: either it pushes a fix and says which commit fixed it, or it explains why no change is needed. It reruns `make check` after the fixes. There is no second automated review unless the owner asks for one.
+  3. **Address.** The authoring agent answers every comment *in its thread*: either it pushes a fix and says which commit fixed it, or it explains why no change is needed. It **resolves each thread it fixed**, and leaves declined threads open for the owner to judge. It reruns `make check` after the fixes. There is no second automated review unless the owner asks for one.
   4. **Hand off.** The authoring agent tells the owner the PR is ready, summarising what was fixed and what was declined, and stops. The owner reviews manually and merges.
 - End every commit message with the trailer of the agent that actually wrote the change:
   - Claude: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
@@ -140,6 +140,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence **by the owner**. A PR is opened once its step is built (and, if it changes what is served, evaluated); the owner decides the next step after reviewing the results. |
 | 2026-11-21 | Agents never merge. Each PR gets a smaller-model sub-agent review; the authoring agent addresses the comments; the owner reviews and merges by hand. |
+| 2026-11-21 | After replying to review comments, the authoring agent resolves the threads it fixed. Declined threads stay open for the owner. |
 | 2026-11-21 | ~~A zero or negative denominator gives NM even when another input is missing.~~ **Reversed the same day:** a missing input gives **missing** (blank) and takes precedence over NM, reading the glossary's "missing → blank, not NM" literally. NM only when every input is present and the denominator is ≤ 0. |
 | 2026-11-21 | Only `~/Downloads/genios-takehome` is ground truth. Every repo doc (this file included) is generated and is checked against the glossary before being relied on. |
 | 2026-11-21 | Zero or negative EV is used as given (multiples shown, included in stats) with an info finding `nonpositive_ev`. Extreme multiples are not flagged. |
