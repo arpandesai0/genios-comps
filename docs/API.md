@@ -17,7 +17,7 @@ This is the contract between the Python backend and the web UI. **Status: draft.
 type Severity = "error" | "limitation" | "warning" | "info";
 
 interface Finding {
-  code: string;               // e.g. "missing_value", "possible_same_issuer", "implausible_scale"
+  code: string;               // e.g. "missing_value", "possible_same_issuer", "stale_price"
   severity: Severity;
   message: string;            // human-readable
   fields: string[];           // affected record fields

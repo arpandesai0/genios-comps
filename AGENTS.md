@@ -121,14 +121,18 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Same key with different content → text fields (name, description, labels) take the value with the latest `price_date`. A tie goes to the later record in the file and is logged as a conflict finding. A text-only change raises an info finding and keeps the previous value in provenance. |
 | 2026-11-21 | Numeric fields are kept as a **time series** of observations keyed by `price_date`. Comps use the **latest observation only**; fields are never mixed across dates. |
 | 2026-11-21 | Different keys with identical content → separate entities flagged **possible same issuer** (e.g. share classes). They are excluded from each other's peer lists and the reason is shown. |
-| 2026-11-21 | Suspected unit or scale errors (e.g. revenue above USD 1T): **flag only**, never rescale. |
+| 2026-11-21 | Supplied numbers are the source of truth: no magnitude or unit-error checks, never rescaled. |
+| 2026-11-21 | No ticker → treated as **not listed** and excluded (finding `unlisted_excluded`). Missing country → placeholder `*` (key `*:TICKER`). |
+| 2026-11-21 | Record `id`s may repeat; this is not a conflict. |
+| 2026-11-21 | Latest text value is empty → use the most recent non-empty value, with a finding (an append-style update). |
+| 2026-11-21 | Stale price (> 90 days before the dataset's latest price date) is a warning only; never blocks serving. |
 | 2026-11-21 | The user picks `k`. There is **no similarity floor or abstention**. |
 | 2026-11-21 | Retrieval = TF-IDF on descriptions. Size and geography are evidence, not ranking inputs. No hard industry filter. Valuation multiples are never used to select peers. |
 | 2026-11-21 | A derived classification-conflict warning comes from description neighbours. It is marked model-derived, and labels are never rewritten. |
 | 2026-11-21 | Manual company additions are **in-memory only**. They never touch the input files. |
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence. Push once each step is built and evaluated; the owner decides the next step after reviewing the results. |
-| 2026-11-21 | Glossary NM/missing precedence: if a required input is missing, the result is **missing** even when the denominator is ≤ 0. *(Proposed in the handoff; confirm with the owner before relying on it.)* |
+| 2026-11-21 | Glossary precedence: a zero or negative denominator gives **NM** even when another input is missing. |
 
 ## 5. Directory map
 
@@ -142,10 +146,10 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `TIMELOG.md` *(planned)* | Rough breakdown of the time actually spent. |
 | `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test tools). |
 | `src/comps/` | The Python service package. |
-| `src/comps/config.py` *(planned)* | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
-| `src/comps/models.py` *(planned)* | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
-| `src/comps/ingest.py` *(planned)* | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
-| `src/comps/quality.py` *(planned)* | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
+| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
+| `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
+| `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
+| `src/comps/quality.py` | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
 | `src/comps/finance.py` *(planned)* | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
@@ -164,7 +168,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 ```bash
 uv venv -p 3.11 .venv && uv pip install -e '.[dev]'   # local setup
 .venv/bin/pytest                                     # tests
-DATA_DIR=~/Downloads/genios-takehome/data ...        # point at a data folder (service command TBD)
+uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
+DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
 ```
 
 Update this section as the service, evaluation, and Docker commands land.
