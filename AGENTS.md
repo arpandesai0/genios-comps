@@ -156,6 +156,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Until comps and ingest exist, the UI in API mode hides the Compare page and the "Add company" form, and `/` redirects to `/data`. Mock mode still shows everything. |
 | 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. A share-class sibling's mirror-image finding is not repeated. |
 | 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
+| 2026-11-21 | **Priorities: data normalization (input) and retrieval (output) matter most.** The pipeline's outputs must match the expected results exactly. Findings are supporting statistics: keep them accurate, but don't spend effort polishing their granularity. |
+| 2026-11-21 | An empty latest text value keeps raising both `text_from_older_record` and `text_updated` (current behaviour). Lower-case currency codes in `fx_rates.json` are upper-cased without a finding. |
 
 ## 5. Directory map
 
