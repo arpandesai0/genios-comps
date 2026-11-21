@@ -1,6 +1,6 @@
 # HTTP API contract (v0 draft)
 
-This is the contract between the Python backend and the web UI. **Status: draft.** The backend endpoints are not implemented yet, so the UI should be built against mocks that follow this document. If a field needs to change, change this file in its own PR first.
+This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps`, `/api/comps.csv` and `/api/ingest/*` are not yet: they return 404, and the UI keeps using mocks for them. If a field needs to change, change this file in its own PR first.
 
 ## Conventions
 

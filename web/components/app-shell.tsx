@@ -12,9 +12,10 @@ import {
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { features } from "@/lib/features";
 
 const destinations = [
-  { href: "/", name: "Compare", icon: BarChart3 },
+  ...(features.compare ? [{ href: "/", name: "Compare", icon: BarChart3 }] : []),
   { href: "/data", name: "Data", icon: Database },
 ];
 

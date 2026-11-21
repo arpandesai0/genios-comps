@@ -1,0 +1,20 @@
+# Keep the build context small, and never ship data, secrets or local state into an image.
+.git
+.venv
+.env*
+web
+data
+state
+*.db
+*.json
+scripts
+tests
+eval
+docs
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+*.egg-info
