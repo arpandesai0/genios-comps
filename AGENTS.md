@@ -169,15 +169,18 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/config.py` | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
-| `src/comps/quality.py` | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
+| `src/comps/quality.py` | Checks across companies: possible same issuer, shared names, stale and future price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
 | `src/comps/service.py` *(planned)* | Builds the immutable snapshot, swaps it atomically, and assembles comps responses. |
 | `src/comps/api.py` *(planned)* | FastAPI adapter that implements `docs/API.md`. |
+| `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
+| `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
+| `docs/finance.md` | Formulas, ok/NM/missing statuses, rounding and display, summary statistics, with worked examples. |
 | `docs/API.md` | HTTP contract shared by the backend and the UI. Change it in its own PR, before the code that depends on it. |
 | `scripts/dev/` | Developer notebooks and scripts for exploring modules against a local `DATA_DIR`. Commit notebooks with outputs cleared, because outputs would contain the supplied data. |
-| `web/` *(planned)* | Next.js + shadcn/ui front end. It talks to the API over HTTP only. |
+| `web/` | Next.js + shadcn/ui front end, currently running on synthetic mocks. It talks to the API over HTTP only. |
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
 | `eval/fixtures/` | Synthetic evaluation universe and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
