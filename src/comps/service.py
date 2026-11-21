@@ -89,3 +89,68 @@ def search(snapshot: Snapshot, q: str | None) -> list[tuple[CompanyView, Match |
             hits.append((c, match))
     hits.sort(key=lambda h: (_MATCH_ORDER[h[1]], h[0].entity.key))
     return [(c, m) for c, m in hits]
+
+
+# --- read-only queries (the API layer only parses parameters and serialises the results) ----------
+
+
+def list_companies(
+    snapshot: Snapshot,
+    q: str | None = None,
+    sector: str | None = None,
+    has_findings: Severity | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[tuple[CompanyView, Match | None]]]:
+    """Search, then filter by sector (case-insensitive) and by having a finding of a severity.
+
+    Returns the total number of matches and the requested page.
+    """
+    rows = search(snapshot, q)
+    if sector:
+        rows = [(c, m) for c, m in rows if (c.entity.sector or "").casefold() == sector.casefold()]
+    if has_findings:
+        rows = [(c, m) for c, m in rows if c.finding_counts[has_findings] > 0]
+    return len(rows), rows[offset : offset + limit]
+
+
+def list_findings(
+    snapshot: Snapshot,
+    severity: Severity | None = None,
+    code: str | None = None,
+    entity: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[int, list[Finding]]:
+    """Filter findings. With ``entity``, it returns exactly that company's own findings (the same list as
+    its company page), so a share-class sibling's mirror-image finding is not repeated."""
+    if entity is not None:
+        company = snapshot.companies.get(entity)
+        pool: tuple[Finding, ...] = company.findings if company else ()
+    else:
+        pool = snapshot.findings
+    items = [f for f in pool if (severity is None or f.severity == severity) and (code is None or f.code == code)]
+    return len(items), items[offset : offset + limit]
+
+
+@dataclass(frozen=True)
+class DatasetOverview:
+    records: int
+    entities: int
+    manual_additions: int
+    by_severity: dict[Severity, int]
+    by_code: list[tuple[str, Severity, str, int]]  # (code, severity, source, count), most frequent first
+
+
+def dataset_overview(snapshot: Snapshot) -> DatasetOverview:
+    by_severity = Counter(f.severity for f in snapshot.findings)
+    by_code = Counter((f.code, f.severity, f.source) for f in snapshot.findings)
+    return DatasetOverview(
+        records=snapshot.dataset.record_count,
+        entities=len(snapshot.companies),
+        manual_additions=int(snapshot.dataset.metadata.get("manual_records", 0)),
+        by_severity={s: by_severity.get(s, 0) for s in SEVERITIES},
+        by_code=[
+            (code, sev, src, n) for (code, sev, src), n in sorted(by_code.items(), key=lambda kv: (-kv[1], kv[0][0]))
+        ],
+    )

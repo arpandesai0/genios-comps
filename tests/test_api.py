@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from comps.api import create_app
 from comps.config import IngestConfig, Settings
+from comps.ingest import DatasetError
 from comps.service import build_snapshot
 from conftest import FX, make_record
 
@@ -117,3 +118,136 @@ def test_endpoints_not_built_yet_are_404(client):
     for path in ("/api/comps?target=US:ACME", "/api/comps.csv?target=US:ACME", "/api/ingest/records"):
         r = client.get(path)
         assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+
+
+# --- richer universe: sectors, same ticker in two countries, aliases, a share-class pair ---------------
+
+RICH = [
+    make_record(id="r1", ticker="ACME", country="US", name="Acme Widgets Inc", sector="Industrials"),
+    make_record(
+        id="r2",
+        ticker="ACME",
+        country="GB",
+        name="Acme Retail plc",
+        sector="Consumer",
+        description="Acme Retail runs shops.",
+        price_currency="GBP",
+        reporting_currency="GBP",
+    ),
+    make_record(
+        id="r3",
+        ticker="OLDN",
+        name="Old Name Corp",
+        description="Old name business.",
+        price_date="2026-07-01",
+        sector="Technology",
+    ),
+    make_record(
+        id="r4",
+        ticker="OLDN",
+        name="New Name Corp",
+        description="Old name business.",
+        price_date="2026-10-01",
+        sector="Technology",
+    ),
+    make_record(
+        id="r5",
+        ticker="BLT.A",
+        name="Bolt Class A",
+        description="Bolt makes fasteners.",
+        sector="Industrials",
+    ),
+    make_record(
+        id="r6",
+        ticker="BLT.B",
+        name="Bolt Class B",
+        description="Bolt makes fasteners.",
+        sector="Industrials",
+    ),
+]
+
+
+@pytest.fixture
+def rich(tmp_path):
+    (tmp_path / "companies.json").write_text(json.dumps(RICH))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
+    with TestClient(create_app(lambda: build_snapshot(settings))) as c:
+        yield c
+
+
+def keys(body):
+    return [i["key"] for i in body["items"]]
+
+
+def test_same_ticker_in_two_countries_both_match_by_ticker(rich):
+    body = rich.get("/api/companies", params={"q": "acme"}).json()
+    assert [(i["key"], i["match"]) for i in body["items"]] == [("GB:ACME", "ticker"), ("US:ACME", "ticker")]
+
+
+def test_search_precedence_key_before_ticker_before_names(rich):
+    # "US:ACME" is a key match only; "acme retail plc" is an exact name; "acme" partial would be a ticker.
+    assert rich.get("/api/companies", params={"q": "US:ACME"}).json()["items"][0]["match"] == "key"
+    assert rich.get("/api/companies", params={"q": "acme retail plc"}).json()["items"][0]["match"] == "name_exact"
+    partial = rich.get("/api/companies", params={"q": "bolt class"}).json()
+    assert [(i["key"], i["match"]) for i in partial["items"]] == [
+        ("US:BLT.A", "name_partial"),
+        ("US:BLT.B", "name_partial"),
+    ]  # ties ordered by key
+
+
+def test_search_finds_a_company_by_an_old_name(rich):
+    body = rich.get("/api/companies", params={"q": "old name corp"}).json()
+    assert [(i["key"], i["match"], i["name"]) for i in body["items"]] == [("US:OLDN", "name_exact", "New Name Corp")]
+
+
+def test_whitespace_query_lists_everything(rich):
+    body = rich.get("/api/companies", params={"q": "   "}).json()
+    assert body["total"] == 5 and all(i["match"] is None for i in body["items"])
+
+
+def test_sector_filter_is_case_insensitive_and_combines_with_search(rich):
+    assert keys(rich.get("/api/companies", params={"sector": "industrials"}).json()) == [
+        "US:ACME",
+        "US:BLT.A",
+        "US:BLT.B",
+    ]
+    both = rich.get("/api/companies", params={"q": "acme", "sector": "Consumer"}).json()
+    assert keys(both) == ["GB:ACME"]
+    warn = rich.get("/api/companies", params={"q": "bolt", "has_findings": "warning"}).json()
+    assert keys(warn) == ["US:BLT.A", "US:BLT.B"]  # possible_same_issuer
+
+
+def test_offset_past_the_end_gives_an_empty_page_with_the_total(rich):
+    body = rich.get("/api/companies", params={"offset": 99}).json()
+    assert (body["total"], body["items"]) == (5, [])
+
+
+def test_entity_findings_match_the_company_page(rich):
+    # Each share class has its own possible_same_issuer finding naming both keys; the entity filter
+    # returns only the company's own, so the counts agree with its page.
+    page = rich.get("/api/companies/US%3ABLT.A").json()
+    listed = rich.get("/api/dataset/findings", params={"entity": "US:BLT.A", "limit": 500}).json()
+    assert listed["total"] == len(page["findings"]) == sum(page["finding_counts"].values())
+    assert [f["code"] for f in listed["items"]].count("possible_same_issuer") == 1
+    assert rich.get("/api/dataset/findings", params={"entity": "US:NOPE"}).json()["total"] == 0
+
+
+def test_findings_severity_filter_and_offset(rich):
+    warnings = rich.get("/api/dataset/findings", params={"severity": "warning", "limit": 500}).json()
+    assert warnings["total"] >= 2 and all(f["severity"] == "warning" for f in warnings["items"])
+    second = rich.get("/api/dataset/findings", params={"severity": "warning", "limit": 1, "offset": 1}).json()
+    assert second["items"] == warnings["items"][1:2]
+
+
+def test_unknown_path_and_wrong_method_use_the_error_shape(rich):
+    r = rich.get("/api/nope")
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+    r = rich.post("/api/health")
+    assert r.status_code == 405 and r.json()["error"]["code"] == "invalid_request"
+
+
+def test_start_up_fails_clearly_on_an_unusable_data_folder(tmp_path):
+    settings = Settings(data_dir=tmp_path, ingest=IngestConfig())  # empty folder: no files
+    with pytest.raises(DatasetError, match="cannot read"), TestClient(create_app(lambda: build_snapshot(settings))):
+        pass

@@ -9,6 +9,13 @@ services:
       - ${DIR:?Set DIR to a folder containing companies.json and fx_rates.json}:/data:ro
     ports:
       - "8000:8000"
+    healthcheck:
+      # Healthy only once the data is ingested and the API answers. If ingestion fails, the
+      # container exits and the web UI is not started.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   web:
     build:
@@ -17,6 +24,7 @@ services:
         NEXT_PUBLIC_USE_MOCKS: "0"
         API_URL: http://api:8000
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "3000:3000"

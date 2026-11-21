@@ -266,7 +266,9 @@ export default function DataPage() {
         <div>
           <h1>Data & integrity</h1>
           <p className="muted mt-2">
-            Inspect the source, review findings and preview manual additions.
+            {features.manualIngest
+              ? "Inspect the source, review findings and preview manual additions."
+              : "Inspect the source and review findings."}
           </p>
         </div>
         {features.manualIngest && (

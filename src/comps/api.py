@@ -10,7 +10,6 @@ Not served yet: ``/api/comps``, ``/api/comps.csv`` and ``/api/ingest/*``. Those 
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -23,8 +22,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from comps.config import load_settings
-from comps.models import SEVERITIES, Finding, Metrics, MetricValue, Observation, Severity
-from comps.service import CompanyView, Snapshot, build_snapshot, search
+from comps.models import Finding, Metrics, MetricValue, Observation, Severity
+from comps.service import CompanyView, Snapshot, build_snapshot, dataset_overview, list_companies, list_findings
 
 
 def _iso(d: date | None) -> str | None:
@@ -144,30 +143,25 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         offset: int = Query(0, ge=0),
     ) -> dict[str, Any]:
         s = snap(request)
-        rows = search(s, q)
-        if sector:
-            rows = [(c, m) for c, m in rows if (c.entity.sector or "").casefold() == sector.casefold()]
-        if has_findings:
-            rows = [(c, m) for c, m in rows if c.finding_counts[has_findings] > 0]
-        page = rows[offset : offset + limit]
+        total, page = list_companies(s, q, sector, has_findings, limit, offset)
         return {
             "dataset_version": s.dataset.version,
-            "total": len(rows),
+            "total": total,
             "items": [{**summary_json(c), "match": m} for c, m in page],
         }
 
     @app.get("/api/companies/{key}")
     def company(request: Request, key: str) -> Any:
-        c = snap(request).companies.get(key)
+        s = snap(request)  # read the snapshot once, so the company and the version always agree
+        c = s.companies.get(key)
         if c is None:
             return _error(404, "not_found", f"No company with key {key!r}.")
-        return {"dataset_version": snap(request).dataset.version, **detail_json(c)}
+        return {"dataset_version": s.dataset.version, **detail_json(c)}
 
     @app.get("/api/dataset")
     def dataset(request: Request) -> dict[str, Any]:
         s = snap(request)
-        by_severity = Counter(f.severity for f in s.findings)
-        by_code = Counter((f.code, f.severity, f.source) for f in s.findings)
+        o = dataset_overview(s)
         return {
             "dataset_version": s.dataset.version,
             "reference_date": _iso(s.dataset.reference_date),
@@ -175,15 +169,10 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
                 "data_dir": str(s.data_dir),
                 "files": [{"name": f.name, "sha256": f.sha256} for f in s.dataset.files],
             },
-            "counts": {
-                "records": s.dataset.record_count,
-                "entities": len(s.companies),
-                "manual_additions": int(s.dataset.metadata.get("manual_records", 0)),
-            },
-            "findings_by_severity": {sev: by_severity.get(sev, 0) for sev in SEVERITIES},
+            "counts": {"records": o.records, "entities": o.entities, "manual_additions": o.manual_additions},
+            "findings_by_severity": o.by_severity,
             "findings_by_code": [
-                {"code": code, "severity": sev, "source": src, "count": n}
-                for (code, sev, src), n in sorted(by_code.items(), key=lambda kv: (-kv[1], kv[0][0]))
+                {"code": code, "severity": sev, "source": src, "count": n} for code, sev, src, n in o.by_code
             ],
         }
 
@@ -197,18 +186,8 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         offset: int = Query(0, ge=0),
     ) -> dict[str, Any]:
         s = snap(request)
-        items = [
-            f
-            for f in s.findings
-            if (severity is None or f.severity == severity)
-            and (code is None or f.code == code)
-            and (entity is None or entity in f.entity_keys)
-        ]
-        return {
-            "dataset_version": s.dataset.version,
-            "total": len(items),
-            "items": [finding_json(f) for f in items[offset : offset + limit]],
-        }
+        total, items = list_findings(s, severity, code, entity, limit, offset)
+        return {"dataset_version": s.dataset.version, "total": total, "items": [finding_json(f) for f in items]}
 
     return app
 
