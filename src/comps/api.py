@@ -14,9 +14,9 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import date
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Path, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -92,6 +92,11 @@ def detail_json(c: CompanyView) -> dict[str, Any]:
     }
 
 
+_ERROR_BODY = "Body: `{ error: { code, message, details } }`."
+_NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"description": f"Not found. {_ERROR_BODY}"}}
+_INVALID: dict[int | str, dict[str, Any]] = {422: {"description": f"Invalid query parameters. {_ERROR_BODY}"}}
+
+
 def _error(status: int, code: str, message: str, details: dict[str, Any] | None = None) -> JSONResponse:
     body = {"error": {"code": code, "message": message, "details": details or {}}}
     return JSONResponse(status_code=status, content=body)
@@ -106,7 +111,16 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         app.state.snapshot = factory()  # a DatasetError here stops start-up with a clear message
         yield
 
-    app = FastAPI(title="Comps service", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Comps service",
+        version="0.1.0",
+        description=(
+            "Read-only access to the ingested dataset. Company identity is the key `COUNTRY:TICKER`. "
+            "Similarity search (peers) and comps tables are not served yet. "
+            "The full contract is in `docs/API.md`."
+        ),
+        lifespan=lifespan,
+    )
 
     @app.exception_handler(StarletteHTTPException)
     def http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
@@ -122,7 +136,12 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         snapshot: Snapshot = request.app.state.snapshot
         return snapshot
 
-    @app.get("/api/health")
+    @app.get(
+        "/api/health",
+        tags=["service"],
+        summary="Service health",
+        description="Liveness check, with the dataset version and the number of companies and records loaded.",
+    )
     def health(request: Request) -> dict[str, Any]:
         s = snap(request)
         return {
@@ -133,14 +152,34 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
             "reference_date": _iso(s.dataset.reference_date),
         }
 
-    @app.get("/api/companies")
+    @app.get(
+        "/api/companies",
+        tags=["companies"],
+        summary="Find companies by key, ticker or name (text matching)",
+        description=(
+            "Text matching, **not** similarity search: it never returns peers or similar companies. "
+            "With `q`, each company is matched by its best rule, ignoring case: `key` (`q` equals "
+            "`COUNTRY:TICKER`), `ticker`, `name_exact` (current or old name) or `name_partial` "
+            "(substring of a current or old name). Results are sorted by match type, then key. "
+            "Every match is counted in `total` and paged by `limit`/`offset`; the caller chooses one. "
+            "Without `q` it lists all companies. "
+            "Use `GET /api/companies/{key}` for one company's full details."
+        ),
+        responses=_INVALID,
+    )
     def companies(
         request: Request,
-        q: str | None = None,
-        sector: str | None = None,
-        has_findings: Severity | None = None,
-        limit: int = Query(20, ge=1, le=200),
-        offset: int = Query(0, ge=0),
+        q: Annotated[
+            str | None, Query(description="Key, ticker, or full or partial company name.", examples=["IROV"])
+        ] = None,
+        sector: Annotated[
+            str | None, Query(description="Only companies in this sector (whole name, ignoring case).")
+        ] = None,
+        has_findings: Annotated[
+            Severity | None, Query(description="Only companies with a finding of this severity.")
+        ] = None,
+        limit: Annotated[int, Query(ge=1, le=200, description="Page size.")] = 20,
+        offset: Annotated[int, Query(ge=0, description="Number of results to skip.")] = 0,
     ) -> dict[str, Any]:
         s = snap(request)
         total, page = list_companies(s, q, sector, has_findings, limit, offset)
@@ -150,15 +189,36 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
             "items": [{**summary_json(c), "match": m} for c, m in page],
         }
 
-    @app.get("/api/companies/{key}")
-    def company(request: Request, key: str) -> Any:
+    @app.get(
+        "/api/companies/{key}",
+        tags=["companies"],
+        summary="Get one company by its exact key",
+        description=(
+            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`. Case-sensitive for now: write "
+            "the key as shown in results (`gb:irov` returns 404). A bare ticker (`IROV`) "
+            "or a name is not a key and returns 404: find the key with `GET /api/companies?q=` first. "
+            "Returns the company's details, observation history, metrics and findings."
+        ),
+        responses=_NOT_FOUND,
+    )
+    def company(
+        request: Request,
+        key: Annotated[str, Path(description="Company key `COUNTRY:TICKER`.", examples=["GB:IROV"])],
+    ) -> Any:
         s = snap(request)  # read the snapshot once, so the company and the version always agree
         c = s.companies.get(key)
         if c is None:
             return _error(404, "not_found", f"No company with key {key!r}.")
         return {"dataset_version": s.dataset.version, **detail_json(c)}
 
-    @app.get("/api/dataset")
+    @app.get(
+        "/api/dataset",
+        tags=["dataset"],
+        summary="Dataset overview",
+        description=(
+            "Source files and their hashes, record and company counts, and finding counts by severity and code."
+        ),
+    )
     def dataset(request: Request) -> dict[str, Any]:
         s = snap(request)
         o = dataset_overview(s)
@@ -176,14 +236,23 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
             ],
         }
 
-    @app.get("/api/dataset/findings")
+    @app.get(
+        "/api/dataset/findings",
+        tags=["dataset"],
+        summary="List data-quality findings",
+        description="Findings raised during ingestion, quality checks and finance, with optional filters.",
+        responses=_INVALID,
+    )
     def findings(
         request: Request,
-        severity: Severity | None = None,
-        code: str | None = None,
-        entity: str | None = None,
-        limit: int = Query(50, ge=1, le=500),
-        offset: int = Query(0, ge=0),
+        severity: Annotated[Severity | None, Query(description="Only findings of this severity.")] = None,
+        code: Annotated[str | None, Query(description="Only findings with this code (exact).")] = None,
+        entity: Annotated[
+            str | None,
+            Query(description="Only this company's own findings (exact, case-sensitive key; unknown key: no results)."),
+        ] = None,
+        limit: Annotated[int, Query(ge=1, le=500, description="Page size.")] = 50,
+        offset: Annotated[int, Query(ge=0, description="Number of results to skip.")] = 0,
     ) -> dict[str, Any]:
         s = snap(request)
         total, items = list_findings(s, severity, code, entity, limit, offset)
