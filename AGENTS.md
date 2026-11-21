@@ -147,6 +147,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Display: money `4,512.3` / `-1,234.5`; multiples `12.3x` / `-2.1x` / `1,234.5x`; NM shows `NM`; missing shows blank (null). |
 | 2026-11-21 | Summary stats only for the three multiples. Even-count median = average of the middle two. With no valid peer values, the stats are null (blank) and the n / n_nm / n_missing counts explain why. The caller passes peers only. |
 | 2026-11-21 | `missing_inputs` names the root record field: `price_currency`, `reporting_currency` or `units` when a conversion failed, otherwise the numeric field itself. |
+| 2026-11-21 | Float noise is cleaned at 9 dp (half away from zero) before the 1-dp display rounding and before the EV ≤ 0 check, so arithmetic ties such as 2.05 × 3 display as 6.2. `missing_inputs` is ordered numerator causes then denominator causes; within a field, the field then its conversion fields. |
+| 2026-11-21 | A non-finite result (float overflow from extreme inputs) becomes **missing**, with a warning finding `non_finite_result` listing every value it blanked. It is excluded from stats and never crashes the response. |
 
 ## 5. Directory map
 

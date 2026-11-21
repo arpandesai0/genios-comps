@@ -10,15 +10,18 @@ Rules (GLOSSARY.md plus owner decisions in AGENTS.md):
 - A missing input gives ``missing`` (blank), and this takes precedence over NM.
 - A negative EV is used as given, and a zero or negative EV raises an info finding.
 - Summary statistics use peers only (the caller passes only peers) and exclude NM and missing values.
-- Everything is computed unrounded. Display values are rounded to 1 dp, with ties rounded
-  half away from zero.
+- Everything is computed unrounded, apart from cleaning float noise at 9 dp. Display values are
+  rounded to 1 dp, with ties rounded half away from zero.
+- A result that is not finite (float overflow from extreme inputs) becomes ``missing``, with a
+  warning finding. It never crashes the comps table.
 """
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Callable, Sequence
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Context, Decimal
 
 from comps.models import (
     Finding,
@@ -31,16 +34,30 @@ from comps.models import (
 )
 
 _ONE_DP = Decimal("0.1")
+_NOISE_DP = Decimal("1e-9")
+# Enough precision to quantize any finite float (up to ~1.8e308) without InvalidOperation.
+_CTX = Context(prec=400, rounding=ROUND_HALF_UP)
 _MONEY_FIELDS = ("total_debt", "cash", "revenue", "ebitda", "net_income")
 
 
 # --- rounding and display ---------------------------------------------------------------------
 
 
+def clean(x: float) -> float:
+    """Remove float noise far below display precision (9 dp), ties away from zero.
+
+    For example 2.05 * 3 = 6.1499999999999995 becomes 6.15, so it later displays as 6.2.
+    ``x`` must be finite.
+    """
+    d = Decimal(repr(x)).quantize(_NOISE_DP, context=_CTX)
+    return float(d) if d != 0 else 0.0  # never -0.0
+
+
 def _quantize(x: float) -> Decimal:
-    # repr() gives the shortest decimal that round-trips, so 2.675 rounds as 2.675 and not as its
-    # binary approximation 2.67499... ROUND_HALF_UP in decimal rounds ties away from zero.
-    d = Decimal(repr(x)).quantize(_ONE_DP, rounding=ROUND_HALF_UP)
+    # Clean first, then round to 1 dp. repr() is the shortest decimal that round-trips, so ties are
+    # judged on the decimal value (0.35 -> 0.4), not on its binary approximation.
+    # ROUND_HALF_UP in decimal rounds ties away from zero.
+    d = Decimal(repr(clean(x))).quantize(_ONE_DP, context=_CTX)
     return d if d != 0 else Decimal("0.0")  # never show "-0.0"
 
 
@@ -64,6 +81,16 @@ def format_multiple(x: float) -> str:
 
 def _ok(raw: float, fmt: Callable[[float], str]) -> MetricValue:
     return MetricValue(status="ok", value=round_1dp(raw), display=fmt(raw), raw=raw)
+
+
+def _finite(x: float | None, metric: str, overflowed: list[str]) -> float | None:
+    """Return ``x`` cleaned of float noise, or None (recording ``metric``) when it is not finite."""
+    if x is None:
+        return None
+    if not math.isfinite(x):
+        overflowed.append(metric)
+        return None
+    return clean(x)
 
 
 def _missing(inputs: Sequence[str]) -> MetricValue:
@@ -113,28 +140,34 @@ def compute_metrics(obs: Observation) -> tuple[Metrics, tuple[Finding, ...]]:
     debt, m_debt = _value(obs, "total_debt")
     cash, m_cash = _value(obs, "cash")
 
+    overflowed: list[str] = []
     mc_missing = m_price + m_shares
-    mc = price * shares if price is not None and shares is not None else None
+    mc = _finite(price * shares if price is not None and shares is not None else None, "market_cap_usd_m", overflowed)
     ev_missing = mc_missing + m_debt + m_cash
-    ev = mc + debt - cash if mc is not None and debt is not None and cash is not None else None
+    ev = _finite(
+        mc + debt - cash if mc is not None and debt is not None and cash is not None else None,
+        "enterprise_value_usd_m",
+        overflowed,
+    )
 
     market_cap = _ok(mc, format_money) if mc is not None else _missing(mc_missing)
     enterprise_value = _ok(ev, format_money) if ev is not None else _missing(ev_missing)
 
-    def multiple(numerator: float | None, num_missing: list[str], denom_name: str) -> MetricValue:
+    def multiple(numerator: float | None, num_missing: list[str], denom_name: str, metric: str) -> MetricValue:
         denom, d_missing = _value(obs, denom_name)
         if numerator is None or denom is None:  # missing wins over NM
             return _missing(num_missing + d_missing)
         if denom <= 0:
             return _NM
-        return _ok(numerator / denom, format_multiple)
+        ratio = _finite(numerator / denom, metric, overflowed)
+        return _ok(ratio, format_multiple) if ratio is not None else _missing([])
 
     metrics = Metrics(
         market_cap_usd_m=market_cap,
         enterprise_value_usd_m=enterprise_value,
-        ev_revenue=multiple(ev, ev_missing, "revenue"),
-        ev_ebitda=multiple(ev, ev_missing, "ebitda"),
-        pe=multiple(mc, mc_missing, "net_income"),
+        ev_revenue=multiple(ev, ev_missing, "revenue", "ev_revenue"),
+        ev_ebitda=multiple(ev, ev_missing, "ebitda", "ev_ebitda"),
+        pe=multiple(mc, mc_missing, "net_income", "pe"),
     )
 
     findings: list[Finding] = []
@@ -149,6 +182,22 @@ def compute_metrics(obs: Observation) -> tuple[Metrics, tuple[Finding, ...]]:
                 ),
                 fields=("price", "shares_outstanding", "total_debt", "cash"),
                 affects=("enterprise_value_usd_m", "ev_revenue", "ev_ebitda"),
+                record_ids=(obs.record_id,),
+            )
+        )
+    if overflowed:
+        # Everything blanked by the overflow: the metric itself and anything computed from it.
+        blanked = tuple(n for n, v in vars(metrics).items() if v.status == "missing" and not v.missing_inputs)
+        findings.append(
+            Finding(
+                code="non_finite_result",
+                severity="warning",
+                message=(
+                    f"{', '.join(blanked)} could not be computed because the result is too large to "
+                    "represent (extreme input values). Shown as blank and excluded from summary statistics."
+                ),
+                fields=("price", "shares_outstanding", "total_debt", "cash", "revenue", "ebitda", "net_income"),
+                affects=blanked,
                 record_ids=(obs.record_id,),
             )
         )

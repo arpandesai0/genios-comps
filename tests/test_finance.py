@@ -140,9 +140,18 @@ def test_unknown_reporting_currency_and_units_name_the_root_causes(fx):
     assert m.ev_revenue.missing_inputs == ("reporting_currency", "units")
 
 
-def test_absent_field_and_failed_conversion_are_both_named(fx):
-    m = metrics(fx, revenue=None, reporting_currency="XYZ")
-    assert m.ev_revenue.missing_inputs == ("reporting_currency", "revenue")
+def test_missing_inputs_follow_formula_order_field_before_its_conversion(fx):
+    # Order: numerator causes, then denominator causes; within a field, the field then its conversion.
+    # P/E: market cap is fine, so only net income is blamed: the field, then its currency.
+    assert metrics(fx, net_income=None, reporting_currency="XYZ").pe.missing_inputs == (
+        "net_income",
+        "reporting_currency",
+    )
+    # EV/Revenue: the numerator EV already blames reporting_currency (via debt and cash), then revenue.
+    assert metrics(fx, revenue=None, reporting_currency="XYZ").ev_revenue.missing_inputs == (
+        "reporting_currency",
+        "revenue",
+    )
 
 
 # --- negative EV ------------------------------------------------------------------------------
@@ -168,6 +177,15 @@ def test_zero_ev_gives_zero_multiples_and_the_same_finding(fx):
     assert [f.code for f in findings] == ["nonpositive_ev"]
 
 
+def test_ev_zero_is_judged_after_cleaning_float_noise(fx):
+    # 0.1 x 30 = 3.0000000000000004 in floats; minus cash 3.0 gives 4e-16, not 0.
+    # Cleaned at 9 dp, EV is exactly 0, so the finding fires and EV/Rev shows 0.0x.
+    m, findings = compute_metrics(observation(fx, price=0.1, shares_outstanding=30.0, total_debt=0.0, cash=3.0))
+    assert m.enterprise_value_usd_m.raw == 0.0
+    assert m.ev_revenue.display == "0.0x"
+    assert [f.code for f in findings] == ["nonpositive_ev"]
+
+
 def test_positive_ev_raises_no_finding(fx):
     assert compute_metrics(observation(fx))[1] == ()
 
@@ -185,7 +203,9 @@ def test_ev_findings_need_a_computed_ev(fx):
         (12.25, 12.3),
         (-12.25, -12.3),
         (12.24, 12.2),
-        (2.675, 2.7),  # binary float is 2.67499..; repr-based rounding still sees the tie at .x5
+        (0.35, 0.4),  # binary 0.34999..; builtin round() gives 0.3
+        (0.45, 0.5),  # binary 0.45000..1; builtin round() gives 0.5 too, but by luck
+        (2.05 * 3, 6.2),  # arithmetic tie: 6.1499999999999995 is cleaned to 6.15 first
         (0.05, 0.1),
         (-0.04, 0.0),
         (1234.56, 1234.6),
@@ -237,10 +257,15 @@ def test_even_count_median_averages_the_middle_two():
 
 
 def test_stats_use_unrounded_values():
-    # Raw 1.04, 1.04, 1.07: mean 1.05 -> 1.1 (tie, away from zero). On rounded values 1.0, 1.0, 1.1
-    # the mean would be 1.0333 -> 1.0.
-    s = summarize_metric([ok(1.04), ok(1.04), ok(1.07)])
-    assert s.mean == 1.1 and s.display.mean == "1.1x"
+    # Raw 1.24 x4 and 1.9: mean 6.86 / 5 = 1.372 -> 1.4.
+    # On the displayed values 1.2 x4 and 1.9 the mean would be 6.7 / 5 = 1.34 -> 1.3.
+    s = summarize_metric([ok(1.24)] * 4 + [ok(1.9)])
+    assert s.mean == 1.4 and s.display.mean == "1.4x"
+
+
+def test_single_peer_stats_all_equal_its_value():
+    s = summarize_metric([ok(7.0)])
+    assert (s.n, s.mean, s.median, s.high, s.low) == (1, 7.0, 7.0, 7.0, 7.0)
 
 
 def test_negative_multiples_are_included():
@@ -265,3 +290,31 @@ def test_summarize_covers_the_three_multiples_of_the_peers_passed(fx):
     assert (s.ev_revenue.n, s.ev_revenue.mean) == (2, 3.2)
     assert (s.ev_ebitda.n, s.ev_ebitda.median) == (2, 12.0)
     assert (s.pe.n, s.pe.n_nm, s.pe.mean) == (1, 1, 25.0)
+
+
+# --- overflow -----------------------------------------------------------------------------------
+
+
+def test_overflowing_multiple_is_missing_with_a_warning(fx):
+    # EV 2,400 / revenue 1e-320 overflows to inf: blank, excluded from stats, never a crash.
+    m, findings = compute_metrics(observation(fx, revenue=1e-320))
+    assert (m.ev_revenue.status, m.ev_revenue.display, m.ev_revenue.missing_inputs) == ("missing", None, ())
+    assert m.ev_ebitda.status == "ok"
+    (f,) = findings
+    assert (f.code, f.severity, f.affects) == ("non_finite_result", "warning", ("ev_revenue",))
+    assert summarize([m]).ev_revenue.n_missing == 1
+
+
+def test_overflowing_market_cap_blanks_everything_built_on_it(fx):
+    # 1e200 x 1e200 = inf, so market cap, EV and all three multiples are blank.
+    m, findings = compute_metrics(observation(fx, price=1e200, shares_outstanding=1e200))
+    assert all(v.status == "missing" for v in vars(m).values())
+    (f,) = findings
+    assert set(f.affects) == {"market_cap_usd_m", "enterprise_value_usd_m", "ev_revenue", "ev_ebitda", "pe"}
+
+
+def test_huge_finite_values_still_round_and_display(fx):
+    # 1e30 has more digits than decimal's default precision; it must not raise.
+    m = metrics(fx, price=1e15, shares_outstanding=1e15)
+    assert m.market_cap_usd_m.status == "ok"
+    assert m.market_cap_usd_m.display == "1" + ",000" * 10 + ".0"
