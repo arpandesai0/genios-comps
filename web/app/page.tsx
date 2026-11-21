@@ -1,4 +1,5 @@
 "use client";
+import { sentenceLabel } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import {
   Download,
@@ -149,7 +150,9 @@ export default function ComparePage() {
                 className={`severity-${f.severity}`}
                 title={f.message}
               >
-                {f.source === "derived" ? "model-derived" : f.severity}
+                {f.source === "derived"
+                  ? "Model-derived"
+                  : sentenceLabel(f.severity)}
               </Badge>
             ))
           ) : (
@@ -201,7 +204,7 @@ export default function ComparePage() {
       accessorKey: "stat",
       header: "Statistic",
       cell: ({ row }) => (
-        <span className="capitalize">{row.original.stat}</span>
+        <span>{sentenceLabel(row.original.stat)}</span>
       ),
     },
     ...(["ev_revenue", "ev_ebitda", "pe"] as const).map((key) => ({
@@ -414,7 +417,7 @@ export default function ComparePage() {
           <section className="panel summary-panel">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">PEERS ONLY</p>
+                <p className="eyebrow">Peers only</p>
                 <h2>Valuation summary</h2>
               </div>
               <span className="muted">NM and missing values excluded</span>
@@ -503,7 +506,7 @@ export default function ComparePage() {
           {evidence && (
             <div className="sheet-stack">
               <section className="evidence-score">
-                <p className="eyebrow">DESCRIPTION SIMILARITY SCORE</p>
+                <p className="eyebrow">Description similarity score</p>
                 <strong>{evidence.evidence.similarity}</strong>
                 <p className="muted">A similarity score, not a probability.</p>
               </section>
@@ -521,9 +524,7 @@ export default function ComparePage() {
                   {Object.entries(evidence.evidence.classification).map(
                     ([key, v]) => (
                       <div key={key}>
-                        <dt className="capitalize">
-                          {key.replaceAll("_", " ")}
-                        </dt>
+                        <dt>{sentenceLabel(key)}</dt>
                         <dd>{v ? "Match" : "No match"}</dd>
                       </div>
                     ),
