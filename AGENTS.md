@@ -150,6 +150,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | `missing_inputs` names the root record field: `price_currency`, `reporting_currency` or `units` when a conversion failed, otherwise the numeric field itself. |
 | 2026-11-21 | Float noise is cleaned at 9 dp (half away from zero) before the 1-dp display rounding and before the EV ≤ 0 check, so arithmetic ties such as 2.05 × 3 display as 6.2. `missing_inputs` is ordered numerator causes then denominator causes; within a field, the field then its conversion fields. |
 | 2026-11-21 | A non-finite result (float overflow from extreme inputs) becomes **missing**, with a warning finding `non_finite_result` listing every value it blanked. It is excluded from stats and never crashes the response. |
+| 2026-11-21 | **General rule: serve no data rather than incorrect data.** This includes partial explanations. So `missing_inputs` names an unusable field *and* its failed conversion (e.g. `["total_debt", "reporting_currency"]`), and finding messages must say which value is actually used. |
 
 ## 5. Directory map
 

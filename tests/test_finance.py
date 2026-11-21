@@ -318,3 +318,16 @@ def test_huge_finite_values_still_round_and_display(fx):
     m = metrics(fx, price=1e15, shares_outstanding=1e15)
     assert m.market_cap_usd_m.status == "ok"
     assert m.market_cap_usd_m.display == "1" + ",000" * 10 + ".0"
+
+
+def test_invalid_field_and_failed_conversion_are_both_named(fx):
+    # Owner rule: never serve a partial explanation. Debt -5 is invalid, and the reporting currency is
+    # unknown, so both causes are listed (field first, then its conversion).
+    m = metrics(fx, total_debt=-5.0, reporting_currency="XYZ")
+    assert m.enterprise_value_usd_m.missing_inputs == ("total_debt", "reporting_currency")
+
+
+def test_wrong_type_field_and_failed_conversion_are_both_named(fx):
+    # P/E isolates one field: market cap is fine, net income is a string and units are invalid.
+    m = metrics(fx, net_income="80", units="billions")
+    assert m.pe.missing_inputs == ("net_income", "units")

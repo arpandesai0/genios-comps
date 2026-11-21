@@ -33,6 +33,7 @@ Each stage talks to the next only through plain data types from `src/comps/model
 
 ## Rules that hold across the whole pipeline
 
+- **Serve no data rather than incorrect data.** A blank value, or a complete explanation, beats a guessed or partial one.
 - **Never silently change data.** No imputing, rescaling, zero-filling or reclassifying. Every such case becomes a finding with a code, severity, fields and affected outputs.
 - **Model-derived signals are labelled.** A finding produced by a model or heuristic has `source: "derived"` and is never presented as fact.
 - **Valuation multiples never choose peers.** Retrieval doesn't see finance output, and finance doesn't know how peers were picked.
@@ -49,4 +50,6 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | #4 | Process: the review loop, where agents never merge. |
 | #5 | Stage 8 (partial): Compare and Data views built against synthetic mocks of [API.md](API.md). |
 | #6 | Stage 5: finance (metrics, statuses, rounding, summary statistics). |
-| this PR | Pipeline, ingestion and finance docs. |
+| #7 | Pipeline, ingestion and finance docs. |
+| #8 | API contract: precise wording for `raw` and NM versus missing. |
+| this PR | Accuracy fixes: `missing_inputs` names every cause; the `text_updated` message says which value is used. |

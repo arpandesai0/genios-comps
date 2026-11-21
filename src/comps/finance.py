@@ -38,6 +38,8 @@ _NOISE_DP = Decimal("1e-9")
 # Enough precision to quantize any finite float (up to ~1.8e308) without InvalidOperation.
 _CTX = Context(prec=400, rounding=ROUND_HALF_UP)
 _MONEY_FIELDS = ("total_debt", "cash", "revenue", "ebitda", "net_income")
+# Ingestion finding codes meaning the field's own value is unusable (absent, null, wrong type, out of range).
+_UNUSABLE_CODES = frozenset({"missing_field", "missing_value", "invalid_type", "invalid_value"})
 
 
 # --- rounding and display ---------------------------------------------------------------------
@@ -107,8 +109,9 @@ def _dedupe(items: Sequence[str]) -> tuple[str, ...]:
 def _causes(obs: Observation, name: str) -> list[str]:
     """The record fields to blame when the USD value of ``name`` is unavailable.
 
-    If a currency or units conversion failed, those root fields are named. The field itself is named
-    when it is absent or invalid in the record, or when no conversion failed.
+    Every cause is named, so the explanation is never partial: the field itself when ingestion found
+    it absent, null or invalid, then any failed currency or units conversion. If neither applies,
+    the field itself is named.
     """
     c = obs.conversion
     if name == "price":
@@ -117,7 +120,8 @@ def _causes(obs: Observation, name: str) -> list[str]:
         conversion = (["reporting_currency"] if c.reporting_fx is None else []) + (
             ["units"] if c.unit_factor is None else []
         )
-    own = [name] if (obs.original.get(name) is None or not conversion) else []
+    unusable = any(f.code in _UNUSABLE_CODES and name in f.fields for f in obs.findings)
+    own = [name] if (unusable or obs.original.get(name) is None or not conversion) else []
     return own + conversion
 
 
