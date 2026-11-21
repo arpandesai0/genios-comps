@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-21",
+  "scope": "Title Case for UI headings and labels, superseding sentence case",
+  "checks": {
+    "make_check": {
+      "passed": true,
+      "tests_passed": 159
+    },
+    "web_eslint": {
+      "passed": true
+    },
+    "web_typescript": {
+      "passed": true
+    },
+    "playwright": {
+      "passed": true,
+      "tests_passed": 7,
+      "mode": "synthetic mocks",
+      "browser": "installed Chrome",
+      "port": 3101
+    }
+  },
+  "interpretation": {
+    "improved": "Headings now explicitly render Data & Integrity and Dataset Health; buttons, table headers, form labels and generated labels follow Title Case. Browser assertions cover the reported headings.",
+    "regressions": "None detected by existing suites. Prose, company names, identifiers and financial calculations are preserved.",
+    "tradeoff": "Static copy updates and a shared generated-label formatter; no added dependency.",
+    "limits": "Presentation regression verification, not a retrieval quality measurement."
+  }
+}

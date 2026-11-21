@@ -34,14 +34,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="sidebar-toggle"
             variant="ghost"
             size="icon"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             aria-expanded={!collapsed}
             aria-controls="workspace-sidebar"
             onClick={() => setCollapsed(!collapsed)}
           >
             <PanelLeft size={17} />
           </Button>
-          <Link href="/" className="brand" aria-label="Genios home">
+          <Link href="/" className="brand" aria-label="Genios Home">
             <span className="brand-icon">
               <Layers3 size={15} />
             </span>
@@ -56,8 +56,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="topbar-actions">
           <span className="environment">
             {process.env.NEXT_PUBLIC_USE_MOCKS !== "0"
-              ? "Synthetic mock data"
-              : "API mode"}
+              ? "Synthetic Mock Data"
+              : "API Mode"}
           </span>
           <Button
             variant="ghost"
@@ -66,14 +66,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               setDark(!dark);
               document.documentElement.classList.toggle("dark", !dark);
             }}
-            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={dark ? "Switch to Light Mode" : "Switch to Dark Mode"}
           >
             {dark ? <Sun size={16} /> : <Moon size={16} />}
           </Button>
         </div>
       </header>
       <aside className="sidebar" id="workspace-sidebar">
-        <nav aria-label="Main navigation">
+        <nav aria-label="Main Navigation">
           {destinations.map(({ href, name, icon: Icon }) => (
             <Link
               key={href}
