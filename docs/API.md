@@ -6,7 +6,8 @@ This is the contract between the Python backend and the web UI. **Status:** the 
 
 - Base path: `/api`. JSON in and out, except the CSV export.
 - **Company key**: `COUNTRY:TICKER`, e.g. `US:NOMA`. This is the company's identity. Record `id`s are internal provenance only. URL-encode the key in paths (`US%3ANOMA`).
-- Money values are in **USD millions**. Multiples are plain ratios.
+- Money values are in **millions of the dataset currency**, given as `currency` in every response that carries money. The dataset currency is **USD** whenever `fx_rates.json` provides a USD rate (always true when its `base` is USD). If the base is another currency and no USD rate is given, it is the base currency, and a dataset-level `currency_not_usd` finding says so. Ingestion decides the currency; no other stage converts anything.
+- Multiples (EV/Revenue, EV/EBITDA, P/E) and the revenue ratio are plain ratios. They are the same in any currency.
 - The backend rounds every value for display (one decimal place, as the glossary requires). The UI shows `display` as given and **never re-rounds**. `raw` is the value before display rounding (only float noise below 9 decimal places is cleaned), for calculation traces only.
 - Errors look like `{"error": {"code": "not_found" | "invalid_request" | "rejected", "message": "...", "details": {}}}` and use HTTP status codes 404, 422 or 409.
 - Every response that depends on data includes `dataset_version`, a short hash of the input files plus any in-memory additions.
@@ -38,8 +39,8 @@ interface MetricValue {
 }
 
 interface Metrics {
-  market_cap_usd_m: MetricValue;
-  enterprise_value_usd_m: MetricValue;
+  market_cap_m: MetricValue;            // millions of the dataset currency
+  enterprise_value_m: MetricValue;      // millions of the dataset currency
   ev_revenue: MetricValue;
   ev_ebitda: MetricValue;
   pe: MetricValue;
@@ -62,7 +63,7 @@ interface Observation {
   origin: "file" | "manual";
   price_date: string | null;
   original: Record<string, unknown>;  // the record exactly as supplied
-  usd: {                               // normalized; null when it can't be computed
+  normalized: {                        // in the dataset currency (price per share, money in millions); null when it can't be computed
     price: number | null;
     total_debt: number | null;
     cash: number | null;
@@ -74,6 +75,7 @@ interface Observation {
 }
 
 interface EntityDetail extends EntitySummary {
+  currency: string;                   // dataset currency of `metrics` and every `normalized` block
   description: string | null;
   fiscal_year_end: string | null;
   aliases: string[];                  // every name seen for this key
@@ -106,7 +108,7 @@ interface RawRecord {
 ## Endpoints
 
 ### `GET /api/health`
-Returns `{ "status": "ok", "dataset_version": string, "entities": number, "records": number, "reference_date": string }`.
+Returns `{ "status": "ok", "dataset_version": string, "currency": string, "entities": number, "records": number, "reference_date": string }`.
 
 ### `GET /api/companies`
 Search and list companies. Used both for target search (with ambiguity) and for the data table.
@@ -128,6 +130,7 @@ To remove a peer, the UI calls the endpoint again with that key added to `exclud
 ```ts
 interface CompsResponse {
   dataset_version: string;
+  currency: string;                          // dataset currency of market cap and EV
   method: { name: string; version: string };
   k: number;
   target: { entity: EntitySummary; metrics: Metrics; findings: Finding[] };
@@ -141,7 +144,7 @@ interface CompsResponse {
       shared_terms: string[];                // description terms that drove the match
       classification: { sector: boolean; industry: boolean; sub_industry: boolean };
       country_match: boolean;
-      revenue_ratio: number | null;          // peer revenue / target revenue (USD); null if unavailable
+      revenue_ratio: number | null;          // peer revenue / target revenue (same currency); null if unavailable
       limitations: string[];                 // finding codes affecting this peer's metrics
     };
   }[];
@@ -157,7 +160,7 @@ interface CompsResponse {
 Errors: 404 for an unknown target, 422 for an invalid `k` or `exclude`.
 
 ### `GET /api/comps.csv`
-Same parameters as `/api/comps`. Returns `text/csv` with the target row, the peer rows (key, name, rank, similarity, market cap, EV, EV/Revenue, EV/EBITDA, P/E using display values) and the summary rows.
+Same parameters as `/api/comps`. Returns `text/csv` with the target row, the peer rows (key, name, rank, similarity, market cap, EV (headers name the currency, e.g. `Market cap (USD m)`), EV/Revenue, EV/EBITDA, P/E using display values) and the summary rows.
 
 ### `GET /api/dataset`
 Data-health overview.
@@ -165,6 +168,8 @@ Data-health overview.
 ```ts
 {
   dataset_version: string;
+  currency: string;                          // dataset currency (see Conventions)
+  fx: { base: string };                      // base currency as given in fx_rates.json
   reference_date: string;                    // date used for freshness checks
   source: { data_dir: string; files: { name: string; sha256: string }[] };
   counts: { records: number; entities: number; manual_additions: number };
