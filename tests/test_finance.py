@@ -331,3 +331,13 @@ def test_wrong_type_field_and_failed_conversion_are_both_named(fx):
     # P/E isolates one field: market cap is fine, net income is a string and units are invalid.
     m = metrics(fx, net_income="80", units="billions")
     assert m.pe.missing_inputs == ("net_income", "units")
+
+
+def test_invalid_price_and_unknown_price_currency_are_both_named(fx):
+    m = metrics(fx, price=-1.0, price_currency="XYZ")
+    assert m.market_cap_usd_m.missing_inputs == ("price", "price_currency")
+
+
+def test_field_with_both_conversions_failing_names_all_three(fx):
+    m = metrics(fx, net_income=None, reporting_currency="XYZ", units="billions")
+    assert m.pe.missing_inputs == ("net_income", "reporting_currency", "units")

@@ -124,6 +124,7 @@ Records are grouped by key and sorted by (`price_date`, position in the input). 
 - An older value that changed gives `text_updated` (info). All versions are kept in `text_history`.
 - If two records on the **latest** date disagree, the later record in the input wins, with `conflicting_attributes` (warning).
 - If the latest value is empty, the most recent non-empty value is used, with `text_from_older_record` (info). This handles append-style updates.
+- A blank is never counted as a change or a conflict. Only non-empty values are compared, and a conflict message names the value actually used.
 
 **d. Aliases.** Every distinct name seen for the key is kept, for search.
 

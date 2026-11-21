@@ -143,13 +143,54 @@ def test_manual_records_change_the_version_and_are_marked(fx):
     assert added.metadata["manual_records"] == 1
 
 
-def test_text_updated_message_says_which_value_is_used_after_a_fallback(fx):
-    # The latest description is blank, so the older one is used; the message must not claim "latest".
+def test_blank_latest_text_is_a_fallback_not_a_change(fx):
+    # Same description, then a blank: the value never changed, so only text_from_older_record is raised.
     ds = build_dataset(
         [make_record(id="c1", price_date="2026-07-01"), make_record(id="c2", price_date="2026-10-01", description=" ")],
         fx,
     )
     (e,) = ds.entities.values()
+    assert e.description == make_record()["description"]
+    assert "text_from_older_record" in codes(e.findings)
+    assert "text_updated" not in codes(e.findings)
+    assert e.text_history == ()
+
+
+def test_text_updated_message_says_which_value_is_used_after_a_fallback(fx):
+    # "a" then "b" then a blank: a real change, and the value used is "b", not the latest (blank).
+    ds = build_dataset(
+        [
+            make_record(id="d1", price_date="2026-06-01", description="Makes widgets."),
+            make_record(id="d2", price_date="2026-07-01", description="Makes widgets and sensors."),
+            make_record(id="d3", price_date="2026-10-01", description=""),
+        ],
+        fx,
+    )
+    (e,) = ds.entities.values()
+    assert e.description == "Makes widgets and sensors."
     (updated,) = [f for f in e.findings if f.code == "text_updated"]
     assert "most recent non-empty value" in updated.message
     assert "using the latest value" not in updated.message
+
+
+def test_blank_on_the_latest_date_is_not_a_conflict(fx):
+    ds = build_dataset([make_record(id="e1", description="Alpha."), make_record(id="e2", description=None)], fx)
+    (e,) = ds.entities.values()
+    assert e.description == "Alpha."
+    assert "conflicting_attributes" not in codes(e.findings)
+
+
+def test_conflict_message_names_the_value_actually_used(fx):
+    # Same date: "Alpha.", "Beta.", then a blank. The value used is "Beta." (latest record with a value).
+    ds = build_dataset(
+        [
+            make_record(id="g1", description="Alpha."),
+            make_record(id="g2", description="Beta."),
+            make_record(id="g3", description=""),
+        ],
+        fx,
+    )
+    (e,) = ds.entities.values()
+    assert e.description == "Beta."
+    (conflict,) = [f for f in e.findings if f.code == "conflicting_attributes"]
+    assert "'Beta.' from the latest record on that date that has a value" in conflict.message

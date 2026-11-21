@@ -577,7 +577,8 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
     text: dict[str, str | None] = {}
     history: list[TextVersion] = []
     for name in TEXT_FIELDS:
-        values = {r.text[name] for r in distinct}
+        # A blank is not a change or a conflict: it falls back to the most recent non-empty value.
+        values = {r.text[name] for r in distinct if r.text[name] is not None}
         text[name] = latest.text[name]
         from_older = False
         if text[name] is None:
@@ -600,7 +601,11 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
         history.extend(
             TextVersion(name, r.text[name], r.observation.record_id, r.observation.price_date) for r in distinct
         )
-        tied = {r.text[name] for r in distinct if r.observation.price_date == latest.observation.price_date}
+        tied = {
+            r.text[name]
+            for r in distinct
+            if r.observation.price_date == latest.observation.price_date and r.text[name] is not None
+        }
         ids = tuple(r.observation.record_id for r in distinct)
         if len(tied) > 1:
             findings.append(
@@ -608,8 +613,8 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
                     code="conflicting_attributes",
                     severity="warning",
                     fields=(name,),
-                    message=f"Records with the same latest price_date disagree on {name}; using the later record's "
-                    f"value {text[name]!r}.",
+                    message=f"Records with the same latest price_date disagree on {name}; using {text[name]!r} from "
+                    "the latest record on that date that has a value.",
                     affects=AFFECTS.get(name, ()),
                     record_ids=ids,
                     entity_keys=(key,),
