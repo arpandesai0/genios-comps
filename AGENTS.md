@@ -151,6 +151,9 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Float noise is cleaned at 9 dp (half away from zero) before the 1-dp display rounding and before the EV ≤ 0 check, so arithmetic ties such as 2.05 × 3 display as 6.2. `missing_inputs` is ordered numerator causes then denominator causes; within a field, the field then its conversion fields. |
 | 2026-11-21 | A non-finite result (float overflow from extreme inputs) becomes **missing**, with a warning finding `non_finite_result` listing every value it blanked. It is excluded from stats and never crashes the response. |
 | 2026-11-21 | **General rule: serve no data rather than incorrect data.** This includes partial explanations. So `missing_inputs` names an unusable field *and* its failed conversion (e.g. `["total_debt", "reporting_currency"]`), and finding messages must say which value is actually used. |
+| 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). |
+| 2026-11-21 | `make start DIR=<folder>` runs **docker compose** (API + web). `DIR` is required and must contain `companies.json` and `fx_rates.json`; there is no default path. `make stop` stops it. |
+| 2026-11-21 | Until comps and ingest exist, the UI in API mode hides the Compare page and the "Add company" form, and `/` redirects to `/data`. Mock mode still shows everything. |
 
 ## 5. Directory map
 
@@ -174,8 +177,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
-| `src/comps/service.py` *(planned)* | Builds the immutable snapshot, swaps it atomically, and assembles comps responses. |
-| `src/comps/api.py` *(planned)* | FastAPI adapter that implements `docs/API.md`. |
+| `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints. Snapshot swapping and comps assembly come later. |
+| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps and ingest return 404. |
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
 | `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
 | `docs/finance.md` | Formulas, ok/NM/missing statuses, rounding and display, summary statistics, with worked examples. |
@@ -185,7 +188,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
 | `eval/fixtures/` | Synthetic evaluation universe and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
-| `Dockerfile`, `docker-compose.yml` *(planned)* | One-command offline startup (`docker compose up`) for the API and web containers. |
+| `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=...` validates the data folder and runs the API (port 8000) and web (port 3000) containers. Data is mounted read-only. |
 
 ## 6. Commands
 
@@ -197,6 +200,7 @@ make format                                          # apply ruff fixes and form
 pre-commit install                                   # optional: ruff and nbstripout on each commit
 uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
+make start DIR=~/Downloads/genios-takehome/data      # API + web via docker compose; make stop to stop
 ```
 
 Update this section as the service, evaluation, and Docker commands land.

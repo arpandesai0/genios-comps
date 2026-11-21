@@ -12,6 +12,22 @@ The service reads its data from a folder it is given at start-up. It runs fully 
 
 This project is under active development. Setup instructions, design notes and evaluation results will be added as each part lands.
 
+## Setup and running
+
+You need Docker. The service reads its data from a folder you name at start-up. The folder must contain `companies.json` and `fx_rates.json`.
+
+```bash
+make start DIR=/path/to/data     # builds and starts the API and the web UI
+make stop                        # stops them
+```
+
+- UI: <http://localhost:3000>. It opens the **Data** view: dataset health, every company, and each company's observation history, normalized USD values, conversion factors, metrics and findings.
+- API: <http://localhost:8000/api/health>. The endpoints are described in [`docs/API.md`](docs/API.md).
+- **Using a different data file:** point `DIR` at another folder with the same two files. The data is mounted read-only and never copied into an image.
+- **Reproducible results:** optionally set `REFERENCE_DATE=YYYY-MM-DD` (e.g. `REFERENCE_DATE=2026-10-01 make start DIR=...`) to pin the date used for stale-price checks.
+
+Status: the read-only data endpoints are served. Comps (peer selection) and manual additions are not built yet, so the Compare page and the "Add company" form are hidden when the UI talks to the real API.
+
 ## Assumptions
 
 Where the brief is silent, the service assumes the following:
@@ -36,6 +52,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.11.
 make install     # create .venv and install the package with dev tools
 make check       # lint, typecheck and tests (the same checks CI runs)
 make format      # apply ruff fixes and formatting
+DATA_DIR=/path/to/data .venv/bin/uvicorn comps.api:app --reload   # API only, without Docker
 ```
 
 CI runs four workflows on every pull request and push to `main`: `lint`, `typecheck`, `tests` (Python 3.11 and 3.12, with a coverage report) and `repo-hygiene` (notebooks cleared, no supplied data or local state committed).

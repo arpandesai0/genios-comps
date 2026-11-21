@@ -19,9 +19,9 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | 3 | **Resolve**: turn an analyst's query (key, ticker or name) into one company, or a list to choose from | query → entity key(s) | ⏳ planned | `resolve.py` | |
 | 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ⏳ planned | `retrieval/` | |
 | 5 | **Finance**: glossary metrics (ok, NM or missing), rounding, peer summary stats | `Observation` → `Metrics`; peers' `Metrics` → `Summary` | ✅ done | `finance.py` | [finance.md](finance.md) |
-| 6 | **Service**: build an immutable snapshot, swap it atomically, assemble comps responses | dataset → snapshot; request → comps response | ⏳ planned | `service.py` | |
-| 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | ⏳ planned | `api.py` | [API.md](API.md) |
-| 8 | **UI**: Next.js + shadcn/ui compare view and data-health view | HTTP only | 🟡 built against synthetic mocks; not wired to the real API | `web/` | |
+| 6 | **Service**: build an immutable snapshot, swap it atomically, assemble comps responses | dataset → snapshot; request → comps response | 🟡 snapshot built at start-up and read-only queries; no swap, no comps yet | `service.py` | |
+| 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | 🟡 read-only endpoints (health, dataset, findings, companies); comps and ingest return 404 | `api.py` | [API.md](API.md) |
+| 8 | **UI**: Next.js + shadcn/ui compare view and data-health view | HTTP only | 🟡 Data view wired to the real API (`make start`); Compare and "Add company" hidden until served | `web/` | |
 
 ## What each hand-off carries
 
@@ -52,4 +52,5 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | #6 | Stage 5: finance (metrics, statuses, rounding, summary statistics). |
 | #7 | Pipeline, ingestion and finance docs. |
 | #8 | API contract: precise wording for `raw` and NM versus missing. |
-| this PR | Accuracy fixes: `missing_inputs` names every cause; the `text_updated` message says which value is used. |
+| #9 | Accuracy fixes: `missing_inputs` names every cause; the `text_updated` message says which value is used. |
+| this PR | Stages 6–7 (partial): read-only API on an immutable snapshot; `make start DIR=...` runs API + web with docker compose. |

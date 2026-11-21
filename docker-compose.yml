@@ -1,0 +1,22 @@
+# `make start DIR=/path/to/data` runs this. DIR must contain companies.json and fx_rates.json.
+services:
+  api:
+    build: .
+    environment:
+      DATA_DIR: /data
+      REFERENCE_DATE: ${REFERENCE_DATE:-}
+    volumes:
+      - ${DIR:?Set DIR to a folder containing companies.json and fx_rates.json}:/data:ro
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_USE_MOCKS: "0"
+        API_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"

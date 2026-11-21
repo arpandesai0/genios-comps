@@ -14,6 +14,7 @@ import type {
 import { DataTable } from "@/components/data-table";
 import { CompanyDetail } from "@/components/company-detail";
 import { DataIngestForm } from "@/components/data-ingest-form";
+import { features } from "@/lib/features";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -268,15 +269,17 @@ export default function DataPage() {
             Inspect the source, review findings and preview manual additions.
           </p>
         </div>
-        <Button
-          onClick={() => setShowAdd(!showAdd)}
-          aria-expanded={showAdd}
-          aria-controls="add-company-section"
-        >
-          {showAdd ? "Close addition form" : "Add company"}
-        </Button>
+        {features.manualIngest && (
+          <Button
+            onClick={() => setShowAdd(!showAdd)}
+            aria-expanded={showAdd}
+            aria-controls="add-company-section"
+          >
+            {showAdd ? "Close addition form" : "Add company"}
+          </Button>
+        )}
       </header>
-      {showAdd && (
+      {features.manualIngest && showAdd && (
         <div id="add-company-section">
           <DataIngestForm
             onSaved={() => {
