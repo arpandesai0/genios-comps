@@ -154,6 +154,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). |
 | 2026-11-21 | `make start DIR=<folder>` runs **docker compose** (API + web). `DIR` is required and must contain `companies.json` and `fx_rates.json`; there is no default path. `make stop` stops it. |
 | 2026-11-21 | Until comps and ingest exist, the UI in API mode hides the Compare page and the "Add company" form, and `/` redirects to `/data`. Mock mode still shows everything. |
+| 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. A share-class sibling's mirror-image finding is not repeated. |
+| 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
 
 ## 5. Directory map
 
