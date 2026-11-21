@@ -7,7 +7,7 @@ This is the contract between the Python backend and the web UI. **Status: draft.
 - Base path: `/api`. JSON in and out, except the CSV export.
 - **Company key**: `COUNTRY:TICKER`, e.g. `US:NOMA`. This is the company's identity. Record `id`s are internal provenance only. URL-encode the key in paths (`US%3ANOMA`).
 - Money values are in **USD millions**. Multiples are plain ratios.
-- The backend rounds every value for display (one decimal place, as the glossary requires). The UI shows `display` as given and **never re-rounds**. `raw` is the unrounded value, for calculation traces only.
+- The backend rounds every value for display (one decimal place, as the glossary requires). The UI shows `display` as given and **never re-rounds**. `raw` is the value before display rounding (only float noise below 9 decimal places is cleaned), for calculation traces only.
 - Errors look like `{"error": {"code": "not_found" | "invalid_request" | "rejected", "message": "...", "details": {}}}` and use HTTP status codes 404, 422 or 409.
 - Every response that depends on data includes `dataset_version`, a short hash of the input files plus any in-memory additions.
 
@@ -27,14 +27,14 @@ interface Finding {
   entity_keys: string[];
 }
 
-type MetricStatus = "ok" | "nm" | "missing";   // NM = zero/negative denominator; missing = input unavailable
+type MetricStatus = "ok" | "nm" | "missing";   // NM = zero/negative denominator with all inputs present; missing = an input is unavailable (wins over NM), or the result overflowed (see non_finite_result)
 
 interface MetricValue {
   status: MetricStatus;
   value: number | null;       // rounded to 1 dp; null unless status = "ok"
   display: string | null;     // "12.3x", "4,512.3", "NM", or null (show blank)
-  raw: number | null;         // unrounded
-  missing_inputs: string[];   // e.g. ["ebitda"] when status = "missing"
+  raw: number | null;         // before display rounding (float noise cleaned at 9 dp)
+  missing_inputs: string[];   // e.g. ["ebitda"] when status = "missing"; empty on overflow (a non_finite_result finding explains it)
 }
 
 interface Metrics {
