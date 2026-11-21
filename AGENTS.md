@@ -87,7 +87,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 - Review loop for every PR:
   1. **Open.** The authoring agent opens the PR once the step is complete and `make check` passes. If the step changes what is served, the PR must also include the updated eval result in `eval/results/` and its interpretation (see "Measure, don't assume").
   2. **Review.** The authoring agent spawns a reviewer sub-agent on a smaller model than its own. The reviewer posts one GitHub review with event `COMMENT` (never `APPROVE` or `REQUEST_CHANGES`) and inline comments where possible. It never edits files, pushes or merges.
-  3. **Address.** The authoring agent answers every comment *in its thread*: either it pushes a fix and says which commit fixed it, or it explains why no change is needed. It reruns `make check` after the fixes. There is no second automated review unless the owner asks for one.
+  3. **Address.** The authoring agent answers every comment *in its thread*: either it pushes a fix and says which commit fixed it, or it explains why no change is needed. It **resolves each thread it fixed**, and leaves declined threads open for the owner to judge. It reruns `make check` after the fixes. There is no second automated review unless the owner asks for one.
   4. **Hand off.** The authoring agent tells the owner the PR is ready, summarising what was fixed and what was declined, and stops. The owner reviews manually and merges.
 - End every commit message with the trailer of the agent that actually wrote the change:
   - Claude: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
@@ -140,7 +140,16 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence **by the owner**. A PR is opened once its step is built (and, if it changes what is served, evaluated); the owner decides the next step after reviewing the results. |
 | 2026-11-21 | Agents never merge. Each PR gets a smaller-model sub-agent review; the authoring agent addresses the comments; the owner reviews and merges by hand. |
-| 2026-11-21 | Glossary precedence: a zero or negative denominator gives **NM** even when another input is missing. |
+| 2026-11-21 | After replying to review comments, the authoring agent resolves the threads it fixed. Declined threads stay open for the owner. |
+| 2026-11-21 | ~~A zero or negative denominator gives NM even when another input is missing.~~ **Reversed the same day:** a missing input gives **missing** (blank) and takes precedence over NM, reading the glossary's "missing → blank, not NM" literally. NM only when every input is present and the denominator is ≤ 0. |
+| 2026-11-21 | Only `~/Downloads/genios-takehome` is ground truth. Every repo doc (this file included) is generated and is checked against the glossary before being relied on. |
+| 2026-11-21 | Zero or negative EV is used as given (multiples shown, included in stats) with an info finding `nonpositive_ev`. Extreme multiples are not flagged. |
+| 2026-11-21 | Rounding: compute everything (summary stats included) on unrounded values; round to 1 dp only for display, ties **half away from zero** (12.25 → 12.3, −12.25 → −12.3). Never show `-0.0`. |
+| 2026-11-21 | Display: money `4,512.3` / `-1,234.5`; multiples `12.3x` / `-2.1x` / `1,234.5x`; NM shows `NM`; missing shows blank (null). |
+| 2026-11-21 | Summary stats only for the three multiples. Even-count median = average of the middle two. With no valid peer values, the stats are null (blank) and the n / n_nm / n_missing counts explain why. The caller passes peers only. |
+| 2026-11-21 | `missing_inputs` names the root record field: `price_currency`, `reporting_currency` or `units` when a conversion failed, otherwise the numeric field itself. |
+| 2026-11-21 | Float noise is cleaned at 9 dp (half away from zero) before the 1-dp display rounding and before the EV ≤ 0 check, so arithmetic ties such as 2.05 × 3 display as 6.2. `missing_inputs` is ordered numerator causes then denominator causes; within a field, the field then its conversion fields. |
+| 2026-11-21 | A non-finite result (float overflow from extreme inputs) becomes **missing**, with a warning finding `non_finite_result` listing every value it blanked. It is excluded from stats and never crashes the response. |
 
 ## 5. Directory map
 
@@ -161,7 +170,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/quality.py` | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
-| `src/comps/finance.py` *(planned)* | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
+| `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
 | `src/comps/service.py` *(planned)* | Builds the immutable snapshot, swaps it atomically, and assembles comps responses. |

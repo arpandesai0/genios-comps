@@ -305,7 +305,8 @@ def normalize_record(
                 "nonpositive_denominator",
                 "info",
                 (name,),
-                f"{name} is {v:g}, so {metric} will be NM (not meaningful).",
+                f"{name} is {v:g} (zero or negative), so {metric} will be NM (not meaningful) "
+                "unless another input it needs is missing.",
                 (metric,),
             )
 

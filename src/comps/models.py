@@ -133,3 +133,62 @@ class Dataset:
             for o in e.observations + e.superseded:
                 out.extend(o.findings)
         return out
+
+
+# --- Finance outputs -------------------------------------------------------------------------
+
+MetricStatus = Literal["ok", "nm", "missing"]
+
+
+@dataclass(frozen=True)
+class MetricValue:
+    """One computed metric.
+
+    ``ok``: computed; ``nm``: zero or negative denominator (all inputs present);
+    ``missing``: an input is unavailable (this takes precedence over ``nm``).
+    ``value`` is rounded to 1 dp for display and ``raw`` is unrounded; both are None unless ``ok``.
+    """
+
+    status: MetricStatus
+    value: float | None
+    display: str | None
+    raw: float | None
+    missing_inputs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Metrics:
+    market_cap_usd_m: MetricValue
+    enterprise_value_usd_m: MetricValue
+    ev_revenue: MetricValue
+    ev_ebitda: MetricValue
+    pe: MetricValue
+
+
+@dataclass(frozen=True)
+class StatDisplay:
+    mean: str | None
+    median: str | None
+    high: str | None
+    low: str | None
+
+
+@dataclass(frozen=True)
+class SummaryStat:
+    """Peer-only statistics for one multiple, computed on unrounded values and rounded to 1 dp."""
+
+    n: int
+    n_nm: int
+    n_missing: int
+    mean: float | None
+    median: float | None
+    high: float | None
+    low: float | None
+    display: StatDisplay
+
+
+@dataclass(frozen=True)
+class Summary:
+    ev_revenue: SummaryStat
+    ev_ebitda: SummaryStat
+    pe: SummaryStat
