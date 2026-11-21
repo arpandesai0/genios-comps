@@ -81,7 +81,13 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 
 ### Git and PRs
 
-- Use small PRs, one per step, each with a clear description, and merge each before the next builds on it. Work on a branch, never directly on `main`.
+- Use small PRs, one per step, each with a clear description. Work on a branch, never directly on `main`.
+- **Agents never merge PRs.** The owner reviews and merges every PR by hand. Work that builds on an unmerged PR waits for the merge.
+- Review loop for every PR:
+  1. The authoring agent opens the PR once the step is complete and `make check` passes.
+  2. A reviewer sub-agent running a smaller model reviews the diff and leaves GitHub review comments. It doesn't push code.
+  3. The authoring agent addresses every comment: it pushes a fix, or replies with the reason no change is needed.
+  4. The owner does a manual review and merges.
 - End every commit message with the trailer of the agent that actually wrote the change:
   - Claude: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
   - Codex: `Co-authored-by: Codex <codex@openai.com>`
@@ -132,6 +138,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Manual company additions are **in-memory only**. They never touch the input files. |
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence. Push once each step is built and evaluated; the owner decides the next step after reviewing the results. |
+| 2026-11-21 | Agents never merge. Each PR gets a smaller-model sub-agent review; the authoring agent addresses the comments; the owner reviews and merges by hand. |
 | 2026-11-21 | Glossary precedence: a zero or negative denominator gives **NM** even when another input is missing. |
 
 ## 5. Directory map
