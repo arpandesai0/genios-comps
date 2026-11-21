@@ -161,7 +161,8 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
             "With `q`, each company is matched by its best rule, ignoring case: `key` (`q` equals "
             "`COUNTRY:TICKER`), `ticker`, `name_exact` (current or old name) or `name_partial` "
             "(substring of a current or old name). Results are sorted by match type, then key. "
-            "Every match is returned and the caller chooses one. Without `q` it lists all companies. "
+            "Every match is counted in `total` and paged by `limit`/`offset`; the caller chooses one. "
+            "Without `q` it lists all companies. "
             "Use `GET /api/companies/{key}` for one company's full details."
         ),
         responses=_INVALID,
@@ -171,7 +172,9 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         q: Annotated[
             str | None, Query(description="Key, ticker, or full or partial company name.", examples=["IROV"])
         ] = None,
-        sector: Annotated[str | None, Query(description="Only companies in this sector (exact).")] = None,
+        sector: Annotated[
+            str | None, Query(description="Only companies in this sector (whole name, ignoring case).")
+        ] = None,
         has_findings: Annotated[
             Severity | None, Query(description="Only companies with a finding of this severity.")
         ] = None,
@@ -191,7 +194,8 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         tags=["companies"],
         summary="Get one company by its exact key",
         description=(
-            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`. A bare ticker (`IROV`) "
+            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`. Case-sensitive for now: write "
+            "the key as shown in results (`gb:irov` returns 404). A bare ticker (`IROV`) "
             "or a name is not a key and returns 404: find the key with `GET /api/companies?q=` first. "
             "Returns the company's details, observation history, metrics and findings."
         ),
@@ -242,8 +246,11 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
     def findings(
         request: Request,
         severity: Annotated[Severity | None, Query(description="Only findings of this severity.")] = None,
-        code: Annotated[str | None, Query(description="Only findings with this code.")] = None,
-        entity: Annotated[str | None, Query(description="Only this company's own findings (exact key).")] = None,
+        code: Annotated[str | None, Query(description="Only findings with this code (exact).")] = None,
+        entity: Annotated[
+            str | None,
+            Query(description="Only this company's own findings (exact, case-sensitive key; unknown key: no results)."),
+        ] = None,
         limit: Annotated[int, Query(ge=1, le=500, description="Page size.")] = 50,
         offset: Annotated[int, Query(ge=0, description="Number of results to skip.")] = 0,
     ) -> dict[str, Any]:

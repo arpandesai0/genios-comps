@@ -258,5 +258,8 @@ def test_every_endpoint_is_described_in_openapi(client):
     for path, ops in paths.items():
         for op in ops.values():
             assert op.get("summary") and op.get("description"), path
-    assert "not** similarity" in paths["/api/companies"]["get"]["description"]
+    search = paths["/api/companies"]["get"]
+    assert "similarity" in search["description"].lower()
+    assert all(param.get("description") for param in search["parameters"])
+    assert "422" in search["responses"]
     assert "404" in paths["/api/companies/{key}"]["get"]["responses"]
