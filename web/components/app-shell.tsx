@@ -1,77 +1,95 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BarChart3, Database, Layers3, Moon, Sun } from "lucide-react";
+import {
+  BarChart3,
+  Database,
+  Layers3,
+  Moon,
+  PanelLeft,
+  Sun,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const destinations = [
+  { href: "/", name: "Compare", icon: BarChart3 },
+  { href: "/data", name: "Data", icon: Database },
+];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [dark, setDark] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const current = destinations.find(({ href }) => href === path)?.name;
   return (
-    <div className={dark ? "app-shell dark" : "app-shell"}>
-      <aside className="sidebar">
-        <Link href="/" className="brand">
-          <span className="brand-icon">
-            <Layers3 size={22} />
+    <div
+      className={`app-shell${dark ? " dark" : ""}${collapsed ? " sidebar-collapsed" : ""}`}
+    >
+      <header className="topbar">
+        <div className="topbar-location">
+          <Button
+            className="sidebar-toggle"
+            variant="ghost"
+            size="icon"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            aria-controls="workspace-sidebar"
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            <PanelLeft size={17} />
+          </Button>
+          <Link href="/" className="brand" aria-label="Genios home">
+            <span className="brand-icon">
+              <Layers3 size={15} />
+            </span>
+            Genios
+          </Link>
+          {current && (
+            <span className="breadcrumb">
+              <span aria-hidden="true">/</span> {current}
+            </span>
+          )}
+        </div>
+        <div className="topbar-actions">
+          <span className="environment">
+            {process.env.NEXT_PUBLIC_USE_MOCKS !== "0"
+              ? "Synthetic mock data"
+              : "API mode"}
           </span>
-          <span>
-            genios<span className="brand-sub">FINANCE WORKSPACE</span>
-          </span>
-        </Link>
-        <div className="nav-label">RESEARCH</div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setDark(!dark);
+              document.documentElement.classList.toggle("dark", !dark);
+            }}
+            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </Button>
+        </div>
+      </header>
+      <aside className="sidebar" id="workspace-sidebar">
         <nav aria-label="Main navigation">
-          <Link
-            className={path === "/" ? "nav-link active" : "nav-link"}
-            href="/"
-            aria-current={path === "/" ? "page" : undefined}
-          >
-            <BarChart3 size={18} />
-            Compare
-          </Link>
-          <Link
-            className={path === "/data" ? "nav-link active" : "nav-link"}
-            href="/data"
-            aria-current={path === "/data" ? "page" : undefined}
-          >
-            <Database size={18} />
-            Data
-          </Link>
+          {destinations.map(({ href, name, icon: Icon }) => (
+            <Link
+              key={href}
+              className={`nav-link${path === href ? " active" : ""}`}
+              href={href}
+              aria-current={path === href ? "page" : undefined}
+              aria-label={name}
+              title={collapsed ? name : undefined}
+            >
+              <Icon size={17} aria-hidden="true" />
+              <span>{name}</span>
+            </Link>
+          ))}
         </nav>
       </aside>
       <div className="workspace">
-        <header className="topbar">
-          <span>
-            Workspace{" "}
-            <span className="breadcrumb">
-              / {path === "/data" ? "Data" : "Compare"}
-            </span>
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="environment">
-              {process.env.NEXT_PUBLIC_USE_MOCKS !== "0"
-                ? "Synthetic mock dataset"
-                : "Connected API"}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setDark(!dark);
-                document.documentElement.classList.toggle("dark", !dark);
-              }}
-              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {dark ? <Sun size={16} /> : <Moon size={16} />}
-            </Button>
-          </div>
-        </header>
         <main>{children}</main>
-        <footer>
-          Genios Comps{" "}
-          <span>
-            Financial values in USD millions · Multiples as reported by the API
-          </span>
-        </footer>
       </div>
     </div>
   );

@@ -260,13 +260,10 @@ export default function DataPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Dataset workspace</p>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Data & integrity
-          </h1>
+          <h1>Data & integrity</h1>
           <p className="muted mt-2">
             Inspect the source, review findings and preview manual additions.
           </p>

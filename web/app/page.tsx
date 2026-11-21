@@ -216,18 +216,7 @@ export default function ComparePage() {
   ];
   return (
     <div className="page-stack">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">COMPARABLE COMPANY ANALYSIS</p>
-          <h1>Compare companies</h1>
-          <p className="muted">
-            Find peers. Understand the match. Put valuations in context.
-          </p>
-        </div>
-        <div className="page-mark">
-          <BarIcon />
-        </div>
-      </div>
+      <h1>Compare companies</h1>
       <section className="panel search-panel" aria-label="Comparison controls">
         <div className="search-field">
           <label htmlFor="company-search">Target company</label>
@@ -583,7 +572,4 @@ export default function ComparePage() {
       <CompanyDetail companyKey={detail} onClose={() => setDetail(null)} />
     </div>
   );
-}
-function BarIcon() {
-  return <SlidersHorizontal size={26} strokeWidth={1.4} />;
 }
