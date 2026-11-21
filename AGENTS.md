@@ -142,10 +142,10 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `TIMELOG.md` *(planned)* | Rough breakdown of the time actually spent. |
 | `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test tools). |
 | `src/comps/` | The Python service package. |
-| `src/comps/config.py` *(planned)* | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
-| `src/comps/models.py` *(planned)* | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
-| `src/comps/ingest.py` *(planned)* | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
-| `src/comps/quality.py` *(planned)* | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
+| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
+| `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
+| `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
+| `src/comps/quality.py` | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
 | `src/comps/finance.py` *(planned)* | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
@@ -164,7 +164,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 ```bash
 uv venv -p 3.11 .venv && uv pip install -e '.[dev]'   # local setup
 .venv/bin/pytest                                     # tests
-DATA_DIR=~/Downloads/genios-takehome/data ...        # point at a data folder (service command TBD)
+uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
+DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
 ```
 
 Update this section as the service, evaluation, and Docker commands land.
