@@ -109,16 +109,3 @@ def _freshness(entities, reference_date, config):
                     entity_keys=(key,),
                 ),
             )
-        elif d > reference_date:
-            yield (
-                key,
-                Finding(
-                    code="future_price_date",
-                    severity="warning",
-                    fields=("price_date",),
-                    message=f"Price date {d} is after the reference date {reference_date}.",
-                    affects=("freshness",),
-                    record_ids=(e.latest.record_id,),
-                    entity_keys=(key,),
-                ),
-            )

@@ -27,8 +27,7 @@ EXPECTED = json.loads((FIXTURE / "expected.json").read_text())
 
 @pytest.fixture(scope="module")
 def snapshot() -> Snapshot:
-    ref = date.fromisoformat(EXPECTED["reference_date"])
-    return build_snapshot(Settings(data_dir=FIXTURE, ingest=IngestConfig(reference_date=ref)))
+    return build_snapshot(Settings(data_dir=FIXTURE, ingest=IngestConfig()))
 
 
 def _key(f: Finding) -> tuple:
@@ -53,8 +52,9 @@ def _metric(v: MetricValue) -> str | list[str]:
     return v.display
 
 
-def test_record_count_and_companies(snapshot):
+def test_record_count_reference_date_and_companies(snapshot):
     assert snapshot.dataset.record_count == EXPECTED["record_count"]
+    assert snapshot.dataset.reference_date == date.fromisoformat(EXPECTED["reference_date"])
     assert sorted(snapshot.companies) == sorted(EXPECTED["companies"])
 
 

@@ -184,9 +184,8 @@ def build_dataset(
         raise DatasetError("no usable company records", dataset_findings)
     entities = resolve_entities(normalized)
 
-    reference_date = config.reference_date or max(
-        (e.latest.price_date for e in entities.values() if e.latest.price_date), default=None
-    )
+    # Freshness is measured from the latest valid price_date, so results don't depend on when the service runs.
+    reference_date = max((e.latest.price_date for e in entities.values() if e.latest.price_date), default=None)
     extra = quality.cross_entity_findings(entities, reference_date, config)
     entities = {
         key: replace(e, findings=e.findings + tuple(extra.get(key, ()))) if key in extra else e

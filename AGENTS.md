@@ -174,7 +174,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `.pre-commit-config.yaml` | Optional local hooks: ruff check, ruff format, and nbstripout for notebook outputs. |
 | `.github/workflows/` | CI, one concern per workflow: `lint`, `typecheck`, `tests` (3.11 and 3.12, with coverage), `repo-hygiene`. |
 | `src/comps/` | The Python service package. |
-| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
+| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, staleness threshold. |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/quality.py` | Checks across companies: possible same issuer, shared names, stale and future price dates. (The derived label-conflict warning is planned; it needs retrieval.) |

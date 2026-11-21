@@ -4,7 +4,6 @@ services:
     build: .
     environment:
       DATA_DIR: /data
-      REFERENCE_DATE: ${REFERENCE_DATE:-}
     volumes:
       - ${DIR:?Set DIR to a folder containing companies.json and fx_rates.json}:/data:ro
     ports:

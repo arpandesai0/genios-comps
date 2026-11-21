@@ -27,7 +27,7 @@ Each stage talks to the next only through plain data types from `src/comps/model
 
 | From → to | Data type | What the receiver can rely on |
 |---|---|---|
-| Ingestion → everything | `Dataset` | Immutable. Values are in USD, and `None` means unavailable, never zero. Each entity's `latest` is the only observation used for comps. Every doubtful value has a finding. `version` identifies the input files and manual additions, but not settings such as `REFERENCE_DATE`. |
+| Ingestion → everything | `Dataset` | Immutable. Values are in USD, and `None` means unavailable, never zero. Each entity's `latest` is the only observation used for comps. Every doubtful value has a finding. `version` identifies the input files and manual additions, but not settings such as `STALE_AFTER_DAYS`. |
 | Dataset → Finance | `Observation` | `usd.*` in USD millions, `price` in USD per share, `shares_outstanding` in millions. `conversion` says which factor failed when a value is `None`. |
 | Finance → Service | `Metrics`, `Summary`, findings | Every value is `ok`, `nm` or `missing`, with `raw` (unrounded apart from cleaning float noise at 9 dp) and `display` (final, 1 dp). Stats are computed over exactly the rows passed in. |
 
@@ -38,7 +38,7 @@ Each stage talks to the next only through plain data types from `src/comps/model
 - **Model-derived signals are labelled.** A finding produced by a model or heuristic has `source: "derived"` and is never presented as fact.
 - **Valuation multiples never choose peers.** Retrieval doesn't see finance output, and finance doesn't know how peers were picked.
 - **Display values are final.** Finance rounds once, and the API, CSV and UI never round again.
-- **Reproducible.** The same input files and `REFERENCE_DATE` give the same dataset version and the same results.
+- **Reproducible.** The same input files give the same dataset version and the same results.
 
 ## Change history
 
@@ -54,4 +54,5 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | #8 | API contract: precise wording for `raw` and NM versus missing. |
 | #9 | Accuracy fixes: `missing_inputs` names every cause; the `text_updated` message says which value is used. |
 | #10 | Stages 6–7 (partial): read-only API on an immutable snapshot; `make start DIR=...` runs API + web with docker compose. |
-| this PR | Tests: end-to-end planted-defects acceptance test for ingestion and finance (no behaviour change). |
+| #11 | Tests: end-to-end planted-defects acceptance test for ingestion and finance (no behaviour change). |
+| this PR | Stage 2: remove the `REFERENCE_DATE` setting and the `future_price_date` check; staleness is always measured from the latest `price_date` in the data. |
