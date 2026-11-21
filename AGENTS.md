@@ -140,7 +140,13 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence **by the owner**. A PR is opened once its step is built (and, if it changes what is served, evaluated); the owner decides the next step after reviewing the results. |
 | 2026-11-21 | Agents never merge. Each PR gets a smaller-model sub-agent review; the authoring agent addresses the comments; the owner reviews and merges by hand. |
-| 2026-11-21 | Glossary precedence: a zero or negative denominator gives **NM** even when another input is missing. |
+| 2026-11-21 | ~~A zero or negative denominator gives NM even when another input is missing.~~ **Reversed the same day:** a missing input gives **missing** (blank) and takes precedence over NM, reading the glossary's "missing → blank, not NM" literally. NM only when every input is present and the denominator is ≤ 0. |
+| 2026-11-21 | Only `~/Downloads/genios-takehome` is ground truth. Every repo doc (this file included) is generated and is checked against the glossary before being relied on. |
+| 2026-11-21 | Zero or negative EV is used as given (multiples shown, included in stats) with an info finding `nonpositive_ev`. Extreme multiples are not flagged. |
+| 2026-11-21 | Rounding: compute everything (summary stats included) on unrounded values; round to 1 dp only for display, ties **half away from zero** (12.25 → 12.3, −12.25 → −12.3). Never show `-0.0`. |
+| 2026-11-21 | Display: money `4,512.3` / `-1,234.5`; multiples `12.3x` / `-2.1x` / `1,234.5x`; NM shows `NM`; missing shows blank (null). |
+| 2026-11-21 | Summary stats only for the three multiples. Even-count median = average of the middle two. With no valid peer values, the stats are null (blank) and the n / n_nm / n_missing counts explain why. The caller passes peers only. |
+| 2026-11-21 | `missing_inputs` names the root record field: `price_currency`, `reporting_currency` or `units` when a conversion failed, otherwise the numeric field itself. |
 
 ## 5. Directory map
 
@@ -161,7 +167,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/quality.py` | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
-| `src/comps/finance.py` *(planned)* | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
+| `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
 | `src/comps/service.py` *(planned)* | Builds the immutable snapshot, swaps it atomically, and assembles comps responses. |
