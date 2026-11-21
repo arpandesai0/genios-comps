@@ -1,0 +1,170 @@
+# AGENTS.md
+
+Guidance for AI coding agents (and humans) working in this repository. Read it fully before changing anything.
+
+## 1. What this project is
+
+An offline **comps-table service**. An analyst names a company; the service picks peers from a universe of ~500 companies, computes valuation multiples, explains why each peer was chosen, and reports summary statistics across the peers.
+
+It is a take-home assignment with a **~6 hour budget**. Treat it as an **MVP**: a smaller scope done well and explained clearly beats a larger one half done.
+
+### Sources of truth (in priority order)
+
+1. **The assignment brief and glossary.** They live outside this repo at `~/Downloads/genios-takehome/` (`README.md`, `GLOSSARY.md`, `data/`). The glossary's formulas and rules must be applied exactly.
+2. **The decision log in §4 of this file.** These decisions were made explicitly by the project owner.
+3. **The original planning handoff.** It was written by a different agent (Codex). It is useful background, but where it conflicts with 1 or 2, those win.
+
+**Never commit the brief, the glossary, or the supplied `data/`.** They are git-ignored. Tests use small synthetic fixtures written for this repo.
+
+## 2. How to work
+
+### Ask, don't decide
+
+- **Do not make business or product decisions on your own.** That includes what counts as a peer, how duplicates are treated, which numbers feed the calculations, how many peers to return, what the UI shows, and what is in or out of scope. Ask the owner a concise question, give options, and mark the one you recommend.
+- Purely technical choices that follow from an existing decision (naming, file layout inside a module, test structure) don't need a question. If a technical choice changes behaviour the analyst can see, it is a business decision.
+- Record every answered decision in §4 with the date. Don't re-ask anything already recorded there.
+- If the brief is silent and the owner is unavailable, pick the most conservative option, say so, and list it under **Assumptions** in the README.
+
+### Engineering style: a simple MVP
+
+- One Python service, synchronous, in-memory. No queues, workers, caches, vector databases, or microservices.
+- FastAPI handlers are plain `def`, so they run in FastAPI's threadpool and requests are served concurrently. Every request reads one **immutable snapshot**. Writes build a new snapshot and swap it in atomically. A failed build leaves the previous snapshot in place.
+- Prefer the standard library, plus numpy and scikit-learn for retrieval. Add a dependency only when it removes real complexity.
+- No speculative abstractions. Add an interface only where a part is genuinely meant to be swapped (retrievers are; storage is not, yet).
+
+### Keep steps abstract and loosely coupled
+
+Each stage talks to the next only through plain data types. Nothing reaches into another stage's internals.
+
+```
+load → validate/normalize → resolve entities → snapshot(index) → retrieve → finance → API → UI
+```
+
+- **Ingestion** knows nothing about retrieval or finance.
+- **Finance** takes a normalized observation and returns metric values. It doesn't know where they came from.
+- **Retrieval** implements a small `Retriever` interface (fit on entities, score candidates for a target, explain a pair). Rankers can be swapped without touching ingestion, finance, or evaluation.
+- **API** is an adapter only: no business logic in route handlers.
+- **UI** depends on the HTTP contract only, never on Python internals.
+
+### Measure, don't assume
+
+- Evals and the served system evolve together, the way a researcher iterates. Only what is served gets evaluated, and every change to what is served comes with an updated eval result in `eval/results/` (machine-readable) plus a short interpretation: what improved, what got worse, and whether it is worth the complexity.
+- Don't build or mention comparators, alternative rankers, or future variants ahead of time. The next step is decided by the owner after the current one has been evaluated.
+- Never present estimates as measurements. Keep development and held-out evaluation targets separate.
+
+### Data integrity rules
+
+Never silently:
+
+- turn missing values into zero;
+- impute financials;
+- rescale suspected unit errors;
+- rewrite classifications;
+- treat a model-derived signal as fact.
+
+Every such case becomes a structured **finding** with a code, the affected fields, a severity, a message, and the metrics it affects.
+
+### Parallelize
+
+Wherever steps don't depend on each other, run them at the same time: independent tool calls in one turn, and parallel sub-agents or worktrees for independent modules. Once the shared data types (§5, `models.py`) are fixed, the following can proceed in parallel:
+
+| Can run in parallel | Depends on |
+|---|---|
+| Finance calculations + tests | `models.py` |
+| Ingestion validation and entity resolution + tests | `models.py` |
+| Synthetic evaluation fixtures and relevance labels | the record schema only |
+| Retriever implementation | `models.py` |
+| Next.js UI against a mocked API | the agreed API contract (OpenAPI) |
+| Docs (DESIGN, README sections, time log) | the decisions in §4 |
+
+These steps run in sequence: the snapshot/service layer (needs ingestion, finance and retrieval), the evaluation run (needs retrievers and fixtures), and wiring the UI to the real API.
+
+### Git and PRs
+
+- Use small PRs, one per step, each with a clear description, and merge each before the next builds on it. Work on a branch, never directly on `main`.
+- End every commit message with the trailer of the agent that actually wrote the change:
+  - Claude: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
+  - Codex: `Co-authored-by: Codex <codex@openai.com>`
+- Run the tests before every commit. Don't claim a PR, merge, or measurement that didn't happen.
+
+## 3. Architecture
+
+```
+DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
+                    └─────────────┬─────────────┘
+                        Ingestion pipeline
+   raw → validate/normalize (USD, units) → group by country:ticker
+       → entities with observation history + findings
+                                  ↓
+          Immutable Snapshot (versioned by input-file hash)
+     entities · findings · TF-IDF index · derived label-conflict warnings
+                                  ↓
+     Resolver (key / ticker / name → match, or a list of choices if ambiguous)
+                                  ↓
+     Retriever: TF-IDF on descriptions
+       user-chosen k; excludes the target and its same-issuer siblings, with reasons;
+       size and geography are shown as evidence only
+                                  ↓
+     Finance: latest observation → market cap, EV, EV/Revenue, EV/EBITDA, P/E
+              (ok | NM | missing) → peer-only mean/median/high/low with n
+                                  ↓
+     FastAPI (JSON + CSV) ──► Next.js + shadcn/ui (compare view, data/ingestion view)
+```
+
+## 4. Decision log
+
+| Date | Decision |
+|---|---|
+| 2026-11-21 | Repo lives in `~/Desktop/genios-finance`; the service reads the brief's data through `DATA_DIR`. |
+| 2026-11-21 | **Identity = `country:ticker`.** Record `id` is internal provenance only. |
+| 2026-11-21 | Same key with identical content → one entity (exact duplicates collapse). |
+| 2026-11-21 | Same key with different content → text fields (name, description, labels) take the value with the latest `price_date`. A tie goes to the later record in the file and is logged as a conflict finding. A text-only change raises an info finding and keeps the previous value in provenance. |
+| 2026-11-21 | Numeric fields are kept as a **time series** of observations keyed by `price_date`. Comps use the **latest observation only**; fields are never mixed across dates. |
+| 2026-11-21 | Different keys with identical content → separate entities flagged **possible same issuer** (e.g. share classes). They are excluded from each other's peer lists and the reason is shown. |
+| 2026-11-21 | Suspected unit or scale errors (e.g. revenue above USD 1T): **flag only**, never rescale. |
+| 2026-11-21 | The user picks `k`. There is **no similarity floor or abstention**. |
+| 2026-11-21 | Retrieval = TF-IDF on descriptions. Size and geography are evidence, not ranking inputs. No hard industry filter. Valuation multiples are never used to select peers. |
+| 2026-11-21 | A derived classification-conflict warning comes from description neighbours. It is marked model-derived, and labels are never rewritten. |
+| 2026-11-21 | Manual company additions are **in-memory only**. They never touch the input files. |
+| 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
+| 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence. Push once each step is built and evaluated; the owner decides the next step after reviewing the results. |
+| 2026-11-21 | Glossary NM/missing precedence: if a required input is missing, the result is **missing** even when the denominator is ≤ 0. *(Proposed in the handoff; confirm with the owner before relying on it.)* |
+
+## 5. Directory map
+
+Items marked *(planned)* don't exist yet. Update this table when you add or remove a directory.
+
+| Path | Purpose |
+|---|---|
+| `AGENTS.md` | This file: working rules, architecture, decisions. |
+| `README.md` | Setup and running, how to point at another data file, how to request a comps table, assumptions, AI usage, ranked future work. |
+| `DESIGN.md` *(planned)* | Scope, the definition of a relevant peer, key decisions and alternatives, data problems and how each was handled, acceptance criteria. |
+| `TIMELOG.md` *(planned)* | Rough breakdown of the time actually spent. |
+| `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test tools). |
+| `src/comps/` | The Python service package. |
+| `src/comps/config.py` *(planned)* | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
+| `src/comps/models.py` *(planned)* | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
+| `src/comps/ingest.py` *(planned)* | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
+| `src/comps/quality.py` *(planned)* | Dataset-level checks: possible same issuer, implausible scale, stale prices, derived label conflicts. |
+| `src/comps/finance.py` *(planned)* | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
+| `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
+| `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
+| `src/comps/service.py` *(planned)* | Builds the immutable snapshot, swaps it atomically, and assembles comps responses. |
+| `src/comps/api.py` *(planned)* | FastAPI adapter that implements `docs/API.md`. |
+| `docs/API.md` | HTTP contract shared by the backend and the UI. Change it in its own PR, before the code that depends on it. |
+| `scripts/dev/` | Developer notebooks and scripts for exploring modules against a local `DATA_DIR`. Commit notebooks with outputs cleared, because outputs would contain the supplied data. |
+| `web/` *(planned)* | Next.js + shadcn/ui front end. It talks to the API over HTTP only. |
+| `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
+| `eval/fixtures/` | Synthetic evaluation universe and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
+| `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
+| `Dockerfile`, `docker-compose.yml` *(planned)* | One-command offline startup (`docker compose up`) for the API and web containers. |
+
+## 6. Commands
+
+```bash
+uv venv -p 3.11 .venv && uv pip install -e '.[dev]'   # local setup
+.venv/bin/pytest                                     # tests
+DATA_DIR=~/Downloads/genios-takehome/data ...        # point at a data folder (service command TBD)
+```
+
+Update this section as the service, evaluation, and Docker commands land.

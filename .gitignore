@@ -1,0 +1,18 @@
+# Assignment materials must never be committed
+data/
+README.brief.md
+GLOSSARY.md
+# local state
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+state/
+*.db
+.DS_Store
+eval/results/local_*
+# web
+web/node_modules/
+web/.next/
+.ipynb_checkpoints/
