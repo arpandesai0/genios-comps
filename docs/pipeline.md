@@ -27,9 +27,9 @@ Each stage talks to the next only through plain data types from `src/comps/model
 
 | From → to | Data type | What the receiver can rely on |
 |---|---|---|
-| Ingestion → everything | `Dataset` | Immutable. Values are in USD, and `None` means unavailable, never zero. Each entity's `latest` is the only observation used for comps. Every doubtful value has a finding. `version` identifies the exact input. |
+| Ingestion → everything | `Dataset` | Immutable. Values are in USD, and `None` means unavailable, never zero. Each entity's `latest` is the only observation used for comps. Every doubtful value has a finding. `version` identifies the input files and manual additions, but not settings such as `REFERENCE_DATE`. |
 | Dataset → Finance | `Observation` | `usd.*` in USD millions, `price` in USD per share, `shares_outstanding` in millions. `conversion` says which factor failed when a value is `None`. |
-| Finance → Service | `Metrics`, `Summary`, findings | Every value is `ok`, `nm` or `missing`, with `raw` (unrounded) and `display` (final, 1 dp). Stats are computed over exactly the rows passed in. |
+| Finance → Service | `Metrics`, `Summary`, findings | Every value is `ok`, `nm` or `missing`, with `raw` (unrounded apart from cleaning float noise at 9 dp) and `display` (final, 1 dp). Stats are computed over exactly the rows passed in. |
 
 ## Rules that hold across the whole pipeline
 

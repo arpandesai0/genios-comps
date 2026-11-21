@@ -157,11 +157,11 @@ These run once all companies are built. They only **add findings** and never cha
 | `warning` | Worth attention, but every output can still be produced | stale price, possible same issuer, a missing `sector` |
 | `info` | Provenance or normalization; nothing is lost | upper-cased ticker, exact duplicate |
 
-A missing field is a `limitation` when it feeds a metric or the company's identity, and a `warning` when it is only evidence, like `sector` or `industry`. Every finding also lists what it `affects`: a metric such as `ev_ebitda`, or a capability such as `retrieval`, `search` or `identity`.
+A missing field is a `limitation` when it affects anything other than evidence: a metric, `identity` (ticker, country), `retrieval` (description), `search` (name) or `freshness` (price date). It is a `warning` when it affects only evidence, like `sector`, `industry` or `sub_industry`, or when it affects nothing, like `fiscal_year_end`. Every finding also lists what it `affects`: a metric such as `ev_ebitda`, or a capability such as `retrieval`, `search` or `identity`.
 
 ### 8. Dataset version
 
-`Dataset.version` is a 12-character hash of the two files' SHA-256 values plus any manual additions. Every API response that depends on the data carries it, so a result can be traced back to its exact input.
+`Dataset.version` is a 12-character hash of the two files' SHA-256 values plus any manual additions. Every API response that depends on the data carries it, so a result can be traced back to its input data. The version does **not** cover the settings: the same files with a different `REFERENCE_DATE` or `STALE_AFTER_DAYS` give the same version but can give different `stale_price` and `future_price_date` findings. Pin `REFERENCE_DATE` for reproducible results.
 
 ## Output: what the dataset looks like
 
