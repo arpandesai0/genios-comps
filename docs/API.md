@@ -112,14 +112,14 @@ interface RawRecord {
 Returns `{ "status": "ok", "dataset_version": string, "currency": string, "entities": number, "records": number, "reference_date": string | null }` (`reference_date` as in `/api/dataset`).
 
 ### `GET /api/companies`
-Search and list companies. Used both for target search (with ambiguity) and for the data table.
+Find companies by **text matching** on key, ticker or name. Used both for target search (with ambiguity) and for the data table. This is not similarity search: it never returns peers.
 
-Query parameters: `q` (key, ticker or name; optional), `sector`, `has_findings` (`error|limitation|warning|info`), `limit` (default 20, max 200), `offset`.
+Query parameters: `q` (optional; case-insensitive, surrounding whitespace ignored, and a blank `q` counts as no query; matches the key `COUNTRY:TICKER`, the ticker, the current name or an old name exactly, or a substring of a current or old name), `sector`, `has_findings` (`error|limitation|warning|info`), `limit` (default 20, max 200), `offset`.
 
-Returns `{ "dataset_version", "total": number, "items": (EntitySummary & { "match": "key" | "ticker" | "name_exact" | "name_partial" | null })[] }`. When a query matches several companies, return all of them; the UI asks the analyst to choose.
+Returns `{ "dataset_version", "total": number, "items": (EntitySummary & { "match": "key" | "ticker" | "name_exact" | "name_partial" | null })[] }`. Each company appears once, with its best match type. Items are sorted by match type (`key`, `ticker`, `name_exact`, `name_partial`), then by key. Without a query every company is listed with `match: null`. When a query matches several companies, return all of them (paged by `limit`/`offset`, with `total` giving the full count); the UI asks the analyst to choose. For example, a bare ticker listed in two countries gives two `ticker` matches.
 
 ### `GET /api/companies/{key}`
-Returns `EntityDetail`, or 404.
+Exact lookup of one company by its key `COUNTRY:TICKER` (e.g. `GB:IROV`), ignoring case. Ignoring case applies to this endpoint only; other parameters that take a key match it exactly. The response always carries the canonical key, as in `GB:IROV`. Returns `EntityDetail`, or 404 if no company has that key. A bare ticker or a name is not a key: use `GET /api/companies?q=` to find one.
 
 ### `GET /api/comps`
 Builds the comps table.
