@@ -144,7 +144,10 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `README.md` | Setup and running, how to point at another data file, how to request a comps table, assumptions, AI usage, ranked future work. |
 | `DESIGN.md` *(planned)* | Scope, the definition of a relevant peer, key decisions and alternatives, data problems and how each was handled, acceptance criteria. |
 | `TIMELOG.md` *(planned)* | Rough breakdown of the time actually spent. |
-| `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test tools). |
+| `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test, lint and type-check tools; ruff and mypy are configured here). |
+| `Makefile` | Developer shortcuts: `install`, `lint`, `format`, `typecheck`, `test`, `check`. |
+| `.pre-commit-config.yaml` | Optional local hooks: ruff check, ruff format, and nbstripout for notebook outputs. |
+| `.github/workflows/` | CI, one concern per workflow: `lint`, `typecheck`, `tests` (3.11 and 3.12, with coverage), `repo-hygiene`. |
 | `src/comps/` | The Python service package. |
 | `src/comps/config.py` | Settings from env vars: `DATA_DIR`, optional `REFERENCE_DATE`, staleness threshold. |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
@@ -168,6 +171,9 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 ```bash
 uv venv -p 3.11 .venv && uv pip install -e '.[dev]'   # local setup
 .venv/bin/pytest                                     # tests
+make check                                           # lint, typecheck and tests (what CI runs)
+make format                                          # apply ruff fixes and formatting
+pre-commit install                                   # optional: ruff and nbstripout on each commit
 uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
 ```

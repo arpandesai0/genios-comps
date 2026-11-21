@@ -22,14 +22,14 @@ def test_exact_duplicates_collapse_keeping_the_later_record(fx):
     ds = build_dataset([a, b], fx)
     e = ds.entities["US:ACME"]
     assert [o.record_id for o in e.observations] == ["b2"]
-    assert e.record_ids == ("b2", "a1")          # the dropped record is kept as provenance
+    assert e.record_ids == ("b2", "a1")  # the dropped record is kept as provenance
     assert codes(e.findings) == ["exact_duplicate"]
 
 
 def test_different_dates_form_a_time_series_and_latest_text_wins(fx):
     old = make_record(id="old", price_date="2026-04-01", price=10.0, name="Acme Old Name")
     new = make_record(id="new", price_date="2026-10-01", price=12.0, name="Acme New Name")
-    ds = build_dataset([new, old], fx)         # input order must not matter here
+    ds = build_dataset([new, old], fx)  # input order must not matter here
     e = ds.entities["US:ACME"]
     assert [o.record_id for o in e.observations] == ["old", "new"]
     assert e.latest.usd.price == 12.0
@@ -109,8 +109,13 @@ def test_explicit_reference_date_and_future_prices(fx):
 
 
 def test_reused_record_id_is_not_a_conflict(fx):
-    ds = build_dataset([make_record(id="dup", ticker="AAA", name="A Co"),
-                        make_record(id="dup", ticker="BBB", name="B Co", revenue=5.0)], fx)
+    ds = build_dataset(
+        [
+            make_record(id="dup", ticker="AAA", name="A Co"),
+            make_record(id="dup", ticker="BBB", name="B Co", revenue=5.0),
+        ],
+        fx,
+    )
     assert sorted(ds.entities) == ["US:AAA", "US:BBB"]
     assert ds.findings == ()
 

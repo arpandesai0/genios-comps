@@ -6,9 +6,10 @@ It holds data only, with no behaviour that depends on another stage.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 Severity = Literal["error", "limitation", "warning", "info"]
 FindingSource = Literal["validation", "derived"]
@@ -59,10 +60,10 @@ class Observation:
 
     record_id: str
     origin: Origin
-    source_index: int                      # position in the input; used for deterministic tie-breaks
+    source_index: int  # position in the input; used for deterministic tie-breaks
     price_date: date | None
-    original: Mapping[str, Any]            # the record exactly as supplied
-    shares_outstanding: float | None       # millions of shares (already in millions per the glossary)
+    original: Mapping[str, Any]  # the record exactly as supplied
+    shares_outstanding: float | None  # millions of shares (already in millions per the glossary)
     usd: UsdValues
     conversion: Conversion
     findings: tuple[Finding, ...] = ()
@@ -118,11 +119,11 @@ class Dataset:
 
     version: str
     reference_date: date | None
-    fx_rates: Mapping[str, float]          # USD per unit of currency, including USD itself
+    fx_rates: Mapping[str, float]  # USD per unit of currency, including USD itself
     files: tuple[SourceFile, ...]
     record_count: int
-    entities: Mapping[str, Entity]         # key -> entity, ordered by key
-    findings: tuple[Finding, ...]          # dataset-level findings (cross-record checks, fx issues)
+    entities: Mapping[str, Entity]  # key -> entity, ordered by key
+    findings: tuple[Finding, ...]  # dataset-level findings (cross-record checks, fx issues)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def all_findings(self) -> list[Finding]:

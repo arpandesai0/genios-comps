@@ -1,0 +1,12 @@
+# Optional local hooks. Enable with `pre-commit install` (see README, "Development").
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6  # keep in sync with the ruff pin in pyproject.toml
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.2
+    hooks:
+      - id: nbstripout  # notebook outputs would contain the supplied data
