@@ -23,3 +23,17 @@ Where the brief is silent, the service assumes the following:
 5. **Supplied numbers are the source of truth.** Unusually large values are used as given. They are not flagged or rescaled. In production, values like these would go through human or automated review.
 6. **Stale prices are a warning, not a blocker.** A price more than 90 days older than the latest `price_date` in the dataset is flagged, and the company is still served. The reference date can be fixed with `REFERENCE_DATE` so results are reproducible.
 7. **NM takes precedence over missing.** When a multiple's denominator is zero or negative, it is reported as NM even if another input is missing, which is consistent with finance convention.
+
+## Development
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11.
+
+```bash
+make install     # create .venv and install the package with dev tools
+make check       # lint, typecheck and tests (the same checks CI runs)
+make format      # apply ruff fixes and formatting
+```
+
+CI runs four workflows on every pull request and push to `main`: `lint`, `typecheck`, `tests` (Python 3.11 and 3.12, with a coverage report) and `repo-hygiene` (notebooks cleared, no supplied data or local state committed).
+
+Optional: `pre-commit install` enables hooks that run ruff and strip notebook outputs on each commit (see `.pre-commit-config.yaml`).

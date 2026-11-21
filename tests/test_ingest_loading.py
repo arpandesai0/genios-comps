@@ -61,12 +61,15 @@ def test_non_object_records_are_skipped_with_an_error_finding(fx):
     assert f.code == "invalid_record" and f.severity == "error"
 
 
-@pytest.mark.parametrize("fx_doc", [
-    [],
-    {"base": "USD"},
-    {"base": "EUR", "rates": {"USD": 0.9}},
-    {"base": "USD", "rates": {"USD": 1.1}},
-])
+@pytest.mark.parametrize(
+    "fx_doc",
+    [
+        [],
+        {"base": "USD"},
+        {"base": "EUR", "rates": {"USD": 0.9}},
+        {"base": "USD", "rates": {"USD": 1.1}},
+    ],
+)
 def test_malformed_fx_is_blocking(fx_doc):
     with pytest.raises(DatasetError):
         build_dataset([make_record()], fx_doc)

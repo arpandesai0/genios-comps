@@ -33,16 +33,25 @@ def test_usd_record_passes_through_unchanged(fx):
 
 def test_mixed_currencies_and_thousands_are_converted_independently(fx):
     # price in GBP, financials in EUR thousands: 2,000,000 thousand EUR = 2,000 m EUR = 2,200 m USD
-    rec = make_record(price_currency="GBP", reporting_currency="EUR", units="thousands", price=148.0,
-                      total_debt=1_000_000, cash=500_000, revenue=2_000_000, ebitda=-30_000, net_income=0)
+    rec = make_record(
+        price_currency="GBP",
+        reporting_currency="EUR",
+        units="thousands",
+        price=148.0,
+        total_debt=1_000_000,
+        cash=500_000,
+        revenue=2_000_000,
+        ebitda=-30_000,
+        net_income=0,
+    )
     o = only(ingest([rec], fx)).latest
-    assert o.usd.price == pytest.approx(185.0)              # 148 × 1.25
-    assert o.usd.total_debt == pytest.approx(1100.0)        # 1,000,000 × 0.001 × 1.10
+    assert o.usd.price == pytest.approx(185.0)  # 148 × 1.25
+    assert o.usd.total_debt == pytest.approx(1100.0)  # 1,000,000 × 0.001 × 1.10
     assert o.usd.cash == pytest.approx(550.0)
     assert o.usd.revenue == pytest.approx(2200.0)
     assert o.usd.ebitda == pytest.approx(-33.0)
     assert o.usd.net_income == 0
-    assert o.shares_outstanding == 100.0                    # always millions, never unit-scaled
+    assert o.shares_outstanding == 100.0  # always millions, never unit-scaled
 
 
 def test_equivalent_representations_normalize_to_equal_values(fx):
@@ -76,20 +85,28 @@ def test_absent_field_is_reported(fx):
     assert codes(o.findings) == ["missing_field"]
 
 
-@pytest.mark.parametrize("field,value,code", [
-    ("price", "20.0", "invalid_type"),
-    ("price", True, "invalid_type"),
-    ("price", 0, "invalid_value"),
-    ("shares_outstanding", -5, "invalid_value"),
-    ("total_debt", -1, "invalid_value"),
-    ("cash", math.nan, "invalid_type"),
-    ("revenue", math.inf, "invalid_type"),
-])
+@pytest.mark.parametrize(
+    "field,value,code",
+    [
+        ("price", "20.0", "invalid_type"),
+        ("price", True, "invalid_type"),
+        ("price", 0, "invalid_value"),
+        ("shares_outstanding", -5, "invalid_value"),
+        ("total_debt", -1, "invalid_value"),
+        ("cash", math.nan, "invalid_type"),
+        ("revenue", math.inf, "invalid_type"),
+    ],
+)
 def test_invalid_numbers_become_unavailable_with_a_finding(fx, field, value, code):
     o = only(ingest([make_record(**{field: value})], fx)).latest
     assert code in codes(o.findings)
-    flat = {"price": o.usd.price, "shares_outstanding": o.shares_outstanding, "total_debt": o.usd.total_debt,
-            "cash": o.usd.cash, "revenue": o.usd.revenue}
+    flat = {
+        "price": o.usd.price,
+        "shares_outstanding": o.shares_outstanding,
+        "total_debt": o.usd.total_debt,
+        "cash": o.usd.cash,
+        "revenue": o.usd.revenue,
+    }
     assert flat[field] is None
 
 

@@ -11,10 +11,11 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from comps import quality
 from comps.config import IngestConfig
@@ -34,9 +35,26 @@ COMPANIES_FILE = "companies.json"
 FX_FILE = "fx_rates.json"
 
 SCHEMA_FIELDS = (
-    "id", "ticker", "name", "description", "sector", "industry", "sub_industry", "country",
-    "price_currency", "reporting_currency", "units", "fiscal_year_end", "price", "price_date",
-    "shares_outstanding", "total_debt", "cash", "revenue", "ebitda", "net_income",
+    "id",
+    "ticker",
+    "name",
+    "description",
+    "sector",
+    "industry",
+    "sub_industry",
+    "country",
+    "price_currency",
+    "reporting_currency",
+    "units",
+    "fiscal_year_end",
+    "price",
+    "price_date",
+    "shares_outstanding",
+    "total_debt",
+    "cash",
+    "revenue",
+    "ebitda",
+    "net_income",
 )
 TEXT_FIELDS = ("name", "description", "sector", "industry", "sub_industry", "fiscal_year_end")
 MONEY_FIELDS = ("total_debt", "cash", "revenue", "ebitda", "net_income")
@@ -135,22 +153,30 @@ def build_dataset(
     normalized: list[_Normalized] = []
     for index, (raw, origin) in enumerate(inputs):
         if not isinstance(raw, Mapping):
-            dataset_findings.append(Finding(
-                code="invalid_record", severity="error",
-                message=f"Record #{index} is not a JSON object and was skipped.",
-                affects=("ingestion",),
-            ))
+            dataset_findings.append(
+                Finding(
+                    code="invalid_record",
+                    severity="error",
+                    message=f"Record #{index} is not a JSON object and was skipped.",
+                    affects=("ingestion",),
+                )
+            )
             continue
         record = normalize_record(raw, index=index, origin=origin, rates=rates)
         if record.ticker is None:
             # Assumption: the universe is public companies, so a record without a ticker is treated
             # as not listed. There is no offline way to verify it, so it is excluded.
-            dataset_findings.append(Finding(
-                code="unlisted_excluded", severity="warning", fields=("ticker",),
-                message=f"Record {record.observation.record_id} has no ticker, so it is treated as not listed "
-                        "and excluded from the universe.",
-                affects=("universe",), record_ids=(record.observation.record_id,),
-            ))
+            dataset_findings.append(
+                Finding(
+                    code="unlisted_excluded",
+                    severity="warning",
+                    fields=("ticker",),
+                    message=f"Record {record.observation.record_id} has no ticker, so it is treated as not listed "
+                    "and excluded from the universe.",
+                    affects=("universe",),
+                    record_ids=(record.observation.record_id,),
+                )
+            )
             continue
         normalized.append(record)
 
@@ -207,11 +233,15 @@ def parse_fx(fx: Any) -> tuple[dict[str, float], list[Finding]]:
     for code, value in fx["rates"].items():
         ccy = str(code).strip().upper()
         if not _is_number(value) or value <= 0:
-            findings.append(Finding(
-                code="invalid_fx_rate", severity="limitation",
-                message=f"FX rate for {ccy} is {value!r}; values in {ccy} cannot be converted.",
-                fields=("fx_rates",), affects=("currency_conversion",),
-            ))
+            findings.append(
+                Finding(
+                    code="invalid_fx_rate",
+                    severity="limitation",
+                    message=f"FX rate for {ccy} is {value!r}; values in {ccy} cannot be converted.",
+                    fields=("fx_rates",),
+                    affects=("currency_conversion",),
+                )
+            )
             continue
         if ccy == "USD" and float(value) != 1.0:
             raise DatasetError(f"{FX_FILE} lists USD at {value}, inconsistent with base USD")
@@ -229,7 +259,7 @@ class _Normalized:
     country: str | None
     text: dict[str, str | None]
     observation: Observation
-    content_signature: str   # everything except id: equal signatures = exact duplicate
+    content_signature: str  # everything except id: equal signatures = exact duplicate
 
 
 def normalize_record(
@@ -255,8 +285,12 @@ def normalize_record(
     country = _code(raw, "country", f)
     text = {name: _text(raw, name, f) for name in TEXT_FIELDS}
     if text["fiscal_year_end"] is not None and not _valid_month_day(text["fiscal_year_end"]):
-        f.add("invalid_value", "warning", ("fiscal_year_end",),
-              f"fiscal_year_end {text['fiscal_year_end']!r} is not a valid MM-DD.")
+        f.add(
+            "invalid_value",
+            "warning",
+            ("fiscal_year_end",),
+            f"fiscal_year_end {text['fiscal_year_end']!r} is not a valid MM-DD.",
+        )
 
     price_date = _date(raw, "price_date", f)
     price = _number(raw, "price", f, minimum=0.0, inclusive=False)
@@ -267,8 +301,13 @@ def normalize_record(
     for name, metric in (("revenue", "ev_revenue"), ("ebitda", "ev_ebitda"), ("net_income", "pe")):
         v = flows[name]
         if v is not None and v <= 0:
-            f.add("nonpositive_denominator", "info", (name,),
-                  f"{name} is {v:g}, so {metric} will be NM (not meaningful).", (metric,))
+            f.add(
+                "nonpositive_denominator",
+                "info",
+                (name,),
+                f"{name} is {v:g}, so {metric} will be NM (not meaningful).",
+                (metric,),
+            )
 
     price_ccy = _code(raw, "price_currency", f)
     report_ccy = _code(raw, "reporting_currency", f)
@@ -278,8 +317,9 @@ def normalize_record(
 
     money_scale = report_fx * unit_factor if report_fx is not None and unit_factor is not None else None
     raw_money = {"total_debt": debt, "cash": cash, **flows}
-    usd_money = {k: (v * money_scale if v is not None and money_scale is not None else None)
-                 for k, v in raw_money.items()}
+    usd_money = {
+        k: (v * money_scale if v is not None and money_scale is not None else None) for k, v in raw_money.items()
+    }
     usd = UsdValues(price=price * price_fx if price is not None and price_fx is not None else None, **usd_money)
 
     # A missing country gets the placeholder "*"; records without a ticker are dropped by the caller.
@@ -300,7 +340,11 @@ def normalize_record(
 
     content = {k: v for k, v in raw.items() if k != "id"}
     return _Normalized(
-        key=key, ticker=ticker, country=country, text=text, observation=observation,
+        key=key,
+        ticker=ticker,
+        country=country,
+        text=text,
+        observation=observation,
         content_signature=_signature(content),
     )
 
@@ -311,8 +355,16 @@ class _FindingSink:
         self.items: list[Finding] = []
 
     def add(self, code, severity, fields, message, affects=()):
-        self.items.append(Finding(code=code, severity=severity, message=message, fields=tuple(fields),
-                                  affects=tuple(affects), record_ids=(self.record_id,)))
+        self.items.append(
+            Finding(
+                code=code,
+                severity=severity,
+                message=message,
+                fields=tuple(fields),
+                affects=tuple(affects),
+                record_ids=(self.record_id,),
+            )
+        )
 
 
 def _severity(field: str) -> str:
@@ -334,8 +386,13 @@ def _text(raw, name, f) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        f.add("invalid_type", _severity(name), (name,), f"{name} should be text, got {type(value).__name__}.",
-              AFFECTS.get(name, ()))
+        f.add(
+            "invalid_type",
+            _severity(name),
+            (name,),
+            f"{name} should be text, got {type(value).__name__}.",
+            AFFECTS.get(name, ()),
+        )
         return None
     value = value.strip()
     if not value:
@@ -365,8 +422,13 @@ def _number(raw, name, f, minimum: float | None = None, inclusive: bool = True) 
     value = float(value)
     if minimum is not None and (value < minimum or (not inclusive and value == minimum)):
         rule = f"{'≥' if inclusive else '>'} {minimum:g}"
-        f.add("invalid_value", "limitation", (name,), f"{name} is {value:g}; it must be {rule}. Treated as unavailable.",
-              AFFECTS[name])
+        f.add(
+            "invalid_value",
+            "limitation",
+            (name,),
+            f"{name} is {value:g}; it must be {rule}. Treated as unavailable.",
+            AFFECTS[name],
+        )
         return None
     return value
 
@@ -403,8 +465,13 @@ def _rate(ccy: str | None, name: str, rates: Mapping[str, float], f) -> float | 
     if ccy is None:
         return None
     if ccy not in rates:
-        f.add("unknown_currency", "limitation", (name,), f"No FX rate for {ccy}; values in it cannot be converted to USD.",
-              AFFECTS[name])
+        f.add(
+            "unknown_currency",
+            "limitation",
+            (name,),
+            f"No FX rate for {ccy}; values in it cannot be converted to USD.",
+            AFFECTS[name],
+        )
         return None
     return rates[ccy]
 
@@ -415,8 +482,13 @@ def _units(raw, f) -> float | None:
         return None
     lowered = value.lower()
     if lowered not in UNIT_FACTORS:
-        f.add("invalid_value", "limitation", ("units",), f"units {value!r} must be 'millions' or 'thousands'.",
-              AFFECTS["units"])
+        f.add(
+            "invalid_value",
+            "limitation",
+            ("units",),
+            f"units {value!r} must be 'millions' or 'thousands'.",
+            AFFECTS["units"],
+        )
         return None
     if lowered != raw["units"]:
         f.add("normalized_value", "info", ("units",), f"units {raw['units']!r} was read as {lowered!r}.")
@@ -456,12 +528,18 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
     for r in group:
         prev = by_content.get(r.content_signature)
         if prev is not None:
-            findings.append(Finding(
-                code="exact_duplicate", severity="info", fields=("id",),
-                message=f"Records {prev.observation.record_id} and {r.observation.record_id} are identical apart "
-                        f"from their id; kept {r.observation.record_id}.",
-                affects=(), record_ids=(prev.observation.record_id, r.observation.record_id), entity_keys=(key,),
-            ))
+            findings.append(
+                Finding(
+                    code="exact_duplicate",
+                    severity="info",
+                    fields=("id",),
+                    message=f"Records {prev.observation.record_id} and {r.observation.record_id} are identical apart "
+                    f"from their id; kept {r.observation.record_id}.",
+                    affects=(),
+                    record_ids=(prev.observation.record_id, r.observation.record_id),
+                    entity_keys=(key,),
+                )
+            )
         by_content[r.content_signature] = r
     distinct = sorted(by_content.values(), key=_order)
 
@@ -477,12 +555,18 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
         numeric_conflict = [r for r in losers if _numbers(r) != _numbers(winner)]
         if numeric_conflict:
             ids = tuple(r.observation.record_id for r in numeric_conflict) + (winner.observation.record_id,)
-            findings.append(Finding(
-                code="conflicting_observation", severity="warning", fields=_numeric_diff(numeric_conflict, winner),
-                message=f"{len(ids)} records for {key} share price_date {d} but report different numbers; "
-                        f"using {winner.observation.record_id} (latest in the input).",
-                affects=_ALL_METRICS, record_ids=ids, entity_keys=(key,),
-            ))
+            findings.append(
+                Finding(
+                    code="conflicting_observation",
+                    severity="warning",
+                    fields=_numeric_diff(numeric_conflict, winner),
+                    message=f"{len(ids)} records for {key} share price_date {d} but report different numbers; "
+                    f"using {winner.observation.record_id} (latest in the input).",
+                    affects=_ALL_METRICS,
+                    record_ids=ids,
+                    entity_keys=(key,),
+                )
+            )
     series.sort(key=_order)
     latest = series[-1]
     in_series = {id(r) for r in series}
@@ -498,30 +582,47 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
             older = [r for r in reversed(distinct) if r.text[name] is not None]
             if older:
                 text[name] = older[0].text[name]
-                findings.append(Finding(
-                    code="text_from_older_record", severity="info", fields=(name,),
-                    message=f"Latest record has no {name}; using the value from {older[0].observation.record_id}.",
-                    record_ids=(latest.observation.record_id, older[0].observation.record_id), entity_keys=(key,),
-                ))
+                findings.append(
+                    Finding(
+                        code="text_from_older_record",
+                        severity="info",
+                        fields=(name,),
+                        message=f"Latest record has no {name}; using the value from {older[0].observation.record_id}.",
+                        record_ids=(latest.observation.record_id, older[0].observation.record_id),
+                        entity_keys=(key,),
+                    )
+                )
         if len(values) <= 1:
             continue
-        history.extend(TextVersion(name, r.text[name], r.observation.record_id, r.observation.price_date)
-                       for r in distinct)
+        history.extend(
+            TextVersion(name, r.text[name], r.observation.record_id, r.observation.price_date) for r in distinct
+        )
         tied = {r.text[name] for r in distinct if r.observation.price_date == latest.observation.price_date}
         ids = tuple(r.observation.record_id for r in distinct)
         if len(tied) > 1:
-            findings.append(Finding(
-                code="conflicting_attributes", severity="warning", fields=(name,),
-                message=f"Records with the same latest price_date disagree on {name}; using the later record's "
-                        f"value {text[name]!r}.",
-                affects=AFFECTS.get(name, ()), record_ids=ids, entity_keys=(key,),
-            ))
+            findings.append(
+                Finding(
+                    code="conflicting_attributes",
+                    severity="warning",
+                    fields=(name,),
+                    message=f"Records with the same latest price_date disagree on {name}; using the later record's "
+                    f"value {text[name]!r}.",
+                    affects=AFFECTS.get(name, ()),
+                    record_ids=ids,
+                    entity_keys=(key,),
+                )
+            )
         else:
-            findings.append(Finding(
-                code="text_updated", severity="info", fields=(name,),
-                message=f"{name} changed over time; using the latest value. Earlier values are kept as provenance.",
-                record_ids=ids, entity_keys=(key,),
-            ))
+            findings.append(
+                Finding(
+                    code="text_updated",
+                    severity="info",
+                    fields=(name,),
+                    message=f"{name} changed over time; using the latest value. Earlier values are kept as provenance.",
+                    record_ids=ids,
+                    entity_keys=(key,),
+                )
+            )
 
     aliases = tuple(dict.fromkeys(r.text["name"] for r in distinct if r.text["name"]))
     return Entity(
@@ -550,5 +651,8 @@ def _numbers(r: _Normalized) -> tuple:
 
 
 def _numeric_diff(losers: list[_Normalized], winner: _Normalized) -> tuple[str, ...]:
-    return tuple(k for k in _NUMERIC_KEYS
-                 if any(r.observation.original.get(k) != winner.observation.original.get(k) for r in losers))
+    return tuple(
+        k
+        for k in _NUMERIC_KEYS
+        if any(r.observation.original.get(k) != winner.observation.original.get(k) for r in losers)
+    )
