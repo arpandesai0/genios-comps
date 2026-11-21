@@ -141,3 +141,15 @@ def test_manual_records_change_the_version_and_are_marked(fx):
     assert added.version != ds.version
     assert added.entities["US:NEW"].latest.origin == "manual"
     assert added.metadata["manual_records"] == 1
+
+
+def test_text_updated_message_says_which_value_is_used_after_a_fallback(fx):
+    # The latest description is blank, so the older one is used; the message must not claim "latest".
+    ds = build_dataset(
+        [make_record(id="c1", price_date="2026-07-01"), make_record(id="c2", price_date="2026-10-01", description=" ")],
+        fx,
+    )
+    (e,) = ds.entities.values()
+    (updated,) = [f for f in e.findings if f.code == "text_updated"]
+    assert "most recent non-empty value" in updated.message
+    assert "using the latest value" not in updated.message

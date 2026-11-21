@@ -273,5 +273,4 @@ These were decided by the project owner where the brief was silent. They are log
 
 ## Known gaps
 
-- `text_from_older_record` also raises `text_updated`, whose message says "using the latest value" when the older value is the one used. This is a wording issue only, and the data is correct.
 - The classification-conflict warning derived from description neighbours (AGENTS.md §4) is not built yet. It needs retrieval.

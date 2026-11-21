@@ -44,7 +44,7 @@ A `missing` value lists the **record fields** that caused it, so the analyst can
 
 - the field itself if it is null or invalid, e.g. `["total_debt"]` for a negative debt;
 - the root cause if a conversion failed: `["price_currency"]`, `["reporting_currency"]` or `["units"]`;
-- both, when the field is **null** and its conversion also failed, e.g. `["revenue", "reporting_currency"]`. A field that is present but invalid (e.g. a negative debt) is not listed when its conversion also failed. Only the conversion field is named, and the invalid value has its own `invalid_value` finding from ingestion.
+- both, when the field is unusable (null, absent, wrong type or invalid) and its conversion also failed, e.g. `["total_debt", "reporting_currency"]` for a debt of −5 in an unknown currency. The explanation is never partial.
 
 The order follows the formula: numerator causes first, then denominator causes. Within a field, the field comes before its conversion. Each cause appears once.
 

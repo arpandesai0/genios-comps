@@ -579,10 +579,12 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
     for name in TEXT_FIELDS:
         values = {r.text[name] for r in distinct}
         text[name] = latest.text[name]
+        from_older = False
         if text[name] is None:
             older = [r for r in reversed(distinct) if r.text[name] is not None]
             if older:
                 text[name] = older[0].text[name]
+                from_older = True
                 findings.append(
                     Finding(
                         code="text_from_older_record",
@@ -619,7 +621,12 @@ def _build_entity(key: str, group: list[_Normalized]) -> Entity:
                     code="text_updated",
                     severity="info",
                     fields=(name,),
-                    message=f"{name} changed over time; using the latest value. Earlier values are kept as provenance.",
+                    message=(
+                        f"{name} changed over time; using the most recent non-empty value. "
+                        if from_older
+                        else f"{name} changed over time; using the latest value. "
+                    )
+                    + "Earlier values are kept as provenance.",
                     record_ids=ids,
                     entity_keys=(key,),
                 )
