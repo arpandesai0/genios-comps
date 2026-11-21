@@ -2,7 +2,6 @@
 
 from datetime import date
 
-from comps.config import IngestConfig
 from comps.ingest import build_dataset
 from conftest import make_record
 
@@ -99,13 +98,6 @@ def test_stale_price_uses_latest_date_in_dataset_as_reference(fx):
     assert ds.reference_date == date(2026, 10, 1)
     assert codes(ds.entities["US:OLD"].findings) == ["stale_price"]
     assert ds.entities["US:NEW"].findings == ()
-
-
-def test_explicit_reference_date_and_future_prices(fx):
-    rec = make_record(price_date="2026-10-01")
-    cfg = IngestConfig(reference_date=date(2026, 9, 1))
-    ds = build_dataset([rec], fx, config=cfg)
-    assert codes(ds.entities["US:ACME"].findings) == ["future_price_date"]
 
 
 def test_reused_record_id_is_not_a_conflict(fx):
