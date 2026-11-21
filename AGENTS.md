@@ -106,7 +106,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
           Immutable Snapshot (versioned by input-file hash)
      entities · findings · TF-IDF index · derived label-conflict warnings
                                   ↓
-     Resolver: service.search (key / ticker / name → every match; the analyst chooses)
+     Resolve (service.search): key / ticker / name → every match; the analyst chooses
                                   ↓
      Retriever: TF-IDF on descriptions
        user-chosen k; excludes the target and its same-issuer siblings, with reasons;
