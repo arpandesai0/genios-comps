@@ -40,7 +40,7 @@ test("manual record requires preview and persists only after Save", async ({
   await expect(
     page.getByRole("heading", { name: "Preview result" }),
   ).toBeVisible();
-  await expect(page.getByText("create", { exact: true })).toBeVisible();
+  await expect(page.getByText("Create", { exact: true })).toBeVisible();
   expect(
     (await request.get(`/api/companies/${encodeURIComponent(key)}`)).status(),
   ).toBe(404);
@@ -63,7 +63,7 @@ test("Data filters findings and companies and opens observation provenance", asy
   const findings = page.getByRole("region", { name: "Findings", exact: true });
   await page.getByLabel("Finding company key", { exact: true }).fill("US:ORBT");
   await expect(
-    findings.getByText("model-derived", { exact: true }),
+    findings.getByText("Model-derived", { exact: true }),
   ).toBeVisible();
   await expect(findings.getByText("US:ORBT", { exact: true })).toBeVisible();
   await page.getByLabel("Search companies", { exact: true }).fill("US:NOMA");

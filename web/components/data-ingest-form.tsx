@@ -1,5 +1,6 @@
 "use client";
 
+import { sentenceLabel } from "@/lib/utils";
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Finding, IngestResult, RawRecord } from "@/lib/api-types";
@@ -224,7 +225,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
               {saved ? "Saved result" : "Preview result"}
             </h3>
             <Badge variant="outline">
-              {preview.resolution.action.replaceAll("_", " ")}
+              {sentenceLabel(preview.resolution.action)}
             </Badge>
             <span className="font-mono text-sm">{preview.resolution.key}</span>
           </div>
@@ -242,7 +243,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
                     ([key, value]) => (
                       <div key={key} className="rounded-lg border p-3">
                         <dt className="muted text-sm">
-                          {key.replaceAll("_", " ")}
+                          {sentenceLabel(key)}
                           {key === "price"
                             ? " · USD per share"
                             : " · USD millions"}

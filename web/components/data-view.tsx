@@ -1,5 +1,6 @@
 "use client";
 
+import { sentenceLabel } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "@/lib/api";
@@ -57,7 +58,7 @@ function useResource<T>(path: string, revision: number) {
 function SeverityBadge({ severity }: { severity: Severity }) {
   return (
     <Badge variant="outline" className={`severity-${severity}`}>
-      {severity}
+      {sentenceLabel(severity)}
     </Badge>
   );
 }
@@ -67,7 +68,7 @@ function SourceBadge({ source }: { source: Finding["source"] }) {
       variant="outline"
       className="border-violet-400/50 bg-violet-500/10 text-violet-700 dark:text-violet-300"
     >
-      model-derived
+      Model-derived
     </Badge>
   ) : (
     <span className="muted">Validation</span>
@@ -251,7 +252,7 @@ export default function DataPage() {
                   variant="outline"
                   className={`severity-${severity}`}
                 >
-                  {row.original.finding_counts[severity]} {severity}
+                  {row.original.finding_counts[severity]} {sentenceLabel(severity)}
                 </Badge>
               ),
           )}
@@ -403,7 +404,7 @@ export default function DataPage() {
               <option value="">All severities</option>
               {severities.map((severity) => (
                 <option key={severity} value={severity}>
-                  {severity}
+                  {sentenceLabel(severity)}
                 </option>
               ))}
             </select>
@@ -507,7 +508,7 @@ export default function DataPage() {
               <option value="">All severities</option>
               {severities.map((severity) => (
                 <option key={severity} value={severity}>
-                  {severity}
+                  {sentenceLabel(severity)}
                 </option>
               ))}
             </select>

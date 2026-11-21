@@ -1,4 +1,5 @@
 "use client";
+import { sentenceLabel } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "@/lib/api";
@@ -52,7 +53,7 @@ export function CalculationTrace({
       <dl className="factor-grid">
         {Object.entries(observation.conversion).map(([key, v]) => (
           <div key={key}>
-            <dt>{key.replaceAll("_", " ")}</dt>
+            <dt>{sentenceLabel(key)}</dt>
             <dd>{value(v)}</dd>
           </div>
         ))}
@@ -152,7 +153,7 @@ export function CompanyDetail({
               {current.observations.map((o, i) => (
                 <details key={`${o.record_id}-${i}`}>
                   <summary>
-                    {o.price_date || "Undated"} · {o.record_id} · {o.origin}
+                    {o.price_date || "Undated"} · {o.record_id} · {sentenceLabel(o.origin)}
                   </summary>
                   <CalculationTrace observation={o} />
                 </details>
