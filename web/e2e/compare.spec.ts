@@ -1,0 +1,103 @@
+import { expect, test } from "@playwright/test";
+
+test("Compare keeps identities distinct, exposes evidence and trace, and refetches removals", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByLabel("Number of peers")).toHaveValue("10");
+  await page.getByLabel("Target company").fill("NOMA");
+  await expect(
+    page.getByRole("button", { name: /Noma Analytics.*GB:NOMA/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: /Noma Cloud Systems.*US:NOMA$/ })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: /Noma Cloud Systems US:NOMA/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Valuation summary" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Evidence", exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Peer evidence" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("A similarity score, not a probability."),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "Shared terms" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Calculation trace", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("heading", { name: "Unrounded metric values" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "Observation history" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("Noma Software, Noma Cloud Systems", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByLabel("Target company").fill("US:NOMA");
+  await page
+    .getByRole("button", { name: /Noma Cloud Systems.*US:NOMA$/ })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Valuation summary" }),
+  ).toBeVisible();
+  const removal = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/comps?") &&
+      response.url().includes("exclude=GB%3ANOMA"),
+  );
+  await page
+    .getByRole("button", { name: "Remove Noma Analytics", exact: true })
+    .click();
+  expect((await removal).ok()).toBeTruthy();
+  await expect(
+    page.getByRole("button", { name: "Remove Noma Analytics", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Export CSV" })).toHaveAttribute(
+    "href",
+    /exclude=GB%3ANOMA/,
+  );
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Remove Noma Analytics", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Number of peers").fill("3");
+  await expect(
+    page.getByRole("button", { name: "Evidence", exact: true }),
+  ).toHaveCount(3);
+});
+
+test("Compare surfaces API errors without replacing them with mock data", async ({
+  page,
+}) => {
+  await page.route("**/api/companies?**", (route) =>
+    route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "invalid_request",
+          message: "Synthetic request failure",
+          details: {},
+        },
+      }),
+    }),
+  );
+  await page.goto("/");
+  await page.getByLabel("Target company").fill("NOMA");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Synthetic request failure" }),
+  ).toHaveText("Synthetic request failure");
+});
