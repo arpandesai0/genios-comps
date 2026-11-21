@@ -254,6 +254,8 @@ Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `
 
 Finance adds `nonpositive_ev` and `non_finite_result`. See [finance.md](finance.md).
 
+**How the catalogue is tested.** Besides the unit tests for each rule, `tests/test_planted_defects.py` runs the whole pipeline, from the files through finance, on a synthetic universe in `tests/fixtures/planted_defects/` where each company carries one known defect. The test checks the result against `expected.json`, which was derived by hand from the rules on this page, and requires an exact match. Every planted defect must be caught with the right code, severity, fields, records and metric status, and no other finding may appear. The test also fails if a code in this table has no planted defect, or if a planted code is missing from this table.
+
 ## Rounding
 
 **Ingestion does no rounding.** USD values are kept at full floating-point precision, and every rounding rule lives in finance. See [finance.md § Rounding](finance.md#rounding-and-display).
