@@ -27,14 +27,14 @@ interface Finding {
   entity_keys: string[];
 }
 
-type MetricStatus = "ok" | "nm" | "missing";   // NM = zero/negative denominator with all inputs present; missing = input unavailable (wins over NM)
+type MetricStatus = "ok" | "nm" | "missing";   // NM = zero/negative denominator with all inputs present; missing = an input is unavailable (wins over NM), or the result overflowed (see non_finite_result)
 
 interface MetricValue {
   status: MetricStatus;
   value: number | null;       // rounded to 1 dp; null unless status = "ok"
   display: string | null;     // "12.3x", "4,512.3", "NM", or null (show blank)
   raw: number | null;         // before display rounding (float noise cleaned at 9 dp)
-  missing_inputs: string[];   // e.g. ["ebitda"] when status = "missing"
+  missing_inputs: string[];   // e.g. ["ebitda"] when status = "missing"; empty on overflow (a non_finite_result finding explains it)
 }
 
 interface Metrics {
