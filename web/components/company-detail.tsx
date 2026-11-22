@@ -1,4 +1,5 @@
 "use client";
+import { titleLabel } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "@/lib/api";
@@ -38,13 +39,13 @@ export function CalculationTrace({
     }),
   );
   const columns: ColumnDef<(typeof rows)[number]>[] = [
-    { accessorKey: "field", header: "Original field" },
-    { accessorKey: "original", header: "Original value" },
-    { accessorKey: "usd", header: "USD value" },
+    { accessorKey: "field", header: "Original Field" },
+    { accessorKey: "original", header: "Original Value" },
+    { accessorKey: "usd", header: "USD Value" },
   ];
   return (
     <section className="trace">
-      <h3>Calculation trace</h3>
+      <h3>Calculation Trace</h3>
       <p className="muted">
         USD financials are in millions; price is USD per share. Shares
         outstanding are in millions.
@@ -52,7 +53,7 @@ export function CalculationTrace({
       <dl className="factor-grid">
         {Object.entries(observation.conversion).map(([key, v]) => (
           <div key={key}>
-            <dt>{key.replaceAll("_", " ")}</dt>
+            <dt>{titleLabel(key)}</dt>
             <dd>{value(v)}</dd>
           </div>
         ))}
@@ -60,7 +61,7 @@ export function CalculationTrace({
       <DataTable columns={columns} data={rows} />
       {metrics && (
         <>
-          <h4>Unrounded metric values</h4>
+          <h4>Unrounded Metric Values</h4>
           <dl className="trace-values">
             {(Object.keys(metricLabels) as (keyof Metrics)[]).map((key) => (
               <div key={key}>
@@ -108,9 +109,9 @@ export function CompanyDetail({
     >
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>{current?.name || "Company detail"}</SheetTitle>
+          <SheetTitle>{current?.name || "Company Detail"}</SheetTitle>
           <SheetDescription>
-            {companyKey} · Latest observation and provenance
+            {companyKey} · Latest Observation and Provenance
           </SheetDescription>
         </SheetHeader>
         {error ? (
@@ -132,8 +133,8 @@ export function CompanyDetail({
               <h3>Aliases</h3>
               <p>{current.aliases.join(", ") || "—"}</p>
               <p className="muted">
-                Fiscal year end: {current.fiscal_year_end || "—"} · Latest
-                price: {current.latest_price_date || "—"}
+                Fiscal Year End: {current.fiscal_year_end || "—"} · Latest
+                Price: {current.latest_price_date || "—"}
               </p>
             </section>
             <CalculationTrace
@@ -145,14 +146,14 @@ export function CompanyDetail({
               <Findings findings={current.findings} />
             </section>
             <section>
-              <h3>Observation history</h3>
+              <h3>Observation History</h3>
               <p className="muted">
                 Oldest first. Calculations use only the latest observation.
               </p>
               {current.observations.map((o, i) => (
                 <details key={`${o.record_id}-${i}`}>
                   <summary>
-                    {o.price_date || "Undated"} · {o.record_id} · {o.origin}
+                    {o.price_date || "Undated"} · {o.record_id} · {titleLabel(o.origin)}
                   </summary>
                   <CalculationTrace observation={o} />
                 </details>

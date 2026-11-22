@@ -251,3 +251,15 @@ def test_start_up_fails_clearly_on_an_unusable_data_folder(tmp_path):
     settings = Settings(data_dir=tmp_path, ingest=IngestConfig())  # empty folder: no files
     with pytest.raises(DatasetError, match="cannot read"), TestClient(create_app(lambda: build_snapshot(settings))):
         pass
+
+
+def test_every_endpoint_is_described_in_openapi(client):
+    paths = client.get("/openapi.json").json()["paths"]
+    for path, ops in paths.items():
+        for op in ops.values():
+            assert op.get("summary") and op.get("description"), path
+    search = paths["/api/companies"]["get"]
+    assert "similarity" in search["description"].lower()
+    assert all(param.get("description") for param in search["parameters"])
+    assert "422" in search["responses"]
+    assert "404" in paths["/api/companies/{key}"]["get"]["responses"]

@@ -1,4 +1,5 @@
 "use client";
+import { titleLabel } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import {
   Download,
@@ -116,7 +117,7 @@ export default function ComparePage() {
     {
       id: "similarity",
       accessorFn: (p) => p.evidence.similarity,
-      header: "Similarity score",
+      header: "Similarity Score",
       cell: ({ row }) => (
         <span className="score">
           <span className="score-bar">
@@ -149,7 +150,9 @@ export default function ComparePage() {
                 className={`severity-${f.severity}`}
                 title={f.message}
               >
-                {f.source === "derived" ? "model-derived" : f.severity}
+                {f.source === "derived"
+                  ? "Model-Derived"
+                  : titleLabel(f.severity)}
               </Badge>
             ))
           ) : (
@@ -201,7 +204,7 @@ export default function ComparePage() {
       accessorKey: "stat",
       header: "Statistic",
       cell: ({ row }) => (
-        <span className="capitalize">{row.original.stat}</span>
+        <span>{titleLabel(row.original.stat)}</span>
       ),
     },
     ...(["ev_revenue", "ev_ebitda", "pe"] as const).map((key) => ({
@@ -216,10 +219,10 @@ export default function ComparePage() {
   ];
   return (
     <div className="page-stack">
-      <h1>Compare companies</h1>
-      <section className="panel search-panel" aria-label="Comparison controls">
+      <h1>Compare Companies</h1>
+      <section className="panel search-panel" aria-label="Comparison Controls">
         <div className="search-field">
-          <label htmlFor="company-search">Target company</label>
+          <label htmlFor="company-search">Target Company</label>
           <div className="input-icon">
             <Search size={18} />
             <Input
@@ -237,7 +240,7 @@ export default function ComparePage() {
           </div>
         </div>
         <div className="k-field">
-          <label htmlFor="peer-count">Number of peers</label>
+          <label htmlFor="peer-count">Number of Peers</label>
           <Input
             id="peer-count"
             type="number"
@@ -252,14 +255,14 @@ export default function ComparePage() {
         <div className="search-note">
           <SlidersHorizontal size={16} />
           <span>
-            Description similarity
+            Description Similarity
             <br />
             <small>Size and geography are evidence only</small>
           </span>
         </div>
         {!validK && <p className="error">Enter a whole number from 1 to 50.</p>}
         {query.trim() && (
-          <div className="search-results" aria-label="Company matches">
+          <div className="search-results" aria-label="Company Matches">
             {searchError ? (
               <p role="alert" className="error">
                 {searchError}
@@ -298,7 +301,7 @@ export default function ComparePage() {
                       disabled={searchOffset === 0}
                       onClick={() => setSearchOffset((n) => n - 20)}
                     >
-                      Previous matches
+                      Previous Matches
                     </Button>
                     <Button
                       variant="outline"
@@ -327,7 +330,7 @@ export default function ComparePage() {
       {!result && !loading && (
         <section className="panel empty-state">
           <FileSearch size={36} />
-          <h2>Start with a company</h2>
+          <h2>Start with a Company</h2>
           <p className="muted">
             Search above and select a target to explore its peers and valuation
             multiples.
@@ -359,7 +362,7 @@ export default function ComparePage() {
               </div>
               <div className="target-actions">
                 <span className="muted">
-                  Price date: {result.target.entity.latest_price_date || "—"}
+                  Price Date: {result.target.entity.latest_price_date || "—"}
                 </span>
                 <Button
                   variant="outline"
@@ -367,7 +370,7 @@ export default function ComparePage() {
                   onClick={() => setDetail(result.target.entity.key)}
                 >
                   <FileSearch size={15} />
-                  Calculation trace
+                  Calculation Trace
                 </Button>
               </div>
             </div>
@@ -385,7 +388,7 @@ export default function ComparePage() {
             <div className="section-heading panel-heading">
               <div>
                 <h2>
-                  Peer comparison <Badge>{result.peers.length}</Badge>
+                  Peer Comparison <Badge>{result.peers.length}</Badge>
                 </h2>
                 <p className="muted">
                   Ranked by description similarity · USD millions
@@ -414,8 +417,8 @@ export default function ComparePage() {
           <section className="panel summary-panel">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">PEERS ONLY</p>
-                <h2>Valuation summary</h2>
+                <p className="eyebrow">Peers Only</p>
+                <h2>Valuation Summary</h2>
               </div>
               <span className="muted">NM and missing values excluded</span>
             </div>
@@ -436,7 +439,7 @@ export default function ComparePage() {
           </section>
           {(result.excluded.length > 0 || excluded.length > 0) && (
             <section className="panel exclusions">
-              <h2>Excluded companies</h2>
+              <h2>Excluded Companies</h2>
               {result.excluded.map((e) => (
                 <div className="exclusion-row" key={e.entity.key}>
                   <div>
@@ -495,7 +498,7 @@ export default function ComparePage() {
       >
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Peer evidence</SheetTitle>
+            <SheetTitle>Peer Evidence</SheetTitle>
             <SheetDescription>
               {evidence?.entity.name} · {evidence?.entity.key}
             </SheetDescription>
@@ -503,12 +506,12 @@ export default function ComparePage() {
           {evidence && (
             <div className="sheet-stack">
               <section className="evidence-score">
-                <p className="eyebrow">DESCRIPTION SIMILARITY SCORE</p>
+                <p className="eyebrow">Description Similarity Score</p>
                 <strong>{evidence.evidence.similarity}</strong>
                 <p className="muted">A similarity score, not a probability.</p>
               </section>
               <section>
-                <h3>Shared terms</h3>
+                <h3>Shared Terms</h3>
                 <div className="badge-row">
                   {evidence.evidence.shared_terms.map((term) => (
                     <Badge key={term}>{term}</Badge>
@@ -516,26 +519,24 @@ export default function ComparePage() {
                 </div>
               </section>
               <section>
-                <h3>Classification and geography</h3>
+                <h3>Classification and Geography</h3>
                 <dl className="trace-values">
                   {Object.entries(evidence.evidence.classification).map(
                     ([key, v]) => (
                       <div key={key}>
-                        <dt className="capitalize">
-                          {key.replaceAll("_", " ")}
-                        </dt>
-                        <dd>{v ? "Match" : "No match"}</dd>
+                        <dt>{titleLabel(key)}</dt>
+                        <dd>{v ? "Match" : "No Match"}</dd>
                       </div>
                     ),
                   )}
                   <div>
                     <dt>Country</dt>
                     <dd>
-                      {evidence.evidence.country_match ? "Match" : "No match"}
+                      {evidence.evidence.country_match ? "Match" : "No Match"}
                     </dd>
                   </div>
                   <div>
-                    <dt>Revenue ratio (peer / target)</dt>
+                    <dt>Revenue Ratio (Peer / Target)</dt>
                     <dd>{evidence.evidence.revenue_ratio ?? "—"}</dd>
                   </div>
                 </dl>
@@ -563,7 +564,7 @@ export default function ComparePage() {
                   setEvidence(null);
                 }}
               >
-                Open calculation trace
+                Open Calculation Trace
               </Button>
             </div>
           )}

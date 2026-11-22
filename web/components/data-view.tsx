@@ -1,5 +1,6 @@
 "use client";
 
+import { titleLabel } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "@/lib/api";
@@ -57,7 +58,7 @@ function useResource<T>(path: string, revision: number) {
 function SeverityBadge({ severity }: { severity: Severity }) {
   return (
     <Badge variant="outline" className={`severity-${severity}`}>
-      {severity}
+      {titleLabel(severity)}
     </Badge>
   );
 }
@@ -67,7 +68,7 @@ function SourceBadge({ source }: { source: Finding["source"] }) {
       variant="outline"
       className="border-violet-400/50 bg-violet-500/10 text-violet-700 dark:text-violet-300"
     >
-      model-derived
+      Model-Derived
     </Badge>
   ) : (
     <span className="muted">Validation</span>
@@ -115,7 +116,7 @@ function Pager({
 const codeColumns: ColumnDef<DatasetResponse["findings_by_code"][number]>[] = [
   {
     accessorKey: "code",
-    header: "Finding code",
+    header: "Finding Code",
     cell: ({ row }) => (
       <span className="font-mono text-sm">{row.original.code}</span>
     ),
@@ -236,7 +237,7 @@ export default function DataPage() {
     { accessorKey: "country", header: "Country" },
     { accessorKey: "sector", header: "Sector" },
     { accessorKey: "industry", header: "Industry" },
-    { accessorKey: "latest_price_date", header: "Latest price date" },
+    { accessorKey: "latest_price_date", header: "Latest Price Date" },
     {
       id: "findings",
       header: "Findings",
@@ -251,7 +252,7 @@ export default function DataPage() {
                   variant="outline"
                   className={`severity-${severity}`}
                 >
-                  {row.original.finding_counts[severity]} {severity}
+                  {row.original.finding_counts[severity]} {titleLabel(severity)}
                 </Badge>
               ),
           )}
@@ -264,7 +265,7 @@ export default function DataPage() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1>Data & integrity</h1>
+          <h1>Data & Integrity</h1>
           <p className="muted mt-2">
             {features.manualIngest
               ? "Inspect the source, review findings and preview manual additions."
@@ -277,7 +278,7 @@ export default function DataPage() {
             aria-expanded={showAdd}
             aria-controls="add-company-section"
           >
-            {showAdd ? "Close addition form" : "Add company"}
+            {showAdd ? "Close Addition Form" : "Add Company"}
           </Button>
         )}
       </header>
@@ -296,7 +297,7 @@ export default function DataPage() {
       <section className="space-y-5" aria-labelledby="dataset-health-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="dataset-health-heading" className="section-heading">
-            Dataset health
+            Dataset Health
           </h2>
           {dataset.data && (
             <Badge variant="outline">
@@ -321,7 +322,7 @@ export default function DataPage() {
                 [
                   ["Entities", dataset.data.counts.entities],
                   ["Records", dataset.data.counts.records],
-                  ["Manual additions", dataset.data.counts.manual_additions],
+                  ["Manual Additions", dataset.data.counts.manual_additions],
                 ] as const
               ).map(([label, count]) => (
                 <div className="panel" key={label}>
@@ -347,9 +348,9 @@ export default function DataPage() {
             </div>
             <div className="panel space-y-4">
               <div className="flex flex-wrap justify-between gap-2">
-                <h3 className="font-semibold">Findings by code</h3>
+                <h3 className="font-semibold">Findings by Code</h3>
                 <p className="muted text-sm">
-                  Reference date: {dataset.data.reference_date}
+                  Reference Date: {dataset.data.reference_date}
                 </p>
               </div>
               <DataTable
@@ -358,7 +359,7 @@ export default function DataPage() {
               />
               <details className="rounded-lg border p-4">
                 <summary className="cursor-pointer font-medium">
-                  Source files & hashes
+                  Source Files & Hashes
                 </summary>
                 <p className="muted mt-3 break-all text-sm">
                   {dataset.data.source.data_dir}
@@ -391,7 +392,7 @@ export default function DataPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="field" htmlFor="finding-severity">
-            <span>Finding severity</span>
+            <span>Finding Severity</span>
             <select
               id="finding-severity"
               value={findingSeverity}
@@ -400,16 +401,16 @@ export default function DataPage() {
                 setFindingOffset(0);
               }}
             >
-              <option value="">All severities</option>
+              <option value="">All Severities</option>
               {severities.map((severity) => (
                 <option key={severity} value={severity}>
-                  {severity}
+                  {titleLabel(severity)}
                 </option>
               ))}
             </select>
           </label>
           <label className="field" htmlFor="finding-code">
-            <span>Finding code</span>
+            <span>Finding Code</span>
             <Input
               id="finding-code"
               placeholder="e.g. missing_value"
@@ -421,7 +422,7 @@ export default function DataPage() {
             />
           </label>
           <label className="field" htmlFor="finding-company">
-            <span>Finding company key</span>
+            <span>Finding Company Key</span>
             <Input
               id="finding-company"
               placeholder="e.g. US:NOMA"
@@ -453,7 +454,7 @@ export default function DataPage() {
               onChange={setFindingOffset}
             />
             <p className="muted text-sm">
-              Dataset version: {findings.data.dataset_version}
+              Dataset Version: {findings.data.dataset_version}
             </p>
           </>
         )}
@@ -471,10 +472,10 @@ export default function DataPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="field" htmlFor="company-search">
-            <span>Search companies</span>
+            <span>Search Companies</span>
             <Input
               id="company-search"
-              placeholder="Company name, ticker or key"
+              placeholder="Company Name, Ticker or Key"
               value={companyQuery}
               onChange={(event) => {
                 setCompanyQuery(event.target.value);
@@ -483,10 +484,10 @@ export default function DataPage() {
             />
           </label>
           <label className="field" htmlFor="company-sector">
-            <span>Company sector</span>
+            <span>Company Sector</span>
             <Input
               id="company-sector"
-              placeholder="All sectors"
+              placeholder="All Sectors"
               value={companySector}
               onChange={(event) => {
                 setCompanySector(event.target.value);
@@ -495,7 +496,7 @@ export default function DataPage() {
             />
           </label>
           <label className="field" htmlFor="company-severity">
-            <span>Company finding severity</span>
+            <span>Company Finding Severity</span>
             <select
               id="company-severity"
               value={companySeverity}
@@ -504,10 +505,10 @@ export default function DataPage() {
                 setCompanyOffset(0);
               }}
             >
-              <option value="">All severities</option>
+              <option value="">All Severities</option>
               {severities.map((severity) => (
                 <option key={severity} value={severity}>
-                  {severity}
+                  {titleLabel(severity)}
                 </option>
               ))}
             </select>
@@ -537,7 +538,7 @@ export default function DataPage() {
               onChange={setCompanyOffset}
             />
             <p className="muted text-sm">
-              Dataset version: {companies.data.dataset_version}
+              Dataset Version: {companies.data.dataset_version}
             </p>
           </>
         )}

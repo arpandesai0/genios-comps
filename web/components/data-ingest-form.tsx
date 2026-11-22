@@ -1,5 +1,6 @@
 "use client";
 
+import { titleLabel } from "@/lib/utils";
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Finding, IngestResult, RawRecord } from "@/lib/api-types";
@@ -12,24 +13,24 @@ import { Findings } from "@/components/findings";
 const textFields = [
   ["id", "Record ID", "text"],
   ["ticker", "Ticker", "text"],
-  ["name", "Company name", "text"],
-  ["country", "Country (optional)", "text"],
+  ["name", "Company Name", "text"],
+  ["country", "Country (Optional)", "text"],
   ["sector", "Sector", "text"],
   ["industry", "Industry", "text"],
-  ["sub_industry", "Sub-industry", "text"],
-  ["price_currency", "Price currency", "text"],
-  ["reporting_currency", "Reporting currency", "text"],
-  ["fiscal_year_end", "Fiscal year end (MM-DD)", "text"],
-  ["price_date", "Price date", "date"],
+  ["sub_industry", "Sub-Industry", "text"],
+  ["price_currency", "Price Currency", "text"],
+  ["reporting_currency", "Reporting Currency", "text"],
+  ["fiscal_year_end", "Fiscal Year End (MM-DD)", "text"],
+  ["price_date", "Price Date", "date"],
 ] as const;
 const numericFields = [
-  ["price", "Share price (price currency)"],
-  ["shares_outstanding", "Shares outstanding (millions)"],
-  ["total_debt", "Total debt"],
+  ["price", "Share Price (Price Currency)"],
+  ["shares_outstanding", "Shares Outstanding (Millions)"],
+  ["total_debt", "Total Debt"],
   ["cash", "Cash"],
   ["revenue", "Revenue (LTM)"],
   ["ebitda", "EBITDA (LTM)"],
-  ["net_income", "Net income (LTM)"],
+  ["net_income", "Net Income (LTM)"],
 ] as const;
 type FormValues = Record<keyof RawRecord, string>;
 const emptyValues = Object.fromEntries(
@@ -114,7 +115,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
       setPreview(result);
       setPreviewedRecord(null);
       setSaved(
-        `Saved ${result.resolution.key ?? "record"}. Dataset version: ${result.dataset_version}.`,
+        `Saved ${result.resolution.key ?? "record"}. Dataset Version: ${result.dataset_version}.`,
       );
       onSaved();
     } catch (cause) {
@@ -127,9 +128,9 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
   return (
     <section className="panel space-y-6" aria-labelledby="add-company-heading">
       <div>
-        <p className="eyebrow">Manual addition</p>
+        <p className="eyebrow">Manual Addition</p>
         <h2 id="add-company-heading" className="section-heading">
-          Add company
+          Add Company
         </h2>
         <p className="muted mt-2">
           Additions are held in memory only and are lost on restart. Input files
@@ -138,7 +139,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
       </div>
       <form onSubmit={handlePreview} className="space-y-6">
         <fieldset disabled={busy} className="space-y-5">
-          <legend className="sr-only">Company record</legend>
+          <legend className="sr-only">Company Record</legend>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {textFields.map(([key, label, type]) => (
               <label className="field" key={key} htmlFor={`record-${key}`}>
@@ -154,7 +155,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
               </label>
             ))}
             <label className="field" htmlFor="record-units">
-              <span>Reporting units</span>
+              <span>Reporting Units</span>
               <select
                 id="record-units"
                 name="units"
@@ -162,14 +163,14 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
                 onChange={(event) => update("units", event.target.value)}
                 required
               >
-                <option value="">Choose units</option>
+                <option value="">Choose Units</option>
                 <option value="millions">Millions</option>
                 <option value="thousands">Thousands</option>
               </select>
             </label>
           </div>
           <label className="field" htmlFor="record-description">
-            <span>Business description</span>
+            <span>Business Description</span>
             <textarea
               id="record-description"
               name="description"
@@ -199,7 +200,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
             ))}
           </div>
           <Button type="submit" disabled={busy}>
-            {busy ? "Processing…" : "Preview addition"}
+            {busy ? "Processing…" : "Preview Addition"}
           </Button>
         </fieldset>
       </form>
@@ -218,13 +219,13 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
         </p>
       )}
       {preview && (
-        <div className="space-y-5 border-t pt-6" aria-label="Addition preview">
+        <div className="space-y-5 border-t pt-6" aria-label="Addition Preview">
           <div className="flex flex-wrap items-center gap-3">
             <h3 className="font-semibold">
-              {saved ? "Saved result" : "Preview result"}
+              {saved ? "Saved Result" : "Preview Result"}
             </h3>
             <Badge variant="outline">
-              {preview.resolution.action.replaceAll("_", " ")}
+              {titleLabel(preview.resolution.action)}
             </Badge>
             <span className="font-mono text-sm">{preview.resolution.key}</span>
           </div>
@@ -236,13 +237,13 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
           {preview.entity && (
             <>
               <div>
-                <h4 className="mb-3 font-semibold">Normalized USD values</h4>
+                <h4 className="mb-3 font-semibold">Normalized USD Values</h4>
                 <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {Object.entries(preview.entity.latest.usd).map(
                     ([key, value]) => (
                       <div key={key} className="rounded-lg border p-3">
                         <dt className="muted text-sm">
-                          {key.replaceAll("_", " ")}
+                          {titleLabel(key)}
                           {key === "price"
                             ? " · USD per share"
                             : " · USD millions"}
@@ -263,7 +264,7 @@ export function DataIngestForm({ onSaved }: { onSaved: () => void }) {
               onClick={save}
               disabled={busy || !preview.accepted || !previewedRecord}
             >
-              {busy ? "Saving…" : "Save to memory"}
+              {busy ? "Saving…" : "Save to Memory"}
             </Button>
           )}
         </div>

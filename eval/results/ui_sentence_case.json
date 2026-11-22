@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-21",
+  "scope": "UI sentence-case labels only",
+  "checks": {
+    "make_check": {"passed": true, "tests_passed": 159},
+    "web_eslint": {"passed": true},
+    "web_typescript": {"passed": true, "route_types_generated": true},
+    "playwright": {"passed": true, "tests_passed": 7, "mode": "synthetic mocks", "browser": "installed Chrome", "port": 3101}
+  },
+  "interpretation": {
+    "improved": "Severity, source, action, provenance and generated field labels use sentence case consistently; financial acronyms retain uppercase spelling.",
+    "regressions": "None detected by the existing backend and browser suites. No retrieval or finance changes.",
+    "tradeoff": "A shared presentation helper replaces inconsistent inline and CSS casing. Worth the small addition for consistency across Data, Compare and detail panels.",
+    "limits": "Presentation regression checks, not a retrieval-quality measurement. The initial browser run used the existing API server and lacked the bundled browser; the successful run used an isolated mock server and installed Chrome."
+  }
+}
