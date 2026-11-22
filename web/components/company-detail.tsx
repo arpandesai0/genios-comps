@@ -148,9 +148,11 @@ export function CompanyDetail({
                         {listing.name && <span className="ml-2">{listing.name}</span>}
                       </span>
                       <span className="muted text-sm">
-                        {listing.counted
-                          ? "Counted Toward Market Cap"
-                          : "Duplicate Listing · Shares Counted Once"}
+                        {!listing.counted
+                          ? "Duplicate Listing · Shares Counted Once"
+                          : listing.market_value_m === null
+                            ? "Included · Market Value Unavailable"
+                            : "Counted Toward Market Cap"}
                       </span>
                     </li>
                   ))}
