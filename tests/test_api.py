@@ -190,10 +190,8 @@ def test_search_precedence_key_before_ticker_before_names(rich):
     assert rich.get("/api/companies", params={"q": "US:ACME"}).json()["items"][0]["match"] == "key"
     assert rich.get("/api/companies", params={"q": "acme retail plc"}).json()["items"][0]["match"] == "name_exact"
     partial = rich.get("/api/companies", params={"q": "bolt class"}).json()
-    assert [(i["key"], i["match"]) for i in partial["items"]] == [
-        ("US:BLT.A", "name_partial"),
-        ("US:BLT.B", "name_partial"),
-    ]  # ties ordered by key
+    # Both share classes match; the issuer appears once, and the shown class wins the tie.
+    assert [(i["key"], i["match"], i["matched_key"]) for i in partial["items"]] == [("US:BLT.A", "name_partial", None)]
 
 
 def test_search_finds_a_company_by_an_old_name(rich):
@@ -203,40 +201,39 @@ def test_search_finds_a_company_by_an_old_name(rich):
 
 def test_whitespace_query_lists_everything(rich):
     body = rich.get("/api/companies", params={"q": "   "}).json()
-    assert body["total"] == 5 and all(i["match"] is None for i in body["items"])
+    assert body["total"] == 4 and all(i["match"] is None for i in body["items"])
 
 
 def test_sector_filter_is_case_insensitive_and_combines_with_search(rich):
     assert keys(rich.get("/api/companies", params={"sector": "industrials"}).json()) == [
         "US:ACME",
         "US:BLT.A",
-        "US:BLT.B",
     ]
     both = rich.get("/api/companies", params={"q": "acme", "sector": "Consumer"}).json()
     assert keys(both) == ["GB:ACME"]
-    warn = rich.get("/api/companies", params={"q": "bolt", "has_findings": "warning"}).json()
-    assert keys(warn) == ["US:BLT.A", "US:BLT.B"]  # possible_same_issuer
+    info = rich.get("/api/companies", params={"q": "bolt", "has_findings": "info"}).json()
+    assert keys(info) == ["US:BLT.A"]  # share_classes_merged
 
 
 def test_offset_past_the_end_gives_an_empty_page_with_the_total(rich):
     body = rich.get("/api/companies", params={"offset": 99}).json()
-    assert (body["total"], body["items"]) == (5, [])
+    assert (body["total"], body["items"]) == (4, [])
 
 
 def test_entity_findings_match_the_company_page(rich):
-    # Each share class has its own possible_same_issuer finding naming both keys; the entity filter
-    # returns only the company's own, so the counts agree with its page.
+    # A share-class key resolves to its issuer, so both class keys give the issuer's own findings.
     page = rich.get("/api/companies/US%3ABLT.A").json()
-    listed = rich.get("/api/dataset/findings", params={"entity": "US:BLT.A", "limit": 500}).json()
-    assert listed["total"] == len(page["findings"]) == sum(page["finding_counts"].values())
-    assert [f["code"] for f in listed["items"]].count("possible_same_issuer") == 1
+    for key in ("US:BLT.A", "US:BLT.B"):
+        listed = rich.get("/api/dataset/findings", params={"entity": key, "limit": 500}).json()
+        assert listed["total"] == len(page["findings"]) == sum(page["finding_counts"].values())
+        assert [f["code"] for f in listed["items"]].count("share_classes_merged") == 1
     assert rich.get("/api/dataset/findings", params={"entity": "US:NOPE"}).json()["total"] == 0
 
 
 def test_findings_severity_filter_and_offset(rich):
-    warnings = rich.get("/api/dataset/findings", params={"severity": "warning", "limit": 500}).json()
-    assert warnings["total"] >= 2 and all(f["severity"] == "warning" for f in warnings["items"])
-    second = rich.get("/api/dataset/findings", params={"severity": "warning", "limit": 1, "offset": 1}).json()
+    warnings = rich.get("/api/dataset/findings", params={"severity": "info", "limit": 500}).json()
+    assert warnings["total"] >= 2 and all(f["severity"] == "info" for f in warnings["items"])
+    second = rich.get("/api/dataset/findings", params={"severity": "info", "limit": 1, "offset": 1}).json()
     assert second["items"] == warnings["items"][1:2]
 
 
@@ -263,3 +260,23 @@ def test_every_endpoint_is_described_in_openapi(client):
     assert all(param.get("description") for param in search["parameters"])
     assert "422" in search["responses"]
     assert "404" in paths["/api/companies/{key}"]["get"]["responses"]
+
+
+def test_share_class_key_resolves_to_the_issuer(rich):
+    body = rich.get("/api/companies/US%3ABLT.B").json()
+    assert body["key"] == "US:BLT.A"  # identical value: the alphabetically first class is shown
+    assert body["share_class_keys"] == ["US:BLT.A", "US:BLT.B"]
+    assert [(c["key"], c["counted"]) for c in body["share_classes"]] == [("US:BLT.A", True), ("US:BLT.B", False)]
+    assert body["share_classes"][1]["market_value_m"] == 2000.0
+    # The same shares listed twice are counted once.
+    assert body["metrics"]["market_cap_usd_m"]["display"] == "2,000.0"
+    assert sorted(body["aliases"]) == ["Bolt Class A", "Bolt Class B"]
+
+
+def test_search_names_the_share_class_that_matched(rich):
+    by_ticker = rich.get("/api/companies", params={"q": "blt.b"}).json()["items"]
+    assert [(i["key"], i["match"], i["matched_key"]) for i in by_ticker] == [("US:BLT.A", "ticker", "US:BLT.B")]
+    by_key = rich.get("/api/companies", params={"q": "US:BLT.B"}).json()["items"]
+    assert [(i["key"], i["match"], i["matched_key"]) for i in by_key] == [("US:BLT.A", "key", "US:BLT.B")]
+    single = rich.get("/api/companies", params={"q": "OLDN"}).json()["items"][0]
+    assert single["share_class_keys"] == ["US:OLDN"] and single["matched_key"] is None

@@ -1,6 +1,6 @@
 # Ingestion
 
-How the service turns `companies.json` and `fx_rates.json` into the in-memory dataset that every other stage reads. The code is in `src/comps/ingest.py` (loading, validation, normalization and entity resolution) and `src/comps/quality.py` (checks across companies).
+How the service turns `companies.json` and `fx_rates.json` into the in-memory dataset that every other stage reads. The code is in `src/comps/ingest.py` (loading, validation, normalization and entity resolution), `src/comps/issuers.py` (merging share classes into issuers) and `src/comps/quality.py` (checks across companies).
 
 **Ingestion's main rule: it never silently changes data.** It never imputes values, rescales them, turns a missing value into zero, or rewrites a classification. Anything doubtful becomes a structured **finding** and the value is left as it was, or set to "unavailable" (`None`).
 
@@ -27,7 +27,7 @@ Manual additions (records posted through the API) are passed in as `extra_record
 
 ```
 read files ─► parse FX ─► validate + normalize each record ─► drop unlisted ─► group by COUNTRY:TICKER
-          ─► build each company's history ─► cross-company checks ─► Dataset (versioned)
+          ─► build each listing's history ─► merge share classes (DSU) ─► cross-company checks ─► Dataset (versioned)
 ```
 
 ### 1. Read the files
@@ -136,28 +136,47 @@ Records are grouped by key and sorted by (`price_date`, position in the input). 
 
 The result is one company with `observations = [r1, r3]` and `superseded = [r2]`. Its description is the October one, and it has two findings: `exact_duplicate` (r2 and r3) and `text_updated` (description). Comps use **r3 only**, the latest observation.
 
-### 6. Checks across companies (`quality.py`)
+### 6. Merge share classes (`issuers.py`)
 
-These run once all companies are built. They only **add findings** and never change data.
+A key `COUNTRY:TICKER` identifies a **listing**. Each country is assumed to have one exchange, so the same ticker in two countries is two companies. Share classes of one issuer (e.g. `US:BLT.A` and `US:BLT.B`) are merged into **one company**, with one row everywhere.
+
+**When two listings merge.** They are in the same known country (never `*`), have different tickers, and their latest records agree on every issuer-level field: `description`, `sector`, `industry`, `sub_industry`, `fiscal_year_end`, `reporting_currency`, `units`, `price_date`, `total_debt`, `cash`, `revenue`, `ebitda` and `net_income`. Ticker, name, price, price currency and share count may differ, because they belong to the class. A merge also needs a non-empty description and at least one financial value, so two near-empty records never merge on missing data. Ticker look-alikes (`ABC.A` / `ABC.B`) whose financials differ are **not** merged: nothing tells us which numbers are right.
+
+**How: a disjoint-set union.** Every listing key starts as its own parent. Listings with the same issuer signature (a hash of the fields above) are unioned. Each resulting set is re-rooted at its **shown key**, the class with the largest market value (price × shares; a class without one ranks last; ties go to the alphabetically first key). `Dataset.parents` keeps the parent pointer of every listing key, so any class key resolves to its issuer in one step, and `Dataset.entities` holds only issuers.
+
+**What the issuer looks like.** Its own fields and history are the shown class's. `aliases` holds every class's names, and `share_classes` lists every listing (shown first, then by market value) with a `counted` flag. Each class keeps its own records and findings; a non-shown class's findings name the shown key first, then the class key.
+
+**Market cap** (computed in finance) is the sum of price × shares over the **counted** classes. A class with the same price, price currency and share count as an earlier class is the same shares listed twice: it is not counted, and `duplicate_share_listing` (info) says so. If a counted class has no usable price or share count, market cap and everything built on it are **missing**, never a partial sum, and `share_class_incomplete` (limitation) names the class. Debt, cash, revenue, EBITDA and net income are counted once.
+
+| Finding | Severity | Raised when |
+|---|---|---|
+| `share_classes_merged` | info | listings were merged; names every class key |
+| `duplicate_share_listing` | info | a class repeats an earlier class's price, price currency and shares, so it is counted once |
+| `share_class_incomplete` | limitation | a non-shown class has no usable price or share count, so market cap is missing |
+
+Example: `US:DUAL.A` (price 20, 100 m shares) and `US:DUAL.B` (price 10, 50 m shares) with identical issuer data become one company shown as `US:DUAL.A`, with market cap 2,000 + 500 = 2,500. If `US:DUAL.B` had price 20 and 100 m shares too, it would be counted once (market cap 2,000).
+
+### 7. Checks across companies (`quality.py`)
+
+These run on issuers, after the merge. They only **add findings** and never change data.
 
 | Check | Rule | Finding |
 |---|---|---|
-| Possible same issuer | Two keys whose latest records are identical apart from `id`, `ticker` and `name`, e.g. `US:BLT.A` and `US:BLT.B`, two share classes | `possible_same_issuer` (warning) on both. They are **not merged**, and retrieval must keep them out of each other's peer lists. |
-| Shared name | Two keys with the same name (case-insensitive) that the check above doesn't explain | `shared_name` (warning): searching by name is ambiguous |
+| Shared name | Two companies with the same name (case-insensitive) | `shared_name` (warning): searching by name is ambiguous |
 | Stale price | Latest `price_date` more than `STALE_AFTER_DAYS` before the reference date (the latest valid `price_date` in the data) | `stale_price` (warning). The company is still served. |
 
-### 7. Severity
+### 8. Severity
 
 | Severity | Meaning | Example |
 |---|---|---|
 | `error` | Something could not be ingested | a record that isn't a JSON object |
 | `limitation` | A value the service needs is unavailable, so some outputs will be blank | null `revenue`, unknown currency |
-| `warning` | Worth attention, but every output can still be produced | stale price, possible same issuer, a missing `sector` |
+| `warning` | Worth attention, but every output can still be produced | stale price, shared name, a missing `sector` |
 | `info` | Provenance or normalization; nothing is lost | upper-cased ticker, exact duplicate |
 
 A missing field is a `limitation` when it affects anything other than evidence: a metric, `identity` (ticker, country), `retrieval` (description), `search` (name) or `freshness` (price date). It is a `warning` when it affects only evidence, like `sector`, `industry` or `sub_industry`, or when it affects nothing, like `fiscal_year_end`. Every finding also lists what it `affects`: a metric such as `ev_ebitda`, or a capability such as `retrieval`, `search` or `identity`.
 
-### 8. Dataset version
+### 9. Dataset version
 
 `Dataset.version` is a 12-character hash of the two files' SHA-256 values plus any manual additions. Every API response that depends on the data carries it, so a result can be traced back to its input data. The version does **not** cover the settings: the same files with a different `STALE_AFTER_DAYS` give the same version but can give different `stale_price` findings.
 
@@ -169,7 +188,7 @@ Example input: eight invented records.
 |---|---|---|---|
 | r1, r2, r3 | ACME | US | time series, plus an exact duplicate (see step 5) |
 | r4 | NIPP | JP | JPY price, EUR thousands financials |
-| r5, r6 | BLT.A, BLT.B | US | identical apart from ticker and name |
+| r5, r6 | BLT.A, BLT.B | US | share classes: identical apart from ticker and name |
 | r7 | *(none)* | US | no ticker |
 | r8 | zed | *(null)* | lower-case ticker, no country, `total_debt = -5`, price from 2026-05-01 |
 
@@ -185,7 +204,7 @@ Output, abridged. These are the real fields of `comps.models.Dataset`:
     {"code": "unlisted_excluded", "severity": "warning", "record_ids": ["r7"],
      "message": "Record r7 has no ticker, so it is treated as not listed and excluded from the universe."}
   ],
-  "entities": {                            // 5 companies from 8 records, ordered by key
+  "entities": {                            // 4 companies from 8 records (BLT.A and BLT.B are one), ordered by key
     "*:ZED": {
       "observations": ["r8"],
       "latest": {
@@ -217,13 +236,18 @@ Output, abridged. These are the real fields of `comps.models.Dataset`:
       "observations": ["r1", "r3"], "superseded": ["r2"],
       "findings": [{"code": "exact_duplicate"}, {"code": "text_updated", "fields": ["description"]}]
     },
-    "US:BLT.A": {"findings": [{"code": "possible_same_issuer", "entity_keys": ["US:BLT.A", "US:BLT.B"]}]},
-    "US:BLT.B": {"findings": [{"code": "possible_same_issuer", "entity_keys": ["US:BLT.A", "US:BLT.B"]}]}
-  }
+    "US:BLT.A": {
+      "share_classes": [{"key": "US:BLT.A", "counted": true}, {"key": "US:BLT.B", "counted": false}],
+      "findings": [{"code": "share_classes_merged", "entity_keys": ["US:BLT.A", "US:BLT.B"]},
+                   {"code": "duplicate_share_listing", "entity_keys": ["US:BLT.A", "US:BLT.B"]}]
+    }
+  },
+  "parents": {"*:ZED": "*:ZED", "JP:NIPP": "JP:NIPP", "US:ACME": "US:ACME",
+              "US:BLT.A": "US:BLT.A", "US:BLT.B": "US:BLT.A"}
 }
 ```
 
-Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `aliases` and `text_history`. Each observation carries `record_id`, `origin`, `price_date` and `original`, which is the record exactly as supplied.
+Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `aliases`, `text_history` and `share_classes` (empty for a single listing). Each observation carries `record_id`, `origin`, `price_date` and `original`, which is the record exactly as supplied.
 
 ## Findings catalogue
 
@@ -245,7 +269,9 @@ Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `
 | `conflicting_attributes` | warning | company | same key and latest date, different text |
 | `text_updated` | info | company | a text field changed over time |
 | `text_from_older_record` | info | company | the latest text value was empty, so an older one is used |
-| `possible_same_issuer` | warning | company | identical content under different keys |
+| `share_classes_merged` | info | company | listings with identical issuer data were merged into one company |
+| `duplicate_share_listing` | info | company | a share class repeats another's price, price currency and shares (counted once) |
+| `share_class_incomplete` | limitation | company | a share class has no usable price or shares, so market cap is missing |
 | `shared_name` | warning | company | the same name under different keys |
 | `stale_price` | warning | company | the latest price is older than the threshold |
 
@@ -261,12 +287,12 @@ Finance adds `nonpositive_ev` and `non_finite_result`. See [finance.md](finance.
 
 These were decided by the project owner where the brief was silent. They are logged in `AGENTS.md` §4.
 
-1. **Identity is `COUNTRY:TICKER`.** The record `id` is provenance only, so a repeated `id` is not a conflict.
+1. **Identity is `COUNTRY:TICKER`.** A key identifies one listing; one country has one exchange. The record `id` is provenance only, so a repeated `id` is not a conflict.
 2. **No ticker means not listed**, so the record is excluded (`unlisted_excluded`). Nothing available offline can verify such a record.
 3. **No country gives the placeholder `*`**, and the company is still served.
 4. **Records with the same key are appends.** Numbers form a time series by `price_date`, and comps use the latest observation only. Text takes the latest value, falling back to the most recent non-empty one. Exact duplicates collapse.
 5. **The later record in the input wins a same-date tie**, and a finding records it.
-6. **Different keys with identical content are kept separate** and flagged `possible_same_issuer`, for example share classes.
+6. **Share classes are one company.** Listings in one country with identical issuer-level data are merged (step 6); market cap sums the counted classes.
 7. **Supplied numbers are the source of truth.** There are no magnitude or unit-error checks, and nothing is ever rescaled.
 8. **A stale price is a warning only.** It never blocks serving.
 

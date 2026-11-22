@@ -1,12 +1,10 @@
-"""Cross-record data-quality checks that run once entities are resolved.
+"""Cross-record data-quality checks that run once share classes are merged into issuers.
 
 Each check only adds findings and never changes an entity's data.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Mapping
 from datetime import date, timedelta
 
@@ -21,20 +19,12 @@ def cross_entity_findings(
 ) -> dict[str, list[Finding]]:
     out: dict[str, list[Finding]] = {}
     for check in (
-        _possible_same_issuer(entities),
         _shared_names(entities),
         _freshness(entities, reference_date, config),
     ):
         for key, finding in check:
             out.setdefault(key, []).append(finding)
     return out
-
-
-def issuer_signature(entity: Entity) -> str:
-    """Latest record content without id, ticker and name. Equal signatures under different keys
-    suggest the same issuer listed twice (e.g. share classes)."""
-    content = {k: v for k, v in entity.latest.original.items() if k not in ("id", "ticker", "name")}
-    return hashlib.sha256(json.dumps(content, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def _groups(entities: Mapping[str, Entity], keyfunc) -> list[list[str]]:
@@ -46,31 +36,8 @@ def _groups(entities: Mapping[str, Entity], keyfunc) -> list[list[str]]:
     return [sorted(g) for g in groups.values() if len(g) > 1]
 
 
-def _possible_same_issuer(entities):
-    for group in _groups(entities, issuer_signature):
-        for key in group:
-            others = [k for k in group if k != key]
-            yield (
-                key,
-                Finding(
-                    code="possible_same_issuer",
-                    severity="warning",
-                    fields=("ticker", "name"),
-                    message=f"Identical description and financials to {', '.join(others)} under a different ticker "
-                    "(possibly another share class or a duplicate listing). Not merged; they are kept out of "
-                    "each other's peer lists.",
-                    affects=("peer_selection", "summary_statistics"),
-                    record_ids=tuple(r for k in group for r in entities[k].record_ids),
-                    entity_keys=tuple(group),
-                ),
-            )
-
-
 def _shared_names(entities):
-    same_issuer = {frozenset(g) for g in _groups(entities, issuer_signature)}
     for group in _groups(entities, lambda e: (e.name or "").casefold() or None):
-        if frozenset(group) in same_issuer:
-            continue  # already explained by possible_same_issuer
         for key in group:
             others = [k for k in group if k != key]
             yield (

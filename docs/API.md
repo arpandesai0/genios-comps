@@ -1,6 +1,6 @@
 # HTTP API contract (v0 draft)
 
-This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps`, `/api/comps.csv` and `/api/ingest/*` are not yet: they return 404, and the UI keeps using mocks for them. If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules below (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are agreed but not implemented yet; until they land, every key is its own issuer, and `docs/ingestion.md` still describes the current separate-entities behaviour.
+This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps`, `/api/comps.csv` and `/api/ingest/*` are not yet: they return 404, and the UI keeps using mocks for them. If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are implemented for these endpoints.
 
 ## Conventions
 

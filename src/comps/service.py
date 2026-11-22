@@ -24,9 +24,9 @@ _MATCH_ORDER: dict[Match, int] = {"key": 0, "ticker": 1, "name_exact": 2, "name_
 
 @dataclass(frozen=True)
 class CompanyView:
-    entity: Entity
+    entity: Entity  # an issuer: shown key plus every share class
     metrics: Metrics
-    findings: tuple[Finding, ...]  # what applies to the served values: company, latest observation, finance
+    findings: tuple[Finding, ...]  # what applies to the served values: company, latest observations, finance
 
     @property
     def finding_counts(self) -> dict[Severity, int]:
@@ -38,8 +38,13 @@ class CompanyView:
 class Snapshot:
     dataset: Dataset
     data_dir: Path
-    companies: Mapping[str, CompanyView]  # key -> view, ordered by key
+    companies: Mapping[str, CompanyView]  # shown key -> view, ordered by key
     findings: tuple[Finding, ...]  # every finding: dataset, all observations, companies, finance
+
+    def resolve(self, key: str) -> CompanyView | None:
+        """The company a listing key belongs to (any share-class key resolves to its issuer). Exact case."""
+        shown = self.dataset.parents.get(key, key)
+        return self.companies.get(shown)
 
 
 def build_snapshot(settings: Settings) -> Snapshot:
@@ -48,11 +53,13 @@ def build_snapshot(settings: Settings) -> Snapshot:
     companies: dict[str, CompanyView] = {}
     finance_findings: list[Finding] = []
     for key, entity in dataset.entities.items():
-        metrics, raised = compute_metrics(entity.latest)
+        listings = [c.entity.latest for c in entity.classes if c.counted]
+        metrics, raised = compute_metrics(entity.latest, listings)
         raised = tuple(replace(f, entity_keys=(key,)) for f in raised)
         finance_findings.extend(raised)
+        others = tuple(f for c in entity.share_classes[1:] for f in c.entity.findings + c.entity.latest.findings)
         companies[key] = CompanyView(
-            entity=entity, metrics=metrics, findings=entity.findings + entity.latest.findings + raised
+            entity=entity, metrics=metrics, findings=entity.findings + entity.latest.findings + others + raised
         )
     return Snapshot(
         dataset=dataset,
@@ -62,33 +69,44 @@ def build_snapshot(settings: Settings) -> Snapshot:
     )
 
 
-def search(snapshot: Snapshot, q: str | None) -> list[tuple[CompanyView, Match | None]]:
+@dataclass(frozen=True)
+class Hit:
+    company: CompanyView
+    match: Match | None
+    matched_key: str | None = None  # the share class that matched, when it is not the shown key
+
+
+def _match(e: Entity, needle: str) -> Match | None:
+    names = [n.casefold() for n in (e.name, *e.aliases) if n]
+    if e.key.casefold() == needle:
+        return "key"
+    if e.ticker.casefold() == needle:
+        return "ticker"
+    if needle in names:
+        return "name_exact"
+    if any(needle in n for n in names):
+        return "name_partial"
+    return None
+
+
+def search(snapshot: Snapshot, q: str | None) -> list[Hit]:
     """Companies matching ``q`` by key, ticker, exact name or partial name (names include aliases).
 
-    Best match type first, then by key. Without ``q`` every company is returned with no match type.
+    Every share class of an issuer is tried; the issuer appears once with its best match (the shown
+    class wins a tie) and ``matched_key`` naming the class when it is not the shown one. Best match
+    type first, then by key. Without ``q`` every company is returned with no match type.
     """
     if not q or not q.strip():
-        return [(c, None) for c in snapshot.companies.values()]
+        return [Hit(c, None) for c in snapshot.companies.values()]
     needle = q.strip().casefold()
-    hits: list[tuple[CompanyView, Match]] = []
+    hits: list[Hit] = []
     for c in snapshot.companies.values():
-        e = c.entity
-        names = [n.casefold() for n in (e.name, *e.aliases) if n]
-        match: Match | None
-        if e.key.casefold() == needle:
-            match = "key"
-        elif e.ticker.casefold() == needle:
-            match = "ticker"
-        elif needle in names:
-            match = "name_exact"
-        elif any(needle in n for n in names):
-            match = "name_partial"
-        else:
-            match = None
-        if match:
-            hits.append((c, match))
-    hits.sort(key=lambda h: (_MATCH_ORDER[h[1]], h[0].entity.key))
-    return [(c, m) for c, m in hits]
+        found = [(m, cls.entity.key) for cls in c.entity.classes if (m := _match(cls.entity, needle))]
+        if found:
+            match, key = min(found, key=lambda f: _MATCH_ORDER[f[0]])
+            hits.append(Hit(c, match, key if key != c.entity.key else None))
+    hits.sort(key=lambda h: (_MATCH_ORDER[h.match] if h.match else 0, h.company.entity.key))
+    return hits
 
 
 # --- read-only queries (the API layer only parses parameters and serialises the results) ----------
@@ -101,16 +119,16 @@ def list_companies(
     has_findings: Severity | None = None,
     limit: int = 20,
     offset: int = 0,
-) -> tuple[int, list[tuple[CompanyView, Match | None]]]:
+) -> tuple[int, list[Hit]]:
     """Search, then filter by sector (case-insensitive) and by having a finding of a severity.
 
     Returns the total number of matches and the requested page.
     """
     rows = search(snapshot, q)
     if sector:
-        rows = [(c, m) for c, m in rows if (c.entity.sector or "").casefold() == sector.casefold()]
+        rows = [h for h in rows if (h.company.entity.sector or "").casefold() == sector.casefold()]
     if has_findings:
-        rows = [(c, m) for c, m in rows if c.finding_counts[has_findings] > 0]
+        rows = [h for h in rows if h.company.finding_counts[has_findings] > 0]
     return len(rows), rows[offset : offset + limit]
 
 
@@ -123,9 +141,9 @@ def list_findings(
     offset: int = 0,
 ) -> tuple[int, list[Finding]]:
     """Filter findings. With ``entity``, it returns exactly that company's own findings (the same list as
-    its company page), so a share-class sibling's mirror-image finding is not repeated."""
+    its company page). A share-class key resolves to its issuer."""
     if entity is not None:
-        company = snapshot.companies.get(entity)
+        company = snapshot.resolve(entity)
         pool: tuple[Finding, ...] = company.findings if company else ()
     else:
         pool = snapshot.findings

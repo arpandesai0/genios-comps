@@ -74,16 +74,6 @@ def test_missing_latest_text_falls_back_to_older_value_with_finding(fx):
     assert "text_from_older_record" in codes(e.findings)
 
 
-def test_possible_same_issuer_flagged_on_both_but_not_merged(fx):
-    a = make_record(ticker="AAA", name="Twin Holdings")
-    b = make_record(ticker="AAB", name="Twin Inc")
-    ds = build_dataset([a, b], fx)
-    assert sorted(ds.entities) == ["US:AAA", "US:AAB"]
-    for key in ds.entities:
-        (f,) = ds.entities[key].findings
-        assert f.code == "possible_same_issuer" and f.entity_keys == ("US:AAA", "US:AAB")
-
-
 def test_shared_name_with_different_content(fx):
     a = make_record(ticker="AAA", name="Same Name Co", revenue=10.0)
     b = make_record(ticker="BBB", name="same name co", revenue=99.0)

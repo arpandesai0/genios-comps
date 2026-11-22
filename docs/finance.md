@@ -18,6 +18,8 @@ P/E                 = market cap ÷ net_income
 
 Revenue, EBITDA and net income are last-twelve-months values, as supplied. Only the company's **latest** observation is used, and fields are never mixed across dates.
 
+**Share classes.** For an issuer with several share classes (see [ingestion.md § 6](ingestion.md#6-merge-share-classes-issuerspy)), market cap is the glossary formula applied to each **counted** class and summed: `Σ price × shares_outstanding`. Debt, cash, revenue, EBITDA and net income come from the issuer's latest observation, once. If any counted class has no usable price or share count, market cap is **missing** (never a partial sum), and `missing_inputs` names the root fields (e.g. `["price"]`); a `share_class_incomplete` finding names the class. `compute_metrics(obs, listings)` takes the counted classes' latest observations as `listings`; a single listing is just `obs`.
+
 ## Every value has a status
 
 | Status | When | `value` / `raw` | `display` |

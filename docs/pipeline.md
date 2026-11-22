@@ -15,7 +15,7 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | # | Stage | Input → output | Status | Code | Docs |
 |---|---|---|---|---|---|
 | 1 | **Ingestion**: validate, normalize to USD, group by `COUNTRY:TICKER`, build time series | JSON files → `Dataset` of `Entity` + `Observation` + `Finding` | ✅ done | `ingest.py` | [ingestion.md](ingestion.md) |
-| 2 | **Quality**: checks across companies (same issuer, shared names, freshness) | entities → extra findings | ✅ done | `quality.py` | [ingestion.md § 6](ingestion.md#6-checks-across-companies-qualitypy) |
+| 2 | **Issuers and quality**: merge share classes into issuers (disjoint-set union), then checks across companies (shared names, freshness) | listings → issuers + extra findings | ✅ done | `issuers.py`, `quality.py` | [ingestion.md § 6](ingestion.md#6-merge-share-classes-issuerspy), [§ 7](ingestion.md#7-checks-across-companies-qualitypy) |
 | 3 | **Resolve**: turn an analyst's query (key, ticker, exact name or alias, partial name) into the matching companies, best match first; the analyst always chooses the target, and comps take a key | query → entity key(s) with match type | ✅ done | `service.search`, served by `GET /api/companies` | [API.md](API.md#get-apicompanies) |
 | 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ⏳ planned | `retrieval/` | |
 | 5 | **Finance**: glossary metrics (ok, NM or missing), rounding, peer summary stats | `Observation` → `Metrics`; peers' `Metrics` → `Summary` | ✅ done | `finance.py` | [finance.md](finance.md) |
