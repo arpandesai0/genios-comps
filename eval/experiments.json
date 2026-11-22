@@ -2012,5 +2012,281 @@
         }
       }
     }
+  },
+  {
+    "experiment": 8,
+    "schema": 2,
+    "date": "2026-11-22T13:51:50+00:00",
+    "description": "Served defaults after review fixes: logs effective settings and dedup precision/recall at the served threshold (dev).",
+    "commit": "944854c8b58b68efec22ebeaf8e2d6380df304b2",
+    "settings": {},
+    "effective": {
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "near_duplicate": 0.88
+    },
+    "model": {
+      "name": "sentence-transformers/all-MiniLM-L6-v2",
+      "dim": 384,
+      "size_gb": 0.09
+    },
+    "env": {
+      "python": "3.11.2",
+      "numpy": "2.1.3",
+      "scikit-learn": "1.5.2",
+      "fastembed": "0.9.1",
+      "onnxruntime": "1.32.0"
+    },
+    "inputs": {
+      "retrieval_v1": {
+        "input": "6a79f5a1113e",
+        "golden": "75367ee0e72f",
+        "queries": 57,
+        "k": 10
+      },
+      "independent": {
+        "input": "1152e3ca65a2",
+        "golden": "b4975b23cbcf",
+        "queries": 90,
+        "k": 10
+      },
+      "dedup": {
+        "input": "a387411bffeb",
+        "golden": "cefdefd59089",
+        "queries": 160,
+        "k": 50
+      }
+    },
+    "outputs": {
+      "retrieval_v1": {
+        "path": "eval/runs/008/retrieval_v1.json",
+        "sha": "aa3627ca8191"
+      },
+      "independent": {
+        "path": "eval/runs/008/independent.json",
+        "sha": "27d6396b281f"
+      },
+      "dedup": {
+        "path": "eval/runs/008/dedup.json",
+        "sha": "e9f7700318bd"
+      }
+    },
+    "runtime": {
+      "retrieval_v1": {
+        "startup_s": 3.1,
+        "rss_mb": 434.3,
+        "latency_ms": {
+          "n": 57,
+          "min": 0.89,
+          "mean": 1.37,
+          "p50": 1.17,
+          "p95": 2.32,
+          "max": 5.43
+        }
+      },
+      "independent": {
+        "startup_s": 2.5,
+        "rss_mb": 392.6,
+        "latency_ms": {
+          "n": 90,
+          "min": 0.92,
+          "mean": 1.26,
+          "p50": 1.09,
+          "p95": 2.08,
+          "max": 3.96
+        }
+      },
+      "dedup": {
+        "startup_s": 4.1,
+        "rss_mb": 348.2,
+        "latency_ms": {
+          "n": 160,
+          "min": 3.23,
+          "mean": 4.12,
+          "p50": 4.01,
+          "p95": 4.75,
+          "max": 14.5
+        }
+      }
+    },
+    "results": {
+      "retrieval_v1": {
+        "dev": {
+          "split": "dev",
+          "targets": 29,
+          "overall": {
+            "ndcg@5": 0.8155,
+            "precision@5": 0.5655,
+            "precision@5_ceiling": 0.6897,
+            "recall@5": 0.8218,
+            "ndcg@10": 0.8355,
+            "precision@10": 0.3241,
+            "precision@10_ceiling": 0.3448,
+            "recall@10": 0.9425
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 7,
+              "ndcg@10": 0.8866
+            },
+            "cross_country": {
+              "targets": 11,
+              "ndcg@10": 0.7894
+            },
+            "mislabelled": {
+              "targets": 2,
+              "ndcg@10": 0.9194
+            },
+            "boilerplate": {
+              "targets": 4,
+              "ndcg@10": 0.5268
+            },
+            "geo_trap": {
+              "targets": 5,
+              "ndcg@10": 0.6156
+            },
+            "(none)": {
+              "targets": 8,
+              "ndcg@10": 0.9336
+            }
+          },
+          "duplicate_listing_returned": 0,
+          "both_copies_returned": 0,
+          "geography_lift": 1.5361
+        }
+      },
+      "independent": {
+        "dev": {
+          "split": "dev",
+          "targets": 45,
+          "overall": {
+            "ndcg@5": 0.7268,
+            "precision@5": 0.5689,
+            "precision@5_ceiling": 0.8,
+            "recall@5": 0.7111,
+            "ndcg@10": 0.7294,
+            "precision@10": 0.3489,
+            "precision@10_ceiling": 0.4,
+            "recall@10": 0.8722
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 10,
+              "ndcg@10": 0.7761
+            },
+            "cross_country": {
+              "targets": 33,
+              "ndcg@10": 0.7205
+            },
+            "mislabelled": {
+              "targets": 4,
+              "ndcg@10": 0.7285
+            },
+            "boilerplate": {
+              "targets": 8,
+              "ndcg@10": 0.682
+            },
+            "geo_trap": {
+              "targets": 10,
+              "ndcg@10": 0.6247
+            },
+            "jargon": {
+              "targets": 12,
+              "ndcg@10": 0.7524
+            },
+            "(none)": {
+              "targets": 2,
+              "ndcg@10": 0.9216
+            }
+          },
+          "duplicate_listing_returned": 4,
+          "both_copies_returned": 0,
+          "geography_lift": 2.3661
+        }
+      },
+      "dedup": {
+        "dev": {
+          "pairs": 80,
+          "duplicates": 32,
+          "top_non_duplicate_score": 0.8015,
+          "recall_at_zero_false_duplicates": 0.9375,
+          "lowest_duplicate_score": 0.7406,
+          "by_kind": {
+            "case_whitespace": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9937,
+              "max": 1.0,
+              "mean": 0.9987
+            },
+            "extra_boilerplate": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8853,
+              "max": 0.9681,
+              "mean": 0.9343
+            },
+            "reordered": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9317,
+              "max": 0.9834,
+              "mean": 0.96
+            },
+            "reworded": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.7952,
+              "max": 0.9043,
+              "mean": 0.8716
+            },
+            "same_business_peer": {
+              "pairs": 19,
+              "duplicate": false,
+              "min": 0.349,
+              "max": 0.7675,
+              "mean": 0.6141
+            },
+            "same_group_different_unit": {
+              "pairs": 7,
+              "duplicate": false,
+              "min": 0.6115,
+              "max": 0.8015,
+              "mean": 0.6929
+            },
+            "same_template": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.2111,
+              "max": 0.408,
+              "mean": 0.2966
+            },
+            "shared_boilerplate": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.2486,
+              "max": 0.5853,
+              "mean": 0.4139
+            },
+            "truncated": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8727,
+              "max": 0.9442,
+              "mean": 0.9132
+            },
+            "updated": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.7406,
+              "max": 0.9561,
+              "mean": 0.9008
+            }
+          },
+          "served_threshold": 0.88,
+          "precision_at_served": 1.0,
+          "recall_at_served": 0.875
+        }
+      }
+    }
   }
 ]

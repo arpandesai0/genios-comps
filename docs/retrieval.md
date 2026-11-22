@@ -79,7 +79,7 @@ With `k = 10`, three peers come back with the note "Only 3 of the 10 requested p
 
 ## Cost
 
-Measured on a laptop CPU (experiments 2–6, [eval.md](eval.md)): embedding 90 companies at start-up takes about 4–5 s with MiniLM (320 short texts about 9 s); a peers request takes about 1.5 ms (p95 under 2 ms), faster than TF-IDF's ~9 ms because the vectors are dense and small. The API process uses about 350–490 MB of memory (342–365 MB in experiment 6); the image is about 1 GB.
+Measured on a laptop CPU (experiments 2–6, [eval.md](eval.md)): embedding 90 companies at start-up takes about 4–5 s with MiniLM (320 short texts about 9 s); a peers request takes about 1.5 ms (p95 under 2 ms), faster than TF-IDF's ~9 ms because the vectors are dense and small. The API process uses about 350–490 MB of memory (342–434 MB in experiments 6 and 8); the image is about 1 GB.
 
 ## How it is tested
 
