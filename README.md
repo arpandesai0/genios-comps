@@ -65,7 +65,7 @@ union      same issuer signature → one set      {US:BLT.A, US:BLT.B}   {US:ACM
 re-root    each set points at its shown key     US:BLT.A → US:BLT.A    US:BLT.B → US:BLT.A    US:ACME → US:ACME
 ```
 
-- Each merge rule unions pairs of keys, so the grouping is always transitive and consistent, and a new rule can be added without touching the rest. Listings are bucketed by a hash of the issuer-level fields, so building the sets takes linear time, not a comparison of every pair.
+- Each merge rule unions pairs of keys, so the grouping is always transitive and consistent, and a new rule can be added without touching the rest. Listings are bucketed by a hash of the issuer-level fields (compared as ingestion reads them: trimmed text, upper-case currency codes, numbers by value), so building and re-rooting the sets takes linear time, not a comparison of every pair.
 - The **shown key** is the class with the largest market value (price × shares). A class without one ranks last, and ties go to the alphabetically first key.
 - The parent pointer of every listing is kept (`Dataset.parents`), so any class key resolves to its issuer: `GET /api/companies/US:BLT.B` returns the issuer under `US:BLT.A`, and search reports which class matched (`matched_key`).
 

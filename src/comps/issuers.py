@@ -82,26 +82,56 @@ class DisjointSet(Generic[T]):
             out.setdefault(self.find(x), []).append(x)
         return out
 
-    def reroot(self, root: T) -> None:
-        """Make ``root`` the parent of every member of its set, including itself."""
-        old = self.find(root)
-        members = [x for x in self.parent if self.find(x) == old]
+    def reroot(self, root: T, members: Iterable[T]) -> None:
+        """Make ``root`` the parent of every member of its set, including itself.
+
+        ``members`` is the set as returned by ``groups()``, so re-rooting every set is linear overall.
+        """
+        members = list(members)
+        assert root in members
         for x in members:
             self.parent[x] = root
         self._size[root] = len(members)
 
 
+_UPPER_CODES = ("reporting_currency", "price_currency")
+_LOWER_CODES = ("units",)
+
+
+def _comparable(name: str, value: object) -> object:
+    """A supplied value as ingestion reads it, so cosmetic differences never decide a merge.
+
+    Text is trimmed (empty becomes None), currency codes are upper-cased and units lower-cased, as in
+    normalization, and numbers compare by value (500 equals 500.0). Anything else is kept as given.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if name in _UPPER_CODES:
+            return text.upper()
+        if name in _LOWER_CODES:
+            return text.lower()
+        return text
+    return value
+
+
 def issuer_signature(entity: Entity) -> str | None:
-    """Hash of the issuer-level fields of the latest record, or None if the listing can't be merged."""
+    """Hash of the issuer-level fields of the latest record, or None if the listing can't be merged.
+
+    It reads the latest record as supplied (normalized like ingestion), not text carried over from an
+    older record, so a latest record with an empty description never merges.
+    """
     if entity.country in ("", _UNKNOWN_COUNTRY):
         return None
-    raw = entity.latest.original
-    description = raw.get("description")
-    if not isinstance(description, str) or not description.strip():
+    content = {f: _comparable(f, entity.latest.original.get(f)) for f in ISSUER_FIELDS}
+    if content["description"] is None or all(content[f] is None for f in _FINANCIALS):
         return None
-    if all(raw.get(f) is None for f in _FINANCIALS):
-        return None
-    content = {"country": entity.country, **{f: raw.get(f) for f in ISSUER_FIELDS}}
+    content["country"] = entity.country
     return hashlib.sha256(json.dumps(content, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -110,7 +140,8 @@ def market_value(obs: Observation) -> float | None:
     if obs.usd.price is None or obs.shares_outstanding is None:
         return None
     v = obs.usd.price * obs.shares_outstanding
-    return v if math.isfinite(v) else None
+    # Rounded far below display precision so float noise can't break the alphabetical tie rule.
+    return round(v, 9) if math.isfinite(v) else None
 
 
 def _class_order(e: Entity) -> tuple[bool, float, str]:
@@ -123,7 +154,7 @@ def _listing_identity(obs: Observation) -> tuple | None:
     if obs.usd.price is None or obs.shares_outstanding is None:
         return None
     raw = obs.original
-    return (raw.get("price"), raw.get("price_currency"), raw.get("shares_outstanding"))
+    return tuple(_comparable(f, raw.get(f)) for f in ("price", "price_currency", "shares_outstanding"))
 
 
 def merge_share_classes(entities: Mapping[str, Entity]) -> tuple[dict[str, Entity], dict[str, str]]:
@@ -146,7 +177,7 @@ def merge_share_classes(entities: Mapping[str, Entity]) -> tuple[dict[str, Entit
     for members in dsu.groups().values():
         ordered = sorted((entities[k] for k in members), key=_class_order)
         shown = ordered[0]
-        dsu.reroot(shown.key)
+        dsu.reroot(shown.key, members)
         issuers[shown.key] = shown if len(ordered) == 1 else _issuer(ordered)
     return dict(sorted(issuers.items())), dict(sorted(dsu.parent.items()))
 

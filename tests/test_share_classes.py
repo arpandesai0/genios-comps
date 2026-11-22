@@ -31,7 +31,7 @@ def test_union_is_transitive_and_reroot_points_every_member_at_the_new_root():
     dsu.union("a", "b")
     dsu.union("c", "b")
     assert dsu.find("a") == dsu.find("c") != dsu.find("d")
-    dsu.reroot("c")
+    dsu.reroot("c", dsu.groups()[dsu.find("c")])
     assert {x: dsu.parent[x] for x in "abcd"} == {"a": "c", "b": "c", "c": "c", "d": "d"}
     assert dsu.union("a", "c") == "c"  # already one set
 
@@ -141,3 +141,25 @@ def test_single_listing_is_its_own_class(fx):
     e = ds.entities["US:ACME"]
     assert e.share_classes == () and e.share_class_keys == ("US:ACME",)
     assert ds.parents == {"US:ACME": "US:ACME"}
+
+
+def test_cosmetic_differences_do_not_block_a_merge(fx):
+    # Ingestion reads these the same way: currency codes are upper-cased, text is trimmed, 500 == 500.0.
+    a = make_record(ticker="COS.A", price=20.0, total_debt=500.0, reporting_currency="USD", description="Makes X.")
+    b = make_record(ticker="COS.B", price=10.0, total_debt=500, reporting_currency="usd", description="Makes X.  ")
+    assert list(build_dataset([a, b], fx).entities) == ["US:COS.A"]
+
+
+def test_price_currency_case_does_not_make_the_same_shares_count_twice(fx):
+    a = make_record(ticker="CUR.A", price_currency="USD")
+    b = make_record(ticker="CUR.B", price_currency="usd")
+    issuer = build_dataset([a, b], fx).entities["US:CUR.A"]
+    assert [c.counted for c in issuer.classes] == [True, False]
+    assert issuer_metrics(issuer).market_cap_usd_m.display == "2,000.0"
+
+
+def test_missing_inputs_list_price_causes_before_share_causes(fx):
+    a = make_record(ticker="MIS.A", price=20.0, shares_outstanding=None)
+    b = make_record(ticker="MIS.B", price=None, shares_outstanding=100.0)
+    issuer = build_dataset([a, b], fx).entities["US:MIS.A"]
+    assert issuer_metrics(issuer).market_cap_usd_m.missing_inputs == ("price", "shares_outstanding")

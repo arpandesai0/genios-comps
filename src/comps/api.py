@@ -215,8 +215,8 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         tags=["companies"],
         summary="Get one company by its exact key",
         description=(
-            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`. Case-sensitive for now: write "
-            "the key as shown in results (`gb:irov` returns 404). A bare ticker (`IROV`) "
+            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`, ignoring case (`gb:irov` works; "
+            "the response carries the canonical key). A bare ticker (`IROV`) "
             "or a name is not a key and returns 404: find the key with `GET /api/companies?q=` first. "
             "A share-class key resolves to its issuer, and the response carries the issuer's shown key. "
             "Returns the company's details, observation history, metrics and findings."
@@ -228,7 +228,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         key: Annotated[str, Path(description="Company key `COUNTRY:TICKER`.", examples=["GB:IROV"])],
     ) -> Any:
         s = snap(request)  # read the snapshot once, so the company and the version always agree
-        c = s.resolve(key)
+        c = s.resolve(key, ignore_case=True)
         if c is None:
             return _error(404, "not_found", f"No company with key {key!r}.")
         return {"dataset_version": s.dataset.version, **detail_json(c)}

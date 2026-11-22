@@ -280,3 +280,10 @@ def test_search_names_the_share_class_that_matched(rich):
     assert [(i["key"], i["match"], i["matched_key"]) for i in by_key] == [("US:BLT.A", "key", "US:BLT.B")]
     single = rich.get("/api/companies", params={"q": "OLDN"}).json()["items"][0]
     assert single["share_class_keys"] == ["US:OLDN"] and single["matched_key"] is None
+
+
+def test_lookup_ignores_case_but_other_key_parameters_do_not(rich):
+    body = rich.get("/api/companies/us%3Ablt.b").json()
+    assert body["key"] == "US:BLT.A"
+    assert rich.get("/api/companies/gb%3Aacme").json()["key"] == "GB:ACME"
+    assert rich.get("/api/dataset/findings", params={"entity": "us:blt.a"}).json()["total"] == 0

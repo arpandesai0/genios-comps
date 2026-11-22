@@ -41,10 +41,19 @@ class Snapshot:
     companies: Mapping[str, CompanyView]  # shown key -> view, ordered by key
     findings: tuple[Finding, ...]  # every finding: dataset, all observations, companies, finance
 
-    def resolve(self, key: str) -> CompanyView | None:
-        """The company a listing key belongs to (any share-class key resolves to its issuer). Exact case."""
-        shown = self.dataset.parents.get(key, key)
-        return self.companies.get(shown)
+    def resolve(self, key: str, ignore_case: bool = False) -> CompanyView | None:
+        """The company a listing key belongs to: any share-class key resolves to its issuer.
+
+        Exact case by default; ``ignore_case`` is for the single-company lookup endpoint only.
+        """
+        parents = self.dataset.parents
+        if ignore_case:
+            # Keys are built from upper-cased codes, so case-folded keys are unique.
+            folded = {k.casefold(): v for k, v in parents.items()}
+            shown = folded.get(key.casefold())
+        else:
+            shown = parents.get(key)
+        return self.companies.get(shown) if shown else None
 
 
 def build_snapshot(settings: Settings) -> Snapshot:

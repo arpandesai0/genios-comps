@@ -141,12 +141,30 @@ def listing_value(obs: Observation) -> tuple[float | None, tuple[str, ...]]:
     Returns None with the record fields to blame when an input is unusable, or None with no fields
     when the product is too large to represent.
     """
-    price, m_price = _value(obs, "price")
-    shares, m_shares = _value(obs, "shares_outstanding")
-    if price is None or shares is None:
-        return None, _dedupe(m_price + m_shares)
-    v = price * shares
+    v, missing = _market_cap([obs])
+    if v is None:
+        return None, missing
     return (clean(v), ()) if math.isfinite(v) else (None, ())
+
+
+def _market_cap(listings: Sequence[Observation]) -> tuple[float | None, tuple[str, ...]]:
+    """Unrounded sum of price x shares over ``listings``, or None with the fields to blame.
+
+    Price causes come before share causes, whichever class they come from, so the list reads like a
+    single listing's (``price``, ``price_currency``, then ``shares_outstanding``).
+    """
+    total = 0.0
+    price_causes: list[str] = []
+    share_causes: list[str] = []
+    for listing in listings:
+        price, m_price = _value(listing, "price")
+        shares, m_shares = _value(listing, "shares_outstanding")
+        price_causes += m_price
+        share_causes += m_shares
+        if price is not None and shares is not None:
+            total += price * shares
+    missing = _dedupe(price_causes + share_causes)
+    return (None, missing) if missing else (total, ())
 
 
 def compute_metrics(
@@ -165,17 +183,9 @@ def compute_metrics(
     cash, m_cash = _value(obs, "cash")
 
     overflowed: list[str] = []
-    mc_missing: list[str] = []
-    total: float | None = 0.0
-    for listing in listings if listings is not None else (obs,):
-        price, m_price = _value(listing, "price")
-        shares, m_shares = _value(listing, "shares_outstanding")
-        mc_missing += m_price + m_shares
-        if price is None or shares is None:
-            total = None
-        elif total is not None:
-            total += price * shares
-    mc = _finite(total if not mc_missing else None, "market_cap_usd_m", overflowed)
+    total, missing = _market_cap(listings if listings is not None else (obs,))
+    mc_missing = list(missing)
+    mc = _finite(total, "market_cap_usd_m", overflowed)
     ev_missing = mc_missing + m_debt + m_cash
     ev = _finite(
         mc + debt - cash if mc is not None and debt is not None and cash is not None else None,
