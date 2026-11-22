@@ -79,5 +79,1078 @@
       "geography_lift": 1.4424
     },
     "result_file": "eval/results/retrieval_tfidf_v1_dev.json"
+  },
+  {
+    "experiment": 2,
+    "schema": 2,
+    "date": "2026-11-22T13:06:09+00:00",
+    "description": "Baseline: TF-IDF v1 (served before embeddings), black-box runner, all fixtures.",
+    "commit": "84c6474110e034397308c4cf7516fc560bc55941",
+    "settings": {},
+    "model": null,
+    "env": {
+      "python": "3.11.2",
+      "numpy": "2.1.3",
+      "scikit-learn": "1.5.2",
+      "fastembed": "0.9.1",
+      "onnxruntime": "1.32.0"
+    },
+    "inputs": {
+      "retrieval_v1": {
+        "input": "6a79f5a1113e",
+        "golden": "75367ee0e72f",
+        "queries": 57,
+        "k": 10
+      },
+      "independent": {
+        "input": "1152e3ca65a2",
+        "golden": "b4975b23cbcf",
+        "queries": 90,
+        "k": 10
+      },
+      "dedup": {
+        "input": "a387411bffeb",
+        "golden": "cefdefd59089",
+        "queries": 160,
+        "k": 50
+      }
+    },
+    "outputs": {
+      "retrieval_v1": {
+        "path": "eval/runs/002/retrieval_v1.json",
+        "sha": "a91232ecb3fe"
+      },
+      "independent": {
+        "path": "eval/runs/002/independent.json",
+        "sha": "fd9940e89b47"
+      },
+      "dedup": {
+        "path": "eval/runs/002/dedup.json",
+        "sha": "8a86c271c3b2"
+      }
+    },
+    "runtime": {
+      "retrieval_v1": {
+        "startup_s": 2.6,
+        "rss_mb": 154.8,
+        "latency_ms": {
+          "n": 57,
+          "min": 8.2,
+          "mean": 8.92,
+          "p50": 8.8,
+          "p95": 9.72,
+          "max": 10.12
+        }
+      },
+      "independent": {
+        "startup_s": 2.0,
+        "rss_mb": 154.6,
+        "latency_ms": {
+          "n": 90,
+          "min": 8.38,
+          "mean": 9.05,
+          "p50": 8.95,
+          "p95": 10.14,
+          "max": 10.37
+        }
+      },
+      "dedup": {
+        "startup_s": 2.0,
+        "rss_mb": 156.8,
+        "latency_ms": {
+          "n": 160,
+          "min": 142.86,
+          "mean": 166.6,
+          "p50": 163.84,
+          "p95": 189.76,
+          "max": 293.66
+        }
+      }
+    },
+    "results": {
+      "retrieval_v1": {
+        "dev": {
+          "split": "dev",
+          "targets": 29,
+          "overall": {
+            "ndcg@5": 0.6568,
+            "precision@5": 0.4138,
+            "precision@5_ceiling": 0.6897,
+            "recall@5": 0.5948,
+            "ndcg@10": 0.6971,
+            "precision@10": 0.269,
+            "precision@10_ceiling": 0.3448,
+            "recall@10": 0.7874
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 7,
+              "ndcg@10": 0.6137
+            },
+            "cross_country": {
+              "targets": 11,
+              "ndcg@10": 0.7607
+            },
+            "mislabelled": {
+              "targets": 2,
+              "ndcg@10": 0.8144
+            },
+            "boilerplate": {
+              "targets": 4,
+              "ndcg@10": 0.3369
+            },
+            "geo_trap": {
+              "targets": 5,
+              "ndcg@10": 0.6761
+            },
+            "(none)": {
+              "targets": 8,
+              "ndcg@10": 0.838
+            }
+          },
+          "duplicate_listing_returned": 0,
+          "geography_lift": 1.4424
+        }
+      },
+      "independent": {
+        "dev": {
+          "split": "dev",
+          "targets": 45,
+          "overall": {
+            "ndcg@5": 0.4195,
+            "precision@5": 0.3644,
+            "precision@5_ceiling": 0.8,
+            "recall@5": 0.4556,
+            "ndcg@10": 0.4587,
+            "precision@10": 0.2533,
+            "precision@10_ceiling": 0.4,
+            "recall@10": 0.6333
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 10,
+              "ndcg@10": 0.4676
+            },
+            "cross_country": {
+              "targets": 33,
+              "ndcg@10": 0.4483
+            },
+            "mislabelled": {
+              "targets": 4,
+              "ndcg@10": 0.4222
+            },
+            "boilerplate": {
+              "targets": 8,
+              "ndcg@10": 0.3121
+            },
+            "geo_trap": {
+              "targets": 10,
+              "ndcg@10": 0.3071
+            },
+            "jargon": {
+              "targets": 12,
+              "ndcg@10": 0.5474
+            },
+            "(none)": {
+              "targets": 2,
+              "ndcg@10": 0.5416
+            }
+          },
+          "duplicate_listing_returned": 9,
+          "geography_lift": 1.5226
+        }
+      },
+      "dedup": {
+        "dev": {
+          "pairs": 80,
+          "duplicates": 32,
+          "top_non_duplicate_score": 0.6942,
+          "recall_at_zero_false_duplicates": 0.6562,
+          "lowest_duplicate_score": 0.2766,
+          "by_kind": {
+            "case_whitespace": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 1.0,
+              "max": 1.0,
+              "mean": 1.0
+            },
+            "extra_boilerplate": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.699,
+              "max": 0.798,
+              "mean": 0.7421
+            },
+            "reordered": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 1.0,
+              "max": 1.0,
+              "mean": 1.0
+            },
+            "reworded": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.2766,
+              "max": 0.7023,
+              "mean": 0.512
+            },
+            "same_business_peer": {
+              "pairs": 19,
+              "duplicate": false,
+              "min": 0.1439,
+              "max": 0.5573,
+              "mean": 0.3615
+            },
+            "same_group_different_unit": {
+              "pairs": 7,
+              "duplicate": false,
+              "min": 0.0825,
+              "max": 0.4233,
+              "mean": 0.202
+            },
+            "same_template": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.0974,
+              "max": 0.6675,
+              "mean": 0.2617
+            },
+            "shared_boilerplate": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.5324,
+              "max": 0.6942,
+              "mean": 0.5995
+            },
+            "truncated": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.5953,
+              "max": 0.6976,
+              "mean": 0.6347
+            },
+            "updated": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.6668,
+              "max": 0.8952,
+              "mean": 0.7657
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "experiment": 3,
+    "schema": 2,
+    "date": "2026-11-22T13:06:28+00:00",
+    "description": "Embedding ranking and dedup: sentence-transformers/all-MiniLM-L6-v2, description only.",
+    "commit": "e29f320c9a7e247a6c1f7da1db705fcfc7483d65",
+    "settings": {
+      "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2",
+      "MODEL_CACHE_DIR": "/Users/arpandesai/.cache/comps-models"
+    },
+    "model": {
+      "name": "sentence-transformers/all-MiniLM-L6-v2",
+      "dim": 384,
+      "size_gb": 0.09
+    },
+    "env": {
+      "python": "3.11.2",
+      "numpy": "2.1.3",
+      "scikit-learn": "1.5.2",
+      "fastembed": "0.9.1",
+      "onnxruntime": "1.32.0"
+    },
+    "inputs": {
+      "retrieval_v1": {
+        "input": "6a79f5a1113e",
+        "golden": "75367ee0e72f",
+        "queries": 57,
+        "k": 10
+      },
+      "independent": {
+        "input": "1152e3ca65a2",
+        "golden": "b4975b23cbcf",
+        "queries": 90,
+        "k": 10
+      },
+      "dedup": {
+        "input": "a387411bffeb",
+        "golden": "cefdefd59089",
+        "queries": 160,
+        "k": 50
+      }
+    },
+    "outputs": {
+      "retrieval_v1": {
+        "path": "eval/runs/003/retrieval_v1.json",
+        "sha": "ea5d072a7eed"
+      },
+      "independent": {
+        "path": "eval/runs/003/independent.json",
+        "sha": "7314a41696f8"
+      },
+      "dedup": {
+        "path": "eval/runs/003/dedup.json",
+        "sha": "545c55eb4acf"
+      }
+    },
+    "runtime": {
+      "retrieval_v1": {
+        "startup_s": 3.6,
+        "rss_mb": 428.9,
+        "latency_ms": {
+          "n": 57,
+          "min": 1.28,
+          "mean": 1.55,
+          "p50": 1.47,
+          "p95": 2.15,
+          "max": 3.07
+        }
+      },
+      "independent": {
+        "startup_s": 4.5,
+        "rss_mb": 487.2,
+        "latency_ms": {
+          "n": 90,
+          "min": 1.31,
+          "mean": 1.5,
+          "p50": 1.43,
+          "p95": 1.83,
+          "max": 2.67
+        }
+      },
+      "dedup": {
+        "startup_s": 8.6,
+        "rss_mb": 342.7,
+        "latency_ms": {
+          "n": 160,
+          "min": 4.98,
+          "mean": 5.91,
+          "p50": 5.77,
+          "p95": 6.61,
+          "max": 16.51
+        }
+      }
+    },
+    "results": {
+      "retrieval_v1": {
+        "dev": {
+          "split": "dev",
+          "targets": 29,
+          "overall": {
+            "ndcg@5": 0.8155,
+            "precision@5": 0.5655,
+            "precision@5_ceiling": 0.6897,
+            "recall@5": 0.8218,
+            "ndcg@10": 0.8355,
+            "precision@10": 0.3241,
+            "precision@10_ceiling": 0.3448,
+            "recall@10": 0.9425
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 7,
+              "ndcg@10": 0.8866
+            },
+            "cross_country": {
+              "targets": 11,
+              "ndcg@10": 0.7894
+            },
+            "mislabelled": {
+              "targets": 2,
+              "ndcg@10": 0.9194
+            },
+            "boilerplate": {
+              "targets": 4,
+              "ndcg@10": 0.5268
+            },
+            "geo_trap": {
+              "targets": 5,
+              "ndcg@10": 0.6156
+            },
+            "(none)": {
+              "targets": 8,
+              "ndcg@10": 0.9336
+            }
+          },
+          "duplicate_listing_returned": 0,
+          "geography_lift": 1.5361
+        }
+      },
+      "independent": {
+        "dev": {
+          "split": "dev",
+          "targets": 45,
+          "overall": {
+            "ndcg@5": 0.7268,
+            "precision@5": 0.5689,
+            "precision@5_ceiling": 0.8,
+            "recall@5": 0.7111,
+            "ndcg@10": 0.7263,
+            "precision@10": 0.3467,
+            "precision@10_ceiling": 0.4,
+            "recall@10": 0.8667
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 10,
+              "ndcg@10": 0.7761
+            },
+            "cross_country": {
+              "targets": 33,
+              "ndcg@10": 0.7173
+            },
+            "mislabelled": {
+              "targets": 4,
+              "ndcg@10": 0.7285
+            },
+            "boilerplate": {
+              "targets": 8,
+              "ndcg@10": 0.682
+            },
+            "geo_trap": {
+              "targets": 10,
+              "ndcg@10": 0.6144
+            },
+            "jargon": {
+              "targets": 12,
+              "ndcg@10": 0.7524
+            },
+            "(none)": {
+              "targets": 2,
+              "ndcg@10": 0.9027
+            }
+          },
+          "duplicate_listing_returned": 8,
+          "geography_lift": 2.371
+        }
+      },
+      "dedup": {
+        "dev": {
+          "pairs": 80,
+          "duplicates": 32,
+          "top_non_duplicate_score": 0.8015,
+          "recall_at_zero_false_duplicates": 0.9375,
+          "lowest_duplicate_score": 0.7406,
+          "by_kind": {
+            "case_whitespace": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9937,
+              "max": 1.0,
+              "mean": 0.9987
+            },
+            "extra_boilerplate": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8853,
+              "max": 0.9681,
+              "mean": 0.9343
+            },
+            "reordered": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9317,
+              "max": 0.9834,
+              "mean": 0.96
+            },
+            "reworded": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.7952,
+              "max": 0.9043,
+              "mean": 0.8716
+            },
+            "same_business_peer": {
+              "pairs": 19,
+              "duplicate": false,
+              "min": 0.349,
+              "max": 0.7675,
+              "mean": 0.6141
+            },
+            "same_group_different_unit": {
+              "pairs": 7,
+              "duplicate": false,
+              "min": 0.6115,
+              "max": 0.8015,
+              "mean": 0.6929
+            },
+            "same_template": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.2171,
+              "max": 0.408,
+              "mean": 0.3137
+            },
+            "shared_boilerplate": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.2486,
+              "max": 0.5853,
+              "mean": 0.4139
+            },
+            "truncated": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8727,
+              "max": 0.9442,
+              "mean": 0.9132
+            },
+            "updated": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.7406,
+              "max": 0.9561,
+              "mean": 0.9008
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "experiment": 4,
+    "schema": 2,
+    "date": "2026-11-22T13:06:57+00:00",
+    "description": "Embedding ranking and dedup: BAAI/bge-small-en-v1.5, description only.",
+    "commit": "e29f320c9a7e247a6c1f7da1db705fcfc7483d65",
+    "settings": {
+      "EMBEDDING_MODEL": "BAAI/bge-small-en-v1.5",
+      "MODEL_CACHE_DIR": "/Users/arpandesai/.cache/comps-models"
+    },
+    "model": {
+      "name": "BAAI/bge-small-en-v1.5",
+      "dim": 384,
+      "size_gb": 0.067
+    },
+    "env": {
+      "python": "3.11.2",
+      "numpy": "2.1.3",
+      "scikit-learn": "1.5.2",
+      "fastembed": "0.9.1",
+      "onnxruntime": "1.32.0"
+    },
+    "inputs": {
+      "retrieval_v1": {
+        "input": "6a79f5a1113e",
+        "golden": "75367ee0e72f",
+        "queries": 57,
+        "k": 10
+      },
+      "independent": {
+        "input": "1152e3ca65a2",
+        "golden": "b4975b23cbcf",
+        "queries": 90,
+        "k": 10
+      },
+      "dedup": {
+        "input": "a387411bffeb",
+        "golden": "cefdefd59089",
+        "queries": 160,
+        "k": 50
+      }
+    },
+    "outputs": {
+      "retrieval_v1": {
+        "path": "eval/runs/004/retrieval_v1.json",
+        "sha": "f5f96d2377fa"
+      },
+      "independent": {
+        "path": "eval/runs/004/independent.json",
+        "sha": "d377af8119e2"
+      },
+      "dedup": {
+        "path": "eval/runs/004/dedup.json",
+        "sha": "df10a38ab855"
+      }
+    },
+    "runtime": {
+      "retrieval_v1": {
+        "startup_s": 4.1,
+        "rss_mb": 498.4,
+        "latency_ms": {
+          "n": 57,
+          "min": 1.26,
+          "mean": 1.55,
+          "p50": 1.41,
+          "p95": 2.37,
+          "max": 2.8
+        }
+      },
+      "independent": {
+        "startup_s": 6.6,
+        "rss_mb": 522.8,
+        "latency_ms": {
+          "n": 90,
+          "min": 1.34,
+          "mean": 1.49,
+          "p50": 1.43,
+          "p95": 1.81,
+          "max": 2.98
+        }
+      },
+      "dedup": {
+        "startup_s": 15.7,
+        "rss_mb": 422.5,
+        "latency_ms": {
+          "n": 160,
+          "min": 5.13,
+          "mean": 5.87,
+          "p50": 5.7,
+          "p95": 6.84,
+          "max": 15.73
+        }
+      }
+    },
+    "results": {
+      "retrieval_v1": {
+        "dev": {
+          "split": "dev",
+          "targets": 29,
+          "overall": {
+            "ndcg@5": 0.7992,
+            "precision@5": 0.5448,
+            "precision@5_ceiling": 0.6897,
+            "recall@5": 0.7874,
+            "ndcg@10": 0.8222,
+            "precision@10": 0.3207,
+            "precision@10_ceiling": 0.3448,
+            "recall@10": 0.9224
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 7,
+              "ndcg@10": 0.8609
+            },
+            "cross_country": {
+              "targets": 11,
+              "ndcg@10": 0.8035
+            },
+            "mislabelled": {
+              "targets": 2,
+              "ndcg@10": 0.9435
+            },
+            "boilerplate": {
+              "targets": 4,
+              "ndcg@10": 0.391
+            },
+            "geo_trap": {
+              "targets": 5,
+              "ndcg@10": 0.6358
+            },
+            "(none)": {
+              "targets": 8,
+              "ndcg@10": 0.9335
+            }
+          },
+          "duplicate_listing_returned": 0,
+          "geography_lift": 1.6403
+        }
+      },
+      "independent": {
+        "dev": {
+          "split": "dev",
+          "targets": 45,
+          "overall": {
+            "ndcg@5": 0.694,
+            "precision@5": 0.5422,
+            "precision@5_ceiling": 0.8,
+            "recall@5": 0.6778,
+            "ndcg@10": 0.6916,
+            "precision@10": 0.3378,
+            "precision@10_ceiling": 0.4,
+            "recall@10": 0.8444
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 10,
+              "ndcg@10": 0.7098
+            },
+            "cross_country": {
+              "targets": 33,
+              "ndcg@10": 0.6622
+            },
+            "mislabelled": {
+              "targets": 4,
+              "ndcg@10": 0.7124
+            },
+            "boilerplate": {
+              "targets": 8,
+              "ndcg@10": 0.5856
+            },
+            "geo_trap": {
+              "targets": 10,
+              "ndcg@10": 0.5123
+            },
+            "jargon": {
+              "targets": 12,
+              "ndcg@10": 0.7644
+            },
+            "(none)": {
+              "targets": 2,
+              "ndcg@10": 0.8343
+            }
+          },
+          "duplicate_listing_returned": 4,
+          "geography_lift": 2.3985
+        }
+      },
+      "dedup": {
+        "dev": {
+          "pairs": 80,
+          "duplicates": 32,
+          "top_non_duplicate_score": 0.8369,
+          "recall_at_zero_false_duplicates": 1.0,
+          "lowest_duplicate_score": 0.8501,
+          "by_kind": {
+            "case_whitespace": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9955,
+              "max": 1.0,
+              "mean": 0.9991
+            },
+            "extra_boilerplate": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9212,
+              "max": 0.9707,
+              "mean": 0.9385
+            },
+            "reordered": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9493,
+              "max": 0.9871,
+              "mean": 0.9752
+            },
+            "reworded": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.8704,
+              "max": 0.9325,
+              "mean": 0.9043
+            },
+            "same_business_peer": {
+              "pairs": 19,
+              "duplicate": false,
+              "min": 0.6933,
+              "max": 0.8369,
+              "mean": 0.7677
+            },
+            "same_group_different_unit": {
+              "pairs": 7,
+              "duplicate": false,
+              "min": 0.6696,
+              "max": 0.8329,
+              "mean": 0.7447
+            },
+            "same_template": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.5714,
+              "max": 0.7765,
+              "mean": 0.6356
+            },
+            "shared_boilerplate": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.5886,
+              "max": 0.8139,
+              "mean": 0.698
+            },
+            "truncated": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8848,
+              "max": 0.9077,
+              "mean": 0.8962
+            },
+            "updated": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.8501,
+              "max": 0.9649,
+              "mean": 0.9093
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "experiment": 5,
+    "schema": 2,
+    "date": "2026-11-22T13:09:05+00:00",
+    "description": "Embedding ranking and dedup: google/embeddinggemma-300m, description only.",
+    "commit": "e29f320c9a7e247a6c1f7da1db705fcfc7483d65",
+    "settings": {
+      "EMBEDDING_MODEL": "google/embeddinggemma-300m",
+      "MODEL_CACHE_DIR": "/Users/arpandesai/.cache/comps-models"
+    },
+    "model": {
+      "name": "google/embeddinggemma-300m",
+      "dim": 768,
+      "size_gb": 1.24
+    },
+    "env": {
+      "python": "3.11.2",
+      "numpy": "2.1.3",
+      "scikit-learn": "1.5.2",
+      "fastembed": "0.9.1",
+      "onnxruntime": "1.32.0"
+    },
+    "inputs": {
+      "retrieval_v1": {
+        "input": "6a79f5a1113e",
+        "golden": "75367ee0e72f",
+        "queries": 57,
+        "k": 10
+      },
+      "independent": {
+        "input": "1152e3ca65a2",
+        "golden": "b4975b23cbcf",
+        "queries": 90,
+        "k": 10
+      },
+      "dedup": {
+        "input": "a387411bffeb",
+        "golden": "cefdefd59089",
+        "queries": 160,
+        "k": 50
+      }
+    },
+    "outputs": {
+      "retrieval_v1": {
+        "path": "eval/runs/005/retrieval_v1.json",
+        "sha": "0d9cd5bdb41f"
+      },
+      "independent": {
+        "path": "eval/runs/005/independent.json",
+        "sha": "0db5ebc6df91"
+      },
+      "dedup": {
+        "path": "eval/runs/005/dedup.json",
+        "sha": "c365a149527e"
+      }
+    },
+    "runtime": {
+      "retrieval_v1": {
+        "startup_s": 15.2,
+        "rss_mb": 734.7,
+        "latency_ms": {
+          "n": 57,
+          "min": 1.3,
+          "mean": 1.73,
+          "p50": 1.47,
+          "p95": 3.44,
+          "max": 4.67
+        }
+      },
+      "independent": {
+        "startup_s": 23.8,
+        "rss_mb": 575.4,
+        "latency_ms": {
+          "n": 90,
+          "min": 1.32,
+          "mean": 1.55,
+          "p50": 1.45,
+          "p95": 1.88,
+          "max": 3.84
+        }
+      },
+      "dedup": {
+        "startup_s": 82.2,
+        "rss_mb": 450.0,
+        "latency_ms": {
+          "n": 160,
+          "min": 6.34,
+          "mean": 11.76,
+          "p50": 10.6,
+          "p95": 17.77,
+          "max": 47.15
+        }
+      }
+    },
+    "results": {
+      "retrieval_v1": {
+        "dev": {
+          "split": "dev",
+          "targets": 29,
+          "overall": {
+            "ndcg@5": 0.7959,
+            "precision@5": 0.5586,
+            "precision@5_ceiling": 0.6897,
+            "recall@5": 0.8017,
+            "ndcg@10": 0.847,
+            "precision@10": 0.3379,
+            "precision@10_ceiling": 0.3448,
+            "recall@10": 0.977
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 7,
+              "ndcg@10": 0.937
+            },
+            "cross_country": {
+              "targets": 11,
+              "ndcg@10": 0.8259
+            },
+            "mislabelled": {
+              "targets": 2,
+              "ndcg@10": 0.9447
+            },
+            "boilerplate": {
+              "targets": 4,
+              "ndcg@10": 0.3888
+            },
+            "geo_trap": {
+              "targets": 5,
+              "ndcg@10": 0.6749
+            },
+            "(none)": {
+              "targets": 8,
+              "ndcg@10": 0.9656
+            }
+          },
+          "duplicate_listing_returned": 0,
+          "geography_lift": 1.7646
+        }
+      },
+      "independent": {
+        "dev": {
+          "split": "dev",
+          "targets": 45,
+          "overall": {
+            "ndcg@5": 0.6788,
+            "precision@5": 0.5778,
+            "precision@5_ceiling": 0.8,
+            "recall@5": 0.7222,
+            "ndcg@10": 0.6824,
+            "precision@10": 0.3489,
+            "precision@10_ceiling": 0.4,
+            "recall@10": 0.8722
+          },
+          "by_tag": {
+            "paraphrase": {
+              "targets": 10,
+              "ndcg@10": 0.7655
+            },
+            "cross_country": {
+              "targets": 33,
+              "ndcg@10": 0.6709
+            },
+            "mislabelled": {
+              "targets": 4,
+              "ndcg@10": 0.7258
+            },
+            "boilerplate": {
+              "targets": 8,
+              "ndcg@10": 0.4674
+            },
+            "geo_trap": {
+              "targets": 10,
+              "ndcg@10": 0.3898
+            },
+            "jargon": {
+              "targets": 12,
+              "ndcg@10": 0.794
+            },
+            "(none)": {
+              "targets": 2,
+              "ndcg@10": 0.9163
+            }
+          },
+          "duplicate_listing_returned": 6,
+          "geography_lift": 2.1394
+        }
+      },
+      "dedup": {
+        "dev": {
+          "pairs": 80,
+          "duplicates": 32,
+          "top_non_duplicate_score": 0.8722,
+          "recall_at_zero_false_duplicates": 0.6562,
+          "lowest_duplicate_score": 0.8076,
+          "by_kind": {
+            "case_whitespace": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9608,
+              "max": 0.9993,
+              "mean": 0.9879
+            },
+            "extra_boilerplate": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8076,
+              "max": 0.8844,
+              "mean": 0.8504
+            },
+            "reordered": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.9836,
+              "max": 0.992,
+              "mean": 0.9875
+            },
+            "reworded": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.8963,
+              "max": 0.934,
+              "mean": 0.9107
+            },
+            "same_business_peer": {
+              "pairs": 19,
+              "duplicate": false,
+              "min": 0.7036,
+              "max": 0.8722,
+              "mean": 0.8079
+            },
+            "same_group_different_unit": {
+              "pairs": 7,
+              "duplicate": false,
+              "min": 0.6275,
+              "max": 0.7414,
+              "mean": 0.6894
+            },
+            "same_template": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.4988,
+              "max": 0.6971,
+              "mean": 0.6023
+            },
+            "shared_boilerplate": {
+              "pairs": 11,
+              "duplicate": false,
+              "min": 0.79,
+              "max": 0.8597,
+              "mean": 0.8278
+            },
+            "truncated": {
+              "pairs": 5,
+              "duplicate": true,
+              "min": 0.8196,
+              "max": 0.8473,
+              "mean": 0.8346
+            },
+            "updated": {
+              "pairs": 6,
+              "duplicate": true,
+              "min": 0.8232,
+              "max": 0.9566,
+              "mean": 0.8908
+            }
+          }
+        }
+      }
+    }
   }
 ]

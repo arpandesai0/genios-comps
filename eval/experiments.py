@@ -142,6 +142,9 @@ def table(entries: Sequence[Mapping[str, Any]]) -> str:
         "P@10",
         "R@10",
         "dedup R@0FP",
+        "start s",
+        "mean ms",
+        "p95 ms",
         "description",
     )
     rows = [head] + [r for e in entries for r in _rows(e)]

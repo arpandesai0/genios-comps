@@ -25,7 +25,7 @@ test:
 check: lint typecheck test
 
 # Eval: run the pipeline at COMMIT (default HEAD) as a black box over HTTP on the fixtures, score the
-# captured output against golden labels, append to eval/experiments.jsonl.
+# captured output against golden labels, append to eval/experiments.json.
 # Usage: make experiment DESC="what it tests" [COMMIT=<sha>] [MODEL=<embedding model>] [HELD_OUT=1]
 experiment:
 	@test -n "$$DESC" || { echo 'usage: make experiment DESC="what this run tests" [COMMIT=sha] [MODEL=name]'; exit 2; }
