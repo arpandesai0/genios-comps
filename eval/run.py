@@ -211,11 +211,47 @@ def worktree(commit: str):
         subprocess.run(["git", "worktree", "remove", "--force", str(path)], cwd=ROOT, check=False)
 
 
+# Service settings never inherited from the shell: a run uses the commit's defaults plus --set only.
+SERVICE_SETTINGS = (
+    "EMBEDDING_MODEL",
+    "NEAR_DUPLICATE_THRESHOLD",
+    "MODEL_OFFLINE",
+    "MODEL_CACHE_DIR",
+    "STALE_AFTER_DAYS",
+    "DATA_DIR",
+)
+
+
+def service_env(tree: Path, settings: Mapping[str, str], data_dir: Path | None = None) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if k not in SERVICE_SETTINGS}
+    env.update(settings)
+    env["PYTHONPATH"] = str(tree / "src")
+    if data_dir is not None:
+        env["DATA_DIR"] = str(data_dir)
+    return env
+
+
+def effective_settings(tree: Path, settings: Mapping[str, str]) -> dict[str, Any] | None:
+    """The retrieval settings the commit actually serves with (its defaults plus --set), or None if the
+    commit has none (e.g. the TF-IDF commit). Read through the commit's own settings loader."""
+    code = (
+        "import json; from comps.config import load_settings; r = getattr(load_settings(), 'retrieval', None); "
+        "print(json.dumps(None if r is None else {'model': r.model, 'near_duplicate': r.near_duplicate}))"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], cwd=tree, env=service_env(tree, settings), capture_output=True, text=True
+    )
+    if out.returncode != 0:
+        raise RuntimeError(f"cannot read the commit's settings:\n{out.stderr[-2000:]}")
+    value: dict[str, Any] | None = json.loads(out.stdout)
+    return value
+
+
 @contextmanager
 def serve(tree: Path, data_dir: Path, settings: Mapping[str, str]):
     """Start the commit's API on ``data_dir``; yield (get, startup seconds, server pid)."""
     port = _free_port()
-    env = {**os.environ, **settings, "DATA_DIR": str(data_dir), "PYTHONPATH": str(tree / "src")}
+    env = service_env(tree, settings, data_dir)
     log = tempfile.TemporaryFile()  # noqa: SIM115 - closed in the finally block below
     cmd = [sys.executable, "-m", "uvicorn", "comps.api:app", "--host", "127.0.0.1", "--port", str(port)]
     proc = subprocess.Popen(cmd, cwd=tree, env=env, stdout=log, stderr=subprocess.STDOUT)
@@ -241,7 +277,11 @@ def serve(tree: Path, data_dir: Path, settings: Mapping[str, str]):
         yield get, round(time.monotonic() - start, 1), proc.pid
     finally:
         proc.terminate()
-        proc.wait(timeout=30)
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
         log.close()
 
 
@@ -253,7 +293,13 @@ def rss_mb(pid: int) -> float | None:
 # --- scoring ---------------------------------------------------------------------------------------
 
 
-def score(fixture: Fixture, captured: Mapping[str, Any], spec: Mapping[str, Any], splits: Sequence[str]) -> dict:
+def score(
+    fixture: Fixture,
+    captured: Mapping[str, Any],
+    spec: Mapping[str, Any],
+    splits: Sequence[str],
+    served_threshold: float | None = None,
+) -> dict:
     out = {}
     if fixture.kind == "retrieval":
         records = json.loads((fixture.path / "companies.json").read_text())
@@ -269,7 +315,7 @@ def score(fixture: Fixture, captured: Mapping[str, Any], spec: Mapping[str, Any]
                 continue
             a, b = spec["keys"][pair["id"]]
             rows.append((pair_score(captured[a], b), bool(pair["duplicate"]), pair["kind"]))
-        out[split] = score_dedup(rows)
+        out[split] = score_dedup(rows, served_threshold)
     return out
 
 
@@ -294,6 +340,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_dir = RUNS / f"{number:03d}"
     results, inputs, outputs, runtime = {}, {}, {}, {}
     with worktree(args.commit) as (commit, tree), tempfile.TemporaryDirectory() as tmp:
+        effective = effective_settings(tree, settings)
+        threshold = effective["near_duplicate"] if effective else None
         for fixture in fixtures:
             data_dir, queries, spec = prepare(fixture, Path(tmp))
             with serve(tree, data_dir, settings) as (get, startup_s, pid):
@@ -314,7 +362,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "k": fixture.k,
             }
             outputs[fixture.name] = {"path": out_path.relative_to(ROOT).as_posix(), "sha": sha(out_path.read_bytes())}
-            results[fixture.name] = score(fixture, captured, spec, splits)
+            results[fixture.name] = score(fixture, captured, spec, splits, threshold)
             print(f"{fixture.name}: {json.dumps(results[fixture.name].get('dev'), indent=1)[:1500]}", file=sys.stderr)
 
     entry = experiments.record(
@@ -322,7 +370,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         description=args.desc,
         commit=commit,
         settings=settings,
-        model=model_info(settings),
+        effective=effective,
+        model=model_info({"EMBEDDING_MODEL": effective["model"]} if effective else settings),
         inputs=inputs,
         outputs=outputs,
         runtime=runtime,

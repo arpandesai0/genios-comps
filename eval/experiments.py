@@ -39,7 +39,10 @@ def read(log: Path | None = None) -> list[dict]:
 
 
 def write(log: Path, entries: Sequence[Mapping[str, Any]]) -> None:
-    log.write_text(json.dumps(list(entries), indent=2, ensure_ascii=False) + "\n")
+    """Replace the log atomically (write a sibling file, then rename), so a crash never truncates it."""
+    tmp = log.with_name(log.name + ".tmp")
+    tmp.write_text(json.dumps(list(entries), indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(log)
 
 
 def next_number(log: Path | None = None) -> int:
@@ -62,6 +65,7 @@ def record(
     settings: Mapping[str, str],
     inputs: Mapping[str, Any],
     model: Mapping[str, Any] | None = None,
+    effective: Mapping[str, Any] | None = None,
     outputs: Mapping[str, Any],
     runtime: Mapping[str, Any],
     results: Mapping[str, Any],
@@ -81,6 +85,7 @@ def record(
         "description": description.strip(),
         "commit": commit,
         "settings": dict(settings),
+        "effective": dict(effective) if effective else None,  # what the commit served with (defaults + settings)
         "model": dict(model) if model else None,
         "env": {
             "python": platform.python_version(),
@@ -112,7 +117,8 @@ def _rows(e: Mapping[str, Any]) -> list[tuple[str, ...]]:
                 e["description"],
             )
         ]
-    cfg = e["settings"].get("EMBEDDING_MODEL", "(commit default)")
+    eff = e.get("effective") or {}
+    cfg = e["settings"].get("EMBEDDING_MODEL") or eff.get("model") or "(commit default)"
     rows = []
     for fixture, by_split in e["results"].items():
         rt = e["runtime"].get(fixture, {})

@@ -85,7 +85,7 @@ For a target, `ranked` is the list of returned peers, with aliases mapped to the
 | **Per-tag** | Mean nDCG@10 over the targets carrying each tag. |
 | **Duplicates** | `both_copies_returned`: both listings of one company in the same peer list, the failure dedup must prevent. `duplicate_listing_returned`: a second listing appeared at all, which is harmless on its own. |
 | **Geography lift** | Same-country share among irrelevant (rel 0) peers returned ÷ same-country share among all irrelevant candidates. 1 = country has no effect; above 1 = country words pull unrelated companies up. |
-| **Dedup recall at zero false duplicates** | Share of duplicate pairs scoring strictly above the best-scoring non-duplicate: the most duplicates any threshold can catch without hiding a genuine peer. Also precision and recall at a given threshold. |
+| **Dedup recall at zero false duplicates** | Share of duplicate pairs scoring strictly above the best-scoring non-duplicate: the most duplicates any threshold can catch without hiding a genuine peer (a ceiling). From experiment 8, also precision and recall at the served threshold. |
 | **Cost** | Service start-up (including indexing), memory (RSS) after start-up, and `GET /api/peers` latency over HTTP: min, mean, p50, p95, max (nearest-rank). |
 
 Cutoffs are @5 and @10, and values are means over the split's targets, rounded to 4 dp.
@@ -114,7 +114,7 @@ The runner starts one service process at a time, with one model, and stops it be
 | Field | Content |
 |---|---|
 | `experiment`, `schema`, `date`, `description` | number (last + 1), entry format, UTC time, what the run tests |
-| `commit`, `settings` | the commit run, and the service settings passed (e.g. `EMBEDDING_MODEL`) |
+| `commit`, `settings`, `effective` | the commit run; the settings passed (e.g. `EMBEDDING_MODEL`); and the retrieval settings it actually served with, read through the commit's own settings loader (its defaults plus the passed settings; added from experiment 8). Settings in the shell are never inherited |
 | `model` | the embedding model's name, vector size and download size |
 | `env` | Python, numpy, scikit-learn, fastembed and onnxruntime versions |
 | `inputs` | per fixture: hash of the input files, hash of the golden file, number of queries, k |

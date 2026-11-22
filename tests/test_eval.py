@@ -63,6 +63,15 @@ def test_dedup_scoring_finds_the_strictest_cut_without_false_duplicates():
     assert out["by_kind"]["y"] == {"pairs": 2, "duplicate": True, "min": 0.7, "max": 0.7, "mean": 0.7}
 
 
+def test_runner_ignores_service_settings_from_the_shell(monkeypatch, tmp_path):
+    monkeypatch.setenv("EMBEDDING_MODEL", "leaked/model")
+    monkeypatch.setenv("NEAR_DUPLICATE_THRESHOLD", "0.5")
+    env = run.service_env(tmp_path, {"MODEL_CACHE_DIR": "/c"}, tmp_path / "data")
+    assert "EMBEDDING_MODEL" not in env and "NEAR_DUPLICATE_THRESHOLD" not in env
+    assert env["MODEL_CACHE_DIR"] == "/c" and env["DATA_DIR"] == str(tmp_path / "data")
+    assert env["PYTHONPATH"] == str(tmp_path / "src")
+
+
 def test_latency_stats_use_nearest_rank_percentiles():
     stats = run.latency_stats([float(x) for x in range(1, 21)])  # 1..20 ms
     assert stats == {"n": 20, "min": 1.0, "mean": 10.5, "p50": 10.0, "p95": 19.0, "max": 20.0}
@@ -201,7 +210,8 @@ def test_committed_experiment_log_is_well_formed_and_reproducible_from_captured_
             fixture = FIXTURES[name]
             assert run.sha(run.golden_path(fixture).read_bytes()) == e["inputs"][name]["golden"]
             captured = json.loads(path.read_text())["responses"]
-            rescored = run.score(fixture, captured, run.golden(fixture), list(e["results"][name]))
+            threshold = (e.get("effective") or {}).get("near_duplicate")
+            rescored = run.score(fixture, captured, run.golden(fixture), list(e["results"][name]), threshold)
             # Metrics added after a run was logged may appear; every logged value must be reproduced.
             assert _contains(rescored, e["results"][name]), f"experiment {e['experiment']} {name}: rescore differs"
 

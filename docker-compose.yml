@@ -1,7 +1,11 @@
 # `make start DIR=/path/to/data` runs this. DIR must contain companies.json and fx_rates.json.
 services:
   api:
-    build: .
+    build:
+      context: .
+      args:
+        # The embedding model baked into the image (downloaded at build; the container runs offline).
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
     environment:
       DATA_DIR: /data
     volumes:

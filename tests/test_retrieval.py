@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,7 +28,7 @@ DOCS = {
 
 def index_and_dups(docs=DOCS):
     index = TfidfRetriever().fit(docs)
-    return index, NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()})
+    return index, NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()}, threshold=0.95)
 
 
 def test_similar_businesses_rank_first():
@@ -98,7 +99,7 @@ def test_target_without_description_gets_no_peers_and_a_note():
 def test_ties_are_ordered_by_key():
     docs = {"US:T": "alpha beta", "US:B": "alpha gamma", "US:A": "alpha delta"}
     index = TfidfRetriever().fit(docs)
-    dups = NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()})
+    dups = NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()}, threshold=0.95)
     sel = select_peers("US:T", 2, universe=docs, ranker=index, duplicates=dups)
     assert [p.key for p in sel.peers] == ["US:A", "US:B"]
 
@@ -261,7 +262,67 @@ def test_embedding_settings_are_read_at_startup():
     cfg = load_settings({"EMBEDDING_MODEL": "some/model", "MODEL_CACHE_DIR": "/m", "MODEL_OFFLINE": "1"}).retrieval
     assert (cfg.model, str(cfg.cache_dir), cfg.offline) == ("some/model", "/m", True)
     default = load_settings({}).retrieval
-    assert (default.model, default.cache_dir, default.offline) == (DEFAULT_EMBEDDING_MODEL, None, False)
+    assert (default.model, default.offline, default.near_duplicate) == (DEFAULT_EMBEDDING_MODEL, False, 0.88)
+    assert default.cache_dir == Path("~/.cache/comps-models").expanduser()  # persistent, not a temp folder
+    assert load_settings({"MODEL_OFFLINE": "TRUE", "NEAR_DUPLICATE_THRESHOLD": ""}).retrieval.offline is True
+    assert load_settings({"NEAR_DUPLICATE_THRESHOLD": "1"}).retrieval.near_duplicate == 1.0
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"MODEL_OFFLINE": "maybe"},
+        {"NEAR_DUPLICATE_THRESHOLD": "high"},
+        {"NEAR_DUPLICATE_THRESHOLD": "1.5"},
+        {"NEAR_DUPLICATE_THRESHOLD": "0"},
+    ],
+)
+def test_malformed_retrieval_settings_fail_startup(env):
+    from comps.config import load_settings
+
+    with pytest.raises(ValueError):
+        load_settings(env)
+
+
+class _Index:
+    keys = ("A", "B", "C")
+
+    def similarity(self, a, b):
+        return {frozenset("AB"): 0.88, frozenset("AC"): 0.8799}[frozenset(a + b)]
+
+
+def test_near_duplicate_threshold_is_inclusive():
+    dups = NearDuplicates(_Index(), {"A": "a", "B": "b", "C": "c"}, threshold=0.88)
+    assert dups.check("A", "B") == 0.88 and dups.check("A", "C") is None
+
+
+class _FakeEncoder:
+    def __init__(self):
+        self.seen = []
+
+    def embed(self, texts):
+        self.seen.extend(texts)
+        table = {"bank": [3.0, 4.0], "lender": [4.0, 3.0], "anti": [-3.0, -4.0]}
+        return [table[t.split(": ")[-1]] for t in texts]
+
+
+def test_embedding_index_normalizes_rows_and_clamps_to_unit_range():
+    from comps.retrieval.embedding import EmbeddingRetriever
+
+    index = EmbeddingRetriever("m", encoder=_FakeEncoder()).fit({"A": "bank", "B": "lender", "C": "anti", "D": "  "})
+    assert index.keys == ("A", "B", "C")  # blank description not indexed
+    sims = index.similarities("A")
+    assert sims["B"] == pytest.approx(24 / 25) and sims["C"] == 0.0  # negative cosine clamps to 0
+    assert index.similarity("A", "A") == pytest.approx(1.0)
+    assert EmbeddingRetriever("m", encoder=_FakeEncoder()).fit({"A": " "}).keys == ()
+
+
+def test_embedding_prompt_applies_whatever_the_model_name_case():
+    from comps.retrieval.embedding import EmbeddingRetriever
+
+    enc = _FakeEncoder()
+    EmbeddingRetriever("Google/EmbeddingGemma-300M", encoder=enc).fit({"A": "bank"})
+    assert enc.seen == ["task: sentence similarity | query: bank"]
 
 
 def test_missing_model_fails_startup_with_no_fallback(tmp_path):
@@ -272,5 +333,5 @@ def test_missing_model_fails_startup_with_no_fallback(tmp_path):
     settings = load_settings(
         {"DATA_DIR": str(tmp_path), "MODEL_CACHE_DIR": str(tmp_path / "empty"), "MODEL_OFFLINE": "1"}
     )
-    with pytest.raises(ModelUnavailable, match="offline"):
+    with pytest.raises(ModelUnavailable, match="MODEL_OFFLINE is set"):
         build_snapshot(settings)

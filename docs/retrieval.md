@@ -21,9 +21,11 @@ At start-up every issuer with a non-empty description is embedded with a **local
 | Setting | Default | Meaning |
 |---|---|---|
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional vectors, ~90 MB) | the one model loaded per process; chosen by the eval ([eval.md](eval.md)) |
-| `NEAR_DUPLICATE_THRESHOLD` | `0.88` | similarity at or above which two companies are near-duplicates (§2) |
-| `MODEL_CACHE_DIR` | fastembed's default; `/models` in the image | where the model is downloaded to and loaded from |
-| `MODEL_OFFLINE` | off; `1` in the image | never download: fail if the model is not in the cache |
+| `NEAR_DUPLICATE_THRESHOLD` | `0.88` | similarity at or above which two companies are near-duplicates (§2); must be in (0, 1]. **Tuned for MiniLM:** another model needs its own threshold |
+| `MODEL_CACHE_DIR` | `~/.cache/comps-models`; `/models` in the image | where the model is downloaded to and loaded from |
+| `MODEL_OFFLINE` | off; `1` in the image | never download: fail if the model is not in the cache (`1`/`true`/`yes`/`on`, any case) |
+
+A malformed setting (e.g. `MODEL_OFFLINE=maybe`, a threshold outside (0, 1]) stops start-up with an error.
 
 **The model is required.** The Docker image downloads it at build time (a failed download fails the build) and runs with `MODEL_OFFLINE=1`. If the model can't be loaded, start-up fails with `ModelUnavailable`; there is no fallback ranker. `make model` downloads the configured model for local runs.
 
@@ -43,7 +45,7 @@ Every other indexed company is ranked by similarity to the target (ties by key).
 
 **Near-duplicates** are two descriptions that are identical after normalizing case and whitespace, or whose embedding similarity is at least **0.88**. This catches the same company listed twice under unrelated tickers, which the share-class merge (ingestion § 6) does not, because their financials differ.
 
-The threshold errs towards keeping peers (owner decision: hiding a genuine peer is worse than showing a duplicate). 0.88 is the lowest cut that flags none of the labelled non-duplicates: the 40 most similar pairs in the supplied pre-test data (all genuine same-business peers, the highest at 0.873) and the synthetic dedup pairs. At 0.88 it catches 87.5% of synthetic dev duplicates and 66% of held-out ones; the misses are heavy rewordings and copies padded with a generic corporate paragraph.
+The threshold errs towards keeping peers (owner decision: hiding a genuine peer is worse than showing a duplicate). 0.88 is the lowest two-decimal cut above every labelled non-duplicate: the 40 most similar pairs in the supplied pre-test data (all genuine same-business peers, the highest at 0.8732) and the synthetic dedup pairs. The threshold is specific to MiniLM: other models score non-duplicates differently (bge-small's top synthetic non-duplicate is 0.837, EmbeddingGemma's 0.872), so switching `EMBEDDING_MODEL` means re-tuning it. At 0.88 it catches 87.5% of synthetic dev duplicates and 66% of held-out ones; the misses are heavy rewordings and copies padded with a generic corporate paragraph.
 
 Skipped candidates never count toward `k`. Every `exclude` key is reported, even when the walk ended before reaching it. A company without a usable description is never ranked (`no_description`); a target without one gets no peers and a note. If the ranking runs out, fewer peers are returned and the `note` says so: the list is never padded with weak or invented matches.
 
@@ -77,7 +79,7 @@ With `k = 10`, three peers come back with the note "Only 3 of the 10 requested p
 
 ## Cost
 
-Measured on a laptop CPU (experiments 2–6, [eval.md](eval.md)): embedding 90 companies at start-up takes about 4–5 s with MiniLM (320 short texts about 9 s); a peers request takes about 1.5 ms (p95 under 2 ms), faster than TF-IDF's ~9 ms because the vectors are dense and small. The API process uses about 0.5 GB of memory; the image is about 1 GB.
+Measured on a laptop CPU (experiments 2–6, [eval.md](eval.md)): embedding 90 companies at start-up takes about 4–5 s with MiniLM (320 short texts about 9 s); a peers request takes about 1.5 ms (p95 under 2 ms), faster than TF-IDF's ~9 ms because the vectors are dense and small. The API process uses about 350–490 MB of memory (342–365 MB in experiment 6); the image is about 1 GB.
 
 ## How it is tested
 
@@ -87,6 +89,6 @@ Ranking quality is measured by the eval ([eval.md](eval.md)), which runs the ser
 
 ## Known gaps
 
-- **Geography leaks more than with TF-IDF.** When the ranker is wrong, the wrong peer shares the target's country more often than chance (lift about 2.4 vs 1.5 for TF-IDF), because descriptions say "based in …". Overall accuracy on those cases still rose (nDCG@10 0.61 vs 0.31). Stripping country phrases is untested.
+- **Geography leaks more than with TF-IDF.** When the ranker is wrong, the wrong peer shares the target's country more often than chance (lift about 2.4 vs 1.5 for TF-IDF), because descriptions say "based in …". Overall accuracy on those cases still rose (geo_trap nDCG@10 0.62 vs 0.31). Stripping country phrases is untested.
 - **Reworded duplicate listings** below 0.88 are shown as peers (see §2).
 - The derived label-conflict warning (a company whose description neighbours disagree with its label) is not built yet.

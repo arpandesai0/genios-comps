@@ -6,15 +6,18 @@ WORKDIR /app
 # uv pip compile pyproject.toml --python-version 3.11 -o requirements.lock --no-header)
 COPY requirements.lock ./
 RUN pip install -r requirements.lock
+# The embedding model is required and the service runs offline: download it now, at build time, before
+# the source is copied so code changes don't re-download it. Any failure fails the build. At runtime
+# MODEL_OFFLINE=1 forbids downloads, so a missing model stops start-up instead of falling back.
+# Set it with `EMBEDDING_MODEL=<name> make start ...` (compose passes it as a build arg).
+ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} MODEL_CACHE_DIR=/models
+RUN python -c "import os; from fastembed import TextEmbedding; \
+TextEmbedding(model_name=os.environ['EMBEDDING_MODEL'], cache_dir='/models'); \
+print('embedding model', os.environ['EMBEDDING_MODEL'], 'is ready in /models')"
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-deps .
-# The embedding model is required and the service runs offline: download it now, at build time.
-# Any download failure fails the build. At runtime MODEL_OFFLINE=1 forbids downloads, so a missing
-# model stops start-up instead of falling back to anything.
-ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} MODEL_CACHE_DIR=/models
-RUN python -m comps.retrieval.embedding
 ENV MODEL_OFFLINE=1 HF_HUB_OFFLINE=1
 ENV DATA_DIR=/data
 EXPOSE 8000

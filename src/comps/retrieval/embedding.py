@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -19,7 +20,7 @@ VERSION = "1"
 
 # Prompts a model card asks for. EmbeddingGemma is trained with task prompts; the symmetric
 # "sentence similarity" task matches comparing two company descriptions.
-PROMPTS = {"google/embeddinggemma-300m": "task: sentence similarity | query: "}
+PROMPTS = {"google/embeddinggemma-300m": "task: sentence similarity | query: "}  # keys lower-case
 
 
 class ModelUnavailable(RuntimeError):
@@ -49,10 +50,15 @@ class EmbeddingRetriever:
     name = NAME
     version = VERSION
 
-    def __init__(self, model: str, *, cache_dir: Path | None = None, offline: bool = False) -> None:
+    def __init__(
+        self, model: str, *, cache_dir: Path | None = None, offline: bool = False, encoder: Any = None
+    ) -> None:
+        self.model = model
+        if encoder is not None:  # tests pass a fake with an ``embed(texts)`` method
+            self._encoder = encoder
+            return
         from fastembed import TextEmbedding  # imported here so TF-IDF-only tests don't load onnxruntime
 
-        self.model = model
         try:
             self._encoder = TextEmbedding(
                 model_name=model,
@@ -61,14 +67,14 @@ class EmbeddingRetriever:
             )
         except Exception as exc:  # fastembed raises ValueError, OSError or hub errors
             where = f" from {cache_dir}" if cache_dir else ""
-            mode = " (offline: the model must already be downloaded)" if offline else ""
+            mode = " (MODEL_OFFLINE is set, so it is never downloaded: is it in the cache?)" if offline else ""
             raise ModelUnavailable(f"cannot load embedding model {model!r}{where}{mode}: {exc}") from exc
 
     def fit(self, documents: Mapping[str, str]) -> EmbeddingIndex:
         keys = tuple(sorted(k for k, d in documents.items() if d.strip()))
         if not keys:
             return EmbeddingIndex(keys=(), _matrix=np.zeros((0, 0)), _row={})
-        prompt = PROMPTS.get(self.model, "")
+        prompt = PROMPTS.get(self.model.lower(), "")
         vectors = np.asarray(list(self._encoder.embed([prompt + documents[k] for k in keys])), dtype=np.float64)
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         matrix = vectors / np.where(norms == 0, 1.0, norms)

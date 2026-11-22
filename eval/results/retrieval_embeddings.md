@@ -45,7 +45,7 @@ Dedup pairs: duplicate recall at the strictest threshold that flags no non-dupli
 
 **Choosing the threshold** (owner rules: tune on the supplied pre-test data, check on synthetic pairs, and treat a false duplicate as the worse error):
 1. The 40 most similar issuer pairs in the pre-test data, by MiniLM, scored from 0.873 down to 0.727. I read every one, and all 40 are genuine same-business peers: different names and tickers, sometimes different countries. The labels are in the git-ignored `local_pretest_pairs_minilm.json`.
-2. The strictest non-duplicate score is therefore 0.8732 on the pre-test data, against 0.80 on the synthetic dev pairs. That gives **0.88**, the lowest cut with no false duplicate in either set.
+2. The strictest non-duplicate score is therefore 0.8732 on the pre-test data, against 0.80 on the synthetic dev pairs. That gives **0.88**, the lowest two-decimal cut above every labelled non-duplicate in either set.
 3. On the synthetic pairs, 0.88 flags no non-duplicate in either split (precision 1.0). It catches 87.5% of duplicates on dev and 66% on held-out, against 41% and 38% at 0.95. The misses are heavy rewordings and copies padded with a generic corporate paragraph.
 
 **Both copies of one company in one peer list** (independent fixture). The original metric, `duplicate_listing_returned`, also counted a second listing appearing *alone*, which is harmless because it stands in for its original. So `both_copies_returned` was added, computed by rescoring the committed outputs:

@@ -22,8 +22,6 @@ from typing import Literal
 
 from comps.retrieval.base import Index
 
-NEAR_DUPLICATE_COSINE = 0.95
-
 SkipReason = Literal["near_duplicate_of_target", "near_duplicate_of_peer", "user_excluded", "no_description"]
 
 
@@ -62,7 +60,7 @@ class NearDuplicates:
 
     index: Index
     normalized: Mapping[str, str]  # key -> normalized description
-    threshold: float = NEAR_DUPLICATE_COSINE
+    threshold: float  # from the NEAR_DUPLICATE_THRESHOLD setting; depends on the model
 
     def check(self, a: str, b: str) -> float | None:
         """The cosine when ``a`` and ``b`` are near-duplicates (1.0 for identical text), else None."""
