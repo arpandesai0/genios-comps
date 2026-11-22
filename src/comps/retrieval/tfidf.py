@@ -62,7 +62,7 @@ class TfidfRetriever:
             matrix = csr_matrix((0, 0), dtype=np.float64)
             terms = np.array([], dtype=object)
             keys = []
-        usable = [i for i in range(len(keys)) if matrix[i].nnz > 0]
+        usable = [int(i) for i in np.flatnonzero(matrix.getnnz(axis=1))] if keys else []
         kept = tuple(keys[i] for i in usable)
         return TfidfIndex(
             keys=kept, _matrix=csr_matrix(matrix[usable]), _terms=terms, _row={k: i for i, k in enumerate(kept)}

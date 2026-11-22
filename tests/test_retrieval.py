@@ -234,3 +234,33 @@ def test_peer_lists_never_contain_the_target_or_repeats(api):
         keys = [p["entity"]["key"] for p in body["peers"]]
         assert target not in keys and len(keys) == len(set(keys))
         assert not ({"US:BNKA", "US:TWIN"} <= set(keys))  # near-duplicates never both appear
+
+
+def test_excluded_company_without_description_is_listed_once():
+    index, dups = index_and_dups()
+    sel = select_peers(
+        "US:BANKA", 2, universe=[*DOCS, "US:NODESC"], ranker=index, duplicates=dups, exclude={"US:NODESC"}
+    )
+    assert [(s.key, s.reason) for s in sel.skipped if s.key == "US:NODESC"] == [("US:NODESC", "user_excluded")]
+    none = select_peers(
+        "US:NODESC", 2, universe=[*DOCS, "US:NODESC", "US:X"], ranker=index, duplicates=dups, exclude={"US:X"}
+    )
+    assert [(s.key, s.reason) for s in none.skipped] == [("US:X", "user_excluded")]
+
+
+def test_revenue_ratio_never_overflows_and_rounds_half_away(tmp_path):
+    from comps.service import find_peers
+
+    recs = [
+        make_record(id="t", ticker="TINY", description="Container shipping and leasing services.", revenue=1e-300),
+        make_record(id="p", ticker="HUGE", description="Container shipping and port leasing.", revenue=1e300),
+        make_record(id="h", ticker="HALF", description="Container leasing for shipping lines.", revenue=0.125),
+        make_record(id="o", ticker="ONE", description="Shipping container leasing company.", revenue=1.0),
+    ]
+    (tmp_path / "companies.json").write_text(json.dumps(recs))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()))
+    ratios = {p.company.entity.key: p.evidence.revenue_ratio for p in find_peers(s, "US:TINY", 3).peers}
+    assert ratios["US:HUGE"] is None  # 1e600 is not representable: blank, not a crash
+    halves = {p.company.entity.key: p.evidence.revenue_ratio for p in find_peers(s, "US:ONE", 3).peers}
+    assert halves["US:HALF"] == 0.13  # 0.125 rounds half away from zero

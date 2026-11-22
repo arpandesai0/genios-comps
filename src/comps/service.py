@@ -7,6 +7,7 @@ stays an adapter.
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 from comps.config import Settings
-from comps.finance import clean, compute_metrics, summarize
+from comps.finance import compute_metrics, round_places, summarize
 from comps.ingest import load_dataset
 from comps.models import SEVERITIES, Dataset, Entity, Finding, Metrics, Severity, Summary
 from comps.retrieval import (
@@ -258,9 +259,11 @@ _METRIC_NAMES = frozenset(Metrics.__dataclass_fields__)
 
 def _evidence(snapshot: Snapshot, target: Entity, peer: Entity, similarity: float) -> Evidence:
     t_rev, p_rev = target.latest.usd.revenue, peer.latest.usd.revenue
-    ratio = round(clean(p_rev / t_rev), 2) if t_rev is not None and p_rev is not None and t_rev > 0 else None
+    raw = p_rev / t_rev if t_rev is not None and p_rev is not None and t_rev > 0 else None
+    # A ratio too large to represent (a tiny target revenue) is blank, like any non-finite value.
+    ratio = round_places(raw, 2) if raw is not None and math.isfinite(raw) else None
     return Evidence(
-        similarity=round(similarity, 4),
+        similarity=round_places(similarity, 4),
         shared_terms=tuple(snapshot.ranker.shared_terms(target.key, peer.key)),
         classification={
             level: getattr(target, level) is not None and getattr(target, level) == getattr(peer, level)

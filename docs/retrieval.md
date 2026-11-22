@@ -55,7 +55,7 @@ Invented universe: three banks (`BANKA`, `BANKB`, and `TWIN`, whose description 
 
 | | Company | Why |
 |---|---|---|
-| skipped | `TWIN` | `near_duplicate_of_target` (identical after normalizing) |
+| skipped | `TWIN` | `near_duplicate_of_target` (description cosine 1.00: the same words, only the punctuation differs) |
 | 1 | `BANKB` | highest cosine; shared terms such as `bank`, `deposit`, `mortgages`, `loans` |
 | 2 | `SOFT` | cosine 0, like `STEEL`; ties are ordered by key |
 

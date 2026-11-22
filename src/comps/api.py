@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from comps.config import load_settings
-from comps.finance import listing_value
+from comps.finance import listing_value, round_places
 from comps.models import Finding, Metrics, MetricValue, Observation, Severity, ShareClass
 from comps.service import (
     CompanyView,
@@ -150,7 +150,7 @@ def _selection_json(r: PeersResult) -> dict[str, Any]:
                 "entity": summary_json(sv.company),
                 "reason": sv.skip.reason,
                 "detail": sv.skip.detail,
-                "similarity": None if sv.skip.similarity is None else round(sv.skip.similarity, 4),
+                "similarity": None if sv.skip.similarity is None else round_places(sv.skip.similarity, 4),
                 "duplicate_of": sv.skip.duplicate_of,
             }
             for sv in r.skipped

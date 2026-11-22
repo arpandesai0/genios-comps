@@ -58,7 +58,8 @@ def normalize_description(text: str) -> str:
 
 @dataclass(frozen=True, eq=False)
 class NearDuplicates:
-    """The near-duplicate test, on its own TF-IDF index so it doesn't change when the ranker does."""
+    """The near-duplicate test. Its index must be TF-IDF with the served settings, so the test doesn't
+    change when the ranker does; while the ranker is that same TF-IDF, the snapshot passes one index."""
 
     index: Index
     normalized: Mapping[str, str]  # key -> normalized description
@@ -86,16 +87,20 @@ def select_peers(
     ``exclude`` holds company keys the analyst removed (the target itself is ignored if present).
     """
     ranked_keys = set(ranker.keys)
+    excluded = set(exclude) - {target}
+    # A company appears in `skipped` once: an excluded company without a description is user_excluded.
     no_description = tuple(
         Skip(key, "no_description", f"{key} has no usable description, so it cannot be ranked.")
         for key in sorted(universe)
-        if key not in ranked_keys and key != target
+        if key not in ranked_keys and key != target and key not in excluded
     )
     if target not in ranked_keys:
         why = f"{target} has no usable description, so no peers can be ranked by similarity."
-        return Selection(target, k, (), no_description, why)
+        excluded_skips = tuple(
+            Skip(key, "user_excluded", f"{key} was removed by the analyst.") for key in sorted(excluded)
+        )
+        return Selection(target, k, (), excluded_skips + no_description, why)
 
-    excluded = set(exclude) - {target}
     scores = ranker.similarities(target)
     ranking = sorted(scores, key=lambda key: (-scores[key], key))
 

@@ -65,6 +65,13 @@ def _quantize(x: float) -> Decimal:
     return d if d != 0 else Decimal("0.0")  # never show "-0.0"
 
 
+def round_places(x: float, places: int) -> float:
+    """Round to ``places`` decimals the same way as everything else: clean float noise first, ties away
+    from zero, never -0.0. ``x`` must be finite."""
+    d = Decimal(repr(clean(x))).quantize(Decimal(1).scaleb(-places), context=_CTX)
+    return float(d) if d != 0 else 0.0
+
+
 def round_1dp(x: float) -> float:
     """Round to one decimal place, ties away from zero (12.25 -> 12.3, -12.25 -> -12.3)."""
     return float(_quantize(x))

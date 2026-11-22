@@ -209,7 +209,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/retrieval/` | `Retriever` / `Index` interface (`base.py`), the served TF-IDF ranker (`tfidf.py`), and the near-duplicate test and k-filling peer selection (`select.py`). |
 | `docs/retrieval.md` | How peers are chosen: index, walk and skip reasons, evidence, example, known gaps. |
 | `src/comps/service.py` | Builds the immutable snapshot (dataset, metrics, retrieval index) at start-up, and holds the query logic for every endpoint: search and resolution, findings, peers (selection + evidence) and comps (peers + metrics + peer-only summary). |
-| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps return 404. |
+| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints, peers and comps (JSON and CSV); handlers only parse and serialise. |
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
 | `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
 | `docs/finance.md` | Formulas, ok/NM/missing statuses, rounding and display, summary statistics, with worked examples. |
