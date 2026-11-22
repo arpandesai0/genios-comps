@@ -31,7 +31,7 @@ Status: the read-only data endpoints are served. Comps (peer selection) and manu
 
 Where the brief is silent, the service assumes the following:
 
-1. **Identity is `country:ticker`.** Record `id`s are internal provenance only, so an `id` reused across records is not treated as a conflict.
+1. **Identity is `country:ticker`.** A key identifies one listing (see 13). Record `id`s are internal provenance only, so an `id` reused across records is not treated as a conflict.
 2. **A record without a ticker is not a listed company.** The brief describes a universe of public companies, and nothing available offline (no web search or LLM) can verify such a record, so it is excluded and reported as `unlisted_excluded`. This applies whether or not the record has a country.
 3. **A missing country becomes the placeholder `*`**, giving keys like `*:ACME`. The company is still served.
 4. **Records with the same key are appends to one company.** Each `price_date` is one observation in a time series, and comps use the latest observation. Text fields (name, description, classification) take the latest value; if the latest value is empty, the most recent non-empty value is used and flagged. Numbers are never carried over from another date. Records that are identical apart from their `id` collapse into one.
