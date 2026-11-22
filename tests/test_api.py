@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from comps.api import create_app
 from comps.config import IngestConfig, Settings
 from comps.ingest import DatasetError
+from comps.retrieval import TfidfRetriever
 from comps.service import build_snapshot
 from conftest import FX, make_record
 
@@ -27,7 +28,7 @@ def client(tmp_path):
     (tmp_path / "companies.json").write_text(json.dumps(RECORDS))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
     settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
-    with TestClient(create_app(lambda: build_snapshot(settings))) as c:
+    with TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))) as c:
         yield c
 
 
@@ -171,7 +172,7 @@ def rich(tmp_path):
     (tmp_path / "companies.json").write_text(json.dumps(RICH))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
     settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
-    with TestClient(create_app(lambda: build_snapshot(settings))) as c:
+    with TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))) as c:
         yield c
 
 
@@ -245,7 +246,10 @@ def test_unknown_path_and_wrong_method_use_the_error_shape(rich):
 
 def test_start_up_fails_clearly_on_an_unusable_data_folder(tmp_path):
     settings = Settings(data_dir=tmp_path, ingest=IngestConfig())  # empty folder: no files
-    with pytest.raises(DatasetError, match="cannot read"), TestClient(create_app(lambda: build_snapshot(settings))):
+    with (
+        pytest.raises(DatasetError, match="cannot read"),
+        TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))),
+    ):
         pass
 
 

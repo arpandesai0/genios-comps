@@ -6,7 +6,7 @@ Rules (AGENTS.md §4, 2026-11-22):
 - A candidate is skipped when the analyst excluded it, when it is a near-duplicate of the target, or
   when it is a near-duplicate of a peer already chosen (the higher-ranked one stays).
 - Near-duplicates: identical descriptions after normalizing case and whitespace, or a description
-  TF-IDF cosine of at least ``NEAR_DUPLICATE_COSINE``.
+  similarity (the served index) of at least the near-duplicate threshold.
 - A company without a description is never ranked (``no_description``). A target without one gets
   no peers and a note.
 - If the ranking runs out, fewer than k peers are returned with a note; the list is never padded.
@@ -58,18 +58,18 @@ def normalize_description(text: str) -> str:
 
 @dataclass(frozen=True, eq=False)
 class NearDuplicates:
-    """The near-duplicate test. Its index must be TF-IDF with the served settings, so the test doesn't
-    change when the ranker does; while the ranker is that same TF-IDF, the snapshot passes one index."""
+    """The near-duplicate test: identical normalized text, or similarity >= ``threshold`` on ``index``."""
 
     index: Index
     normalized: Mapping[str, str]  # key -> normalized description
+    threshold: float = NEAR_DUPLICATE_COSINE
 
     def check(self, a: str, b: str) -> float | None:
         """The cosine when ``a`` and ``b`` are near-duplicates (1.0 for identical text), else None."""
         if self.normalized[a] == self.normalized[b]:
             return 1.0
         cos = self.index.similarity(a, b)
-        return cos if cos >= NEAR_DUPLICATE_COSINE else None
+        return cos if cos >= self.threshold else None
 
 
 def select_peers(
@@ -115,13 +115,13 @@ def select_peers(
             continue
         cos = duplicates.check(key, target)
         if cos is not None:
-            detail = f"Near-duplicate of the target {target} (description cosine {cos:.2f})."
+            detail = f"Near-duplicate of the target {target}: the descriptions are (almost) the same."
             skipped.append(Skip(key, "near_duplicate_of_target", detail, sim, target))
             continue
-        twin = next(((p.key, c) for p in peers if (c := duplicates.check(key, p.key)) is not None), None)
+        twin = next((p.key for p in peers if duplicates.check(key, p.key) is not None), None)
         if twin is not None:
-            detail = f"Near-duplicate of peer {twin[0]} (description cosine {twin[1]:.2f}), which ranks higher."
-            skipped.append(Skip(key, "near_duplicate_of_peer", detail, sim, twin[0]))
+            detail = f"Near-duplicate of peer {twin}, which ranks higher: the descriptions are (almost) the same."
+            skipped.append(Skip(key, "near_duplicate_of_peer", detail, sim, twin))
             continue
         peers.append(Pick(key, len(peers) + 1, sim))
 

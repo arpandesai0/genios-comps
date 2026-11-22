@@ -1,83 +1,32 @@
-"""Append-only experiment log for the evals.
+"""Append-only experiment log for the evals (``experiments.jsonl``).
 
-Each eval run started with ``--log "description"`` appends one JSON line to ``experiments.jsonl``:
-the experiment number, when it ran, what it was meant to test, the git commit it ran on, its inputs
-(method, fixture and label versions, split, settings, library versions) and its headline metrics. Lines
-are never rewritten or removed; a wrong run is corrected by a later one whose description says so.
+One JSON line per run of ``run.py``. The **experiment number** identifies a run; the commit is only
+metadata, since one commit can be run with several settings (e.g. three embedding models). Each entry
+records when it ran, what it tests, the commit and service settings, the hashes of every input and
+golden file, where the captured pipeline output is and its hash, start-up time and memory, and the
+scores. Lines are never rewritten or removed; a wrong run is corrected by a later one that says so.
 
-    make experiment DESC="what this run tests"      # dev split, appends to the log
-    .venv/bin/python eval/experiments.py            # print the log as a table
+    .venv/bin/python eval/experiments.py      # the log as a table
 
-The full per-target result stays in ``results/`` (``--out``); the log keeps the history.
+Entry 1 predates the black-box runner (schema 1: the eval imported the pipeline). Its fields differ,
+and the table reads both.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import platform
-import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import Any
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent
 LOG = HERE / "experiments.jsonl"
-# Paths whose uncommitted changes can change a result. Outputs (the log and the result file the run
-# writes) are excluded.
-RESULT_INPUTS = ("src", "eval", "pyproject.toml", "requirements.lock")
-
-
-def _git(root: Path, *args: str) -> str | None:
-    """Output of a git command, or None if git is missing or fails (not a repo, dubious ownership)."""
-    try:
-        out = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return out.stdout
-
-
-def git_info(root: Path = ROOT, outputs: Sequence[Path] = ()) -> dict:
-    """The commit the run used, and whether files that affect results had uncommitted changes.
-
-    Every field is None when git can't answer, so "unknown" is never recorded as "clean". ``outputs``
-    are files this run writes; they don't make the tree dirty.
-    """
-    root = root.resolve()
-    ignored = {_repo_path(p, root) for p in (LOG, *outputs)}
-    status = _git(root, "status", "--porcelain", "-z", "--", *RESULT_INPUTS)
-    commit = _git(root, "rev-parse", "HEAD")
-    branch = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
-    changed: list[str] | None = None
-    if status is not None:
-        changed, fields = [], iter(status.split("\0"))
-        for field in fields:
-            if not field:
-                continue
-            code, path = field[:2], field[3:]
-            if code[0] in "RC":  # renames and copies carry the original path in the next field
-                next(fields, None)
-            if path not in ignored:
-                changed.append(path)
-    return {
-        "commit": commit.strip() if commit else None,
-        "branch": None if branch is None or branch.strip() == "HEAD" else branch.strip(),  # None when detached
-        "dirty": None if changed is None else bool(changed),
-        "dirty_paths": None if changed is None else sorted(changed),
-    }
-
-
-def _repo_path(path: Path, root: Path = ROOT) -> str:
-    """``path`` relative to the repo as git prints it, or absolute if it lies outside the repo."""
-    resolved = path.resolve()
-    return resolved.relative_to(root).as_posix() if resolved.is_relative_to(root) else resolved.as_posix()
-
-
-def file_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+SCHEMA = 2
+METRICS = ("ndcg@5", "ndcg@10", "precision@10", "recall@10")
 
 
 def read(log: Path | None = None) -> list[dict]:
@@ -87,48 +36,52 @@ def read(log: Path | None = None) -> list[dict]:
     return [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
 
 
+def next_number(log: Path | None = None) -> int:
+    entries = read(log)
+    return entries[-1]["experiment"] + 1 if entries else 1
+
+
+def _version(package: str) -> str | None:
+    try:
+        return version(package)
+    except PackageNotFoundError:
+        return None
+
+
 def record(
-    result: Mapping,
     *,
+    number: int,
     description: str,
-    eval_name: str,
-    inputs: Mapping,
-    result_file: Path | None = None,
+    commit: str,
+    settings: Mapping[str, str],
+    inputs: Mapping[str, Any],
+    outputs: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+    results: Mapping[str, Any],
     log: Path | None = None,
     now: datetime | None = None,
 ) -> dict:
-    """Append one experiment to ``log`` and return it. The number is one more than the last entry.
-
-    The log is written by one person at a time from a local checkout, so there is no lock.
-    """
+    """Append one experiment. ``number`` must be the next number (``next_number``)."""
+    log = log or LOG
     if not description.strip():
         raise ValueError("an experiment needs a description of what it tests")
-    log = log or LOG
-    entries = read(log)
+    if number != next_number(log):
+        raise ValueError(f"experiment {number} is not next ({next_number(log)}): was another run logged meanwhile?")
     entry = {
-        "experiment": (entries[-1]["experiment"] + 1) if entries else 1,
+        "experiment": number,
+        "schema": SCHEMA,
         "date": (now or datetime.now(UTC)).isoformat(timespec="seconds"),
         "description": description.strip(),
-        "eval": eval_name,
-        "git": git_info(outputs=[result_file] if result_file else ()),
-        "inputs": {
-            **inputs,
-            "env": {
-                "python": platform.python_version(),
-                "numpy": version("numpy"),
-                "scikit-learn": version("scikit-learn"),
-            },
+        "commit": commit,
+        "settings": dict(settings),
+        "env": {
+            "python": platform.python_version(),
+            **{p: _version(p) for p in ("numpy", "scikit-learn", "fastembed", "onnxruntime")},
         },
-        "results": {
-            "targets": result["targets"],
-            "overall": result["overall"],
-            "by_tag": result["by_tag"],
-            "duplicate_listing_returned": result["duplicate_listing_returned"],
-            "geography_lift": result["geography"]["lift"],
-        },
-        # The result file is overwritten by later runs; its hash tells whether it still holds this run.
-        "result_file": _repo_path(result_file) if result_file else None,
-        "result_sha": file_hash(result_file) if result_file else None,
+        "inputs": dict(inputs),
+        "outputs": dict(outputs),
+        "runtime": dict(runtime),
+        "results": dict(results),
     }
     text = log.read_text() if log.exists() else ""
     with log.open("a") as f:
@@ -136,24 +89,56 @@ def record(
     return entry
 
 
-def table(entries: Sequence[Mapping]) -> str:
-    head = ("#", "date", "commit", "method", "split", "nDCG@5", "nDCG@10", "P@10", "R@10", "description")
-    rows = [head]
-    for e in entries:
+def _rows(e: Mapping[str, Any]) -> list[tuple[str, ...]]:
+    """One table row per (experiment, fixture): dev retrieval scores, or dev dedup recall."""
+    if e.get("schema", 1) == 1:
         o, i = e["results"]["overall"], e["inputs"]
-        dirty = {True: "*", None: "?", False: ""}[e["git"]["dirty"]]
-        commit = (e["git"]["commit"] or "?")[:7] + dirty
-        method = f"{i['method']['name']} v{i['method']['version']}"
-        metrics = (o.get("ndcg@5"), o.get("ndcg@10"), o.get("precision@10"), o.get("recall@10"))
-        rows.append(
-            (str(e["experiment"]), e["date"][:10], commit, method, i["split"])
-            + tuple("" if m is None else f"{m:.3f}" for m in metrics)
-            + (e["description"],)
-        )
+        cfg = f"{i['method']['name']} v{i['method']['version']}"
+        nums = tuple(f"{o[m]:.3f}" for m in METRICS) + ("",)
+        return [
+            (
+                str(e["experiment"]),
+                e["date"][:10],
+                (e["git"]["commit"] or "?")[:7],
+                cfg,
+                "retrieval_v1",
+                *nums,
+                e["description"],
+            )
+        ]
+    cfg = e["settings"].get("EMBEDDING_MODEL", "(commit default)")
+    rows = []
+    for fixture, by_split in e["results"].items():
+        dev = by_split.get("dev", {})
+        if "overall" in dev:
+            nums = tuple(f"{dev['overall'][m]:.3f}" for m in METRICS) + ("",)
+        else:
+            r = dev.get("recall_at_zero_false_duplicates")
+            nums = ("", "", "", "", "" if r is None else f"{r:.3f}")
+        rows.append((str(e["experiment"]), e["date"][:10], e["commit"][:7], cfg, fixture, *nums, e["description"]))
+    return rows
+
+
+def table(entries: Sequence[Mapping[str, Any]]) -> str:
+    head = (
+        "#",
+        "date",
+        "commit",
+        "config",
+        "fixture",
+        "nDCG@5",
+        "nDCG@10",
+        "P@10",
+        "R@10",
+        "dedup R@0FP",
+        "description",
+    )
+    rows = [head] + [r for e in entries for r in _rows(e)]
     widths = [max(len(r[c]) for r in rows) for c in range(len(head) - 1)]
     return "\n".join("  ".join(r[c].ljust(widths[c]) for c in range(len(widths))) + "  " + r[-1] for r in rows)
 
 
 if __name__ == "__main__":
-    print(table(read()) + "\n\n* = uncommitted changes to files that affect results; ? = git state unknown")
+    print(table(read()))
+    print("\nDev split. dedup R@0FP = duplicate recall at the strictest cut that flags no non-duplicate.")
     sys.exit(0)

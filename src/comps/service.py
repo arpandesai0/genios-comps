@@ -21,12 +21,13 @@ from comps.models import SEVERITIES, Dataset, Entity, Finding, Metrics, Severity
 from comps.retrieval import (
     Index,
     NearDuplicates,
+    Retriever,
     Selection,
     Skip,
-    TfidfRetriever,
     normalize_description,
     select_peers,
 )
+from comps.retrieval.embedding import EmbeddingRetriever
 
 Match = Literal["key", "ticker", "name_exact", "name_partial"]
 _MATCH_ORDER: dict[Match, int] = {"key": 0, "ticker": 1, "name_exact": 2, "name_partial": 3}
@@ -51,8 +52,8 @@ class Snapshot:
     companies: Mapping[str, CompanyView]  # shown key -> view, ordered by key
     findings: tuple[Finding, ...]  # every finding: dataset, all observations, companies, finance
     ranker: Index  # description similarity over companies with a usable description
-    duplicates: NearDuplicates  # near-duplicate test (its own TF-IDF index)
-    method: tuple[str, str]  # (name, version) of the ranker
+    duplicates: NearDuplicates  # near-duplicate test on the same index
+    method: tuple[str, str]  # (name, model or version) of the ranker; for logs, never served
 
     def resolve(self, key: str, ignore_case: bool = False) -> CompanyView | None:
         """The company a listing key belongs to: any share-class key resolves to its issuer.
@@ -69,8 +70,13 @@ class Snapshot:
         return self.companies.get(shown) if shown else None
 
 
-def build_snapshot(settings: Settings) -> Snapshot:
-    """Load and ingest ``settings.data_dir``. Raises ``DatasetError`` if the input is unusable."""
+def build_snapshot(settings: Settings, retriever: Retriever | None = None) -> Snapshot:
+    """Load and ingest ``settings.data_dir`` and index the descriptions.
+
+    ``retriever`` defaults to the configured embedding model (``settings.retrieval``); tests pass a
+    lighter one. Raises ``DatasetError`` if the input is unusable and ``ModelUnavailable`` if the model
+    can't be loaded.
+    """
     dataset = load_dataset(settings.data_dir, settings.ingest)
     companies: dict[str, CompanyView] = {}
     finance_findings: list[Finding] = []
@@ -84,11 +90,15 @@ def build_snapshot(settings: Settings) -> Snapshot:
             entity=entity, metrics=metrics, findings=entity.findings + entity.latest.findings + others + raised
         )
     documents = {key: e.description for key, e in dataset.entities.items() if e.description and e.description.strip()}
-    retriever = TfidfRetriever()
+    cfg = settings.retrieval
+    if retriever is None:
+        retriever = EmbeddingRetriever(cfg.model, cache_dir=cfg.cache_dir, offline=cfg.offline)
     ranker = retriever.fit(documents)
-    # The near-duplicate rule is defined on TF-IDF cosine. While the ranker is TF-IDF with the same
-    # settings, the same index serves both; a different ranker would get its own index here.
-    duplicates = NearDuplicates(index=ranker, normalized={k: normalize_description(d) for k, d in documents.items()})
+    duplicates = NearDuplicates(
+        index=ranker,
+        normalized={k: normalize_description(d) for k, d in documents.items()},
+        threshold=cfg.near_duplicate,
+    )
     return Snapshot(
         dataset=dataset,
         data_dir=settings.data_dir,
@@ -96,7 +106,7 @@ def build_snapshot(settings: Settings) -> Snapshot:
         findings=tuple(dataset.all_findings()) + tuple(finance_findings),
         ranker=ranker,
         duplicates=duplicates,
-        method=(retriever.name, retriever.version),
+        method=(retriever.name, getattr(retriever, "model", retriever.version)),
     )
 
 
@@ -221,7 +231,6 @@ class UnknownExclude(ValueError):
 @dataclass(frozen=True)
 class Evidence:
     similarity: float
-    shared_terms: tuple[str, ...]
     classification: dict[str, bool]
     country_match: bool
     revenue_ratio: float | None
@@ -257,14 +266,13 @@ class CompsResult:
 _METRIC_NAMES = frozenset(Metrics.__dataclass_fields__)
 
 
-def _evidence(snapshot: Snapshot, target: Entity, peer: Entity, similarity: float) -> Evidence:
+def _evidence(target: Entity, peer: Entity, similarity: float) -> Evidence:
     t_rev, p_rev = target.latest.usd.revenue, peer.latest.usd.revenue
     raw = p_rev / t_rev if t_rev is not None and p_rev is not None and t_rev > 0 else None
     # A ratio too large to represent (a tiny target revenue) is blank, like any non-finite value.
     ratio = round_places(raw, 2) if raw is not None and math.isfinite(raw) else None
     return Evidence(
         similarity=round_places(similarity, 4),
-        shared_terms=tuple(snapshot.ranker.shared_terms(target.key, peer.key)),
         classification={
             level: getattr(target, level) is not None and getattr(target, level) == getattr(peer, level)
             for level in ("sector", "industry", "sub_industry")
@@ -297,9 +305,7 @@ def find_peers(snapshot: Snapshot, target: str, k: int, exclude: list[str] | tup
         t.key, k, universe=snapshot.companies, ranker=snapshot.ranker, duplicates=snapshot.duplicates, exclude=excluded
     )
     peers = tuple(
-        PeerView(
-            p.rank, snapshot.companies[p.key], _evidence(snapshot, t, snapshot.companies[p.key].entity, p.similarity)
-        )
+        PeerView(p.rank, snapshot.companies[p.key], _evidence(t, snapshot.companies[p.key].entity, p.similarity))
         for p in selection.peers
     )
     skipped = tuple(SkippedView(snapshot.companies[s.key], s) for s in selection.skipped)

@@ -2,12 +2,13 @@
 
 A ``Retriever`` is fitted once per snapshot on the companies' descriptions and returns an immutable
 ``Index``. Peer selection, the API and the evals only talk to these two protocols, so a different
-ranker (for example sentence embeddings) can replace TF-IDF without touching them.
+ranker can be swapped without touching them. The served ranker is sentence embeddings
+(``embedding.py``); TF-IDF (``tfidf.py``) is the earlier baseline.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Protocol
 
 
@@ -25,10 +26,6 @@ class Index(Protocol):
 
     def similarity(self, a: str, b: str) -> float:
         """Similarity of two keys, in [0, 1]."""
-        ...
-
-    def shared_terms(self, a: str, b: str, n: int = 5) -> Sequence[str]:
-        """Up to ``n`` terms that contributed most to the similarity of ``a`` and ``b``, strongest first."""
         ...
 
 

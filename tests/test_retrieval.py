@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from comps.api import create_app
-from comps.config import IngestConfig, Settings
+from comps.config import IngestConfig, Settings, load_settings
 from comps.retrieval import NearDuplicates, TfidfRetriever, normalize_description, select_peers
 from comps.service import build_snapshot
 from conftest import FX, make_record
@@ -30,23 +30,12 @@ def index_and_dups(docs=DOCS):
     return index, NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()})
 
 
-def test_similar_businesses_rank_first_and_terms_explain_why():
+def test_similar_businesses_rank_first():
     index, _ = index_and_dups()
     scores = index.similarities("US:BANKA")
     assert "US:BANKA" not in scores
     assert max(scores, key=scores.get) == "US:TWIN"
     assert scores["US:BANKB"] > scores["US:STEEL"] and scores["US:BANKB"] > scores["US:SOFT"]
-    terms = index.shared_terms("US:BANKA", "US:BANKB")
-    assert 0 < len(terms) <= 5 and set(terms) <= {
-        "bank",
-        "deposit",
-        "accounts",
-        "mortgages",
-        "small",
-        "business",
-        "loans",
-    }
-    assert index.shared_terms("US:STEEL", "US:SOFT") == []
 
 
 def test_stop_word_only_descriptions_are_not_indexed():
@@ -133,19 +122,19 @@ def api(tmp_path):
     (tmp_path / "companies.json").write_text(json.dumps(UNIVERSE))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
     settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
-    with TestClient(create_app(lambda: build_snapshot(settings))) as c:
+    with TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))) as c:
         yield c
 
 
 def test_peers_endpoint(api):
     body = api.get("/api/peers", params={"target": "US:BNKA", "k": 2}).json()
-    assert body["method"] == {"name": "tfidf-description", "version": "1"}
+    assert "method" not in body
     assert body["target"]["key"] == "US:BNKA"
     assert (body["requested_k"], body["returned_k"], body["note"]) == (2, 2, None)
     first = body["peers"][0]
     assert first["rank"] == 1 and first["entity"]["key"] == "US:BNKB"
     ev = first["evidence"]
-    assert 0 < ev["similarity"] < 1 and ev["shared_terms"]
+    assert 0 < ev["similarity"] < 1 and "shared_terms" not in ev
     assert ev["classification"] == {"sector": True, "industry": True, "sub_industry": True}
     assert ev["country_match"] is True and ev["revenue_ratio"] == 0.5
     assert "metrics" not in first
@@ -259,8 +248,29 @@ def test_revenue_ratio_never_overflows_and_rounds_half_away(tmp_path):
     ]
     (tmp_path / "companies.json").write_text(json.dumps(recs))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
-    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()))
+    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()), TfidfRetriever())
     ratios = {p.company.entity.key: p.evidence.revenue_ratio for p in find_peers(s, "US:TINY", 3).peers}
     assert ratios["US:HUGE"] is None  # 1e600 is not representable: blank, not a crash
     halves = {p.company.entity.key: p.evidence.revenue_ratio for p in find_peers(s, "US:ONE", 3).peers}
     assert halves["US:HALF"] == 0.13  # 0.125 rounds half away from zero
+
+
+def test_embedding_settings_are_read_at_startup():
+    from comps.config import DEFAULT_EMBEDDING_MODEL, load_settings
+
+    cfg = load_settings({"EMBEDDING_MODEL": "some/model", "MODEL_CACHE_DIR": "/m", "MODEL_OFFLINE": "1"}).retrieval
+    assert (cfg.model, str(cfg.cache_dir), cfg.offline) == ("some/model", "/m", True)
+    default = load_settings({}).retrieval
+    assert (default.model, default.cache_dir, default.offline) == (DEFAULT_EMBEDDING_MODEL, None, False)
+
+
+def test_missing_model_fails_startup_with_no_fallback(tmp_path):
+    from comps.retrieval.embedding import ModelUnavailable
+
+    (tmp_path / "companies.json").write_text(json.dumps(UNIVERSE))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    settings = load_settings(
+        {"DATA_DIR": str(tmp_path), "MODEL_CACHE_DIR": str(tmp_path / "empty"), "MODEL_OFFLINE": "1"}
+    )
+    with pytest.raises(ModelUnavailable, match="offline"):
+        build_snapshot(settings)
