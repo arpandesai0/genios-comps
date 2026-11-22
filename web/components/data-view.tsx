@@ -14,18 +14,15 @@ import type {
 } from "@/lib/api-types";
 import { DataTable } from "@/components/data-table";
 import { CompanyDetail } from "@/components/company-detail";
-import { DataIngestForm } from "@/components/data-ingest-form";
-import { features } from "@/lib/features";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 const severities: Severity[] = ["error", "limitation", "warning", "info"];
 const pageSize = 20;
-function useResource<T>(path: string, revision: number) {
+function useResource<T>(path: string) {
   const [result, setResult] = useState<{
     path: string;
-    revision: number;
     data?: T;
     error?: string;
   } | null>(null);
@@ -33,22 +30,20 @@ function useResource<T>(path: string, revision: number) {
     const controller = new AbortController();
     api<T>(path, { signal: controller.signal }).then(
       (data) => {
-        if (!controller.signal.aborted) setResult({ path, revision, data });
+        if (!controller.signal.aborted) setResult({ path, data });
       },
       (cause: unknown) => {
         if (!controller.signal.aborted)
           setResult({
             path,
-            revision,
             error:
               cause instanceof Error ? cause.message : "Unable to load data.",
           });
       },
     );
     return () => controller.abort();
-  }, [path, revision]);
-  const current =
-    result?.path === path && result.revision === revision ? result : null;
+  }, [path]);
+  const current = result?.path === path ? result : null;
   return {
     data: current?.data,
     error: current?.error,
@@ -180,8 +175,6 @@ const findingColumns: ColumnDef<Finding>[] = [
 ];
 
 export default function DataPage() {
-  const [revision, setRevision] = useState(0);
-  const [showAdd, setShowAdd] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [companyQuery, setCompanyQuery] = useState("");
   const [companySector, setCompanySector] = useState("");
@@ -191,7 +184,7 @@ export default function DataPage() {
   const [findingCode, setFindingCode] = useState("");
   const [findingEntity, setFindingEntity] = useState("");
   const [findingOffset, setFindingOffset] = useState(0);
-  const dataset = useResource<DatasetResponse>("/dataset", revision);
+  const dataset = useResource<DatasetResponse>("/dataset");
   const companyParams = new URLSearchParams({
     limit: String(pageSize),
     offset: String(companyOffset),
@@ -199,10 +192,7 @@ export default function DataPage() {
   if (companyQuery) companyParams.set("q", companyQuery);
   if (companySector) companyParams.set("sector", companySector);
   if (companySeverity) companyParams.set("has_findings", companySeverity);
-  const companies = useResource<CompaniesResponse>(
-    `/companies?${companyParams}`,
-    revision,
-  );
+  const companies = useResource<CompaniesResponse>(`/companies?${companyParams}`);
   const findingParams = new URLSearchParams({
     limit: String(pageSize),
     offset: String(findingOffset),
@@ -212,7 +202,6 @@ export default function DataPage() {
   if (findingEntity) findingParams.set("entity", findingEntity);
   const findings = useResource<FindingsResponse>(
     `/dataset/findings?${findingParams}`,
-    revision,
   );
   const companyColumns: ColumnDef<EntitySummary>[] = [
     {
@@ -263,36 +252,10 @@ export default function DataPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1>Data & Integrity</h1>
-          <p className="muted mt-2">
-            {features.manualIngest
-              ? "Inspect the source, review findings and preview manual additions."
-              : "Inspect the source and review findings."}
-          </p>
-        </div>
-        {features.manualIngest && (
-          <Button
-            onClick={() => setShowAdd(!showAdd)}
-            aria-expanded={showAdd}
-            aria-controls="add-company-section"
-          >
-            {showAdd ? "Close Addition Form" : "Add Company"}
-          </Button>
-        )}
+      <header>
+        <h1>Data & Integrity</h1>
+        <p className="muted mt-2">Inspect the source and review findings.</p>
       </header>
-      {features.manualIngest && showAdd && (
-        <div id="add-company-section">
-          <DataIngestForm
-            onSaved={() => {
-              setRevision((value) => value + 1);
-              setCompanyOffset(0);
-              setFindingOffset(0);
-            }}
-          />
-        </div>
-      )}
 
       <section className="space-y-5" aria-labelledby="dataset-health-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -317,12 +280,11 @@ export default function DataPage() {
         )}
         {dataset.data && (
           <>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               {(
                 [
                   ["Entities", dataset.data.counts.entities],
                   ["Records", dataset.data.counts.records],
-                  ["Manual Additions", dataset.data.counts.manual_additions],
                 ] as const
               ).map(([label, count]) => (
                 <div className="panel" key={label}>

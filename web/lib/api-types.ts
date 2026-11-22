@@ -43,7 +43,6 @@ export interface EntitySummary {
 
 export interface Observation {
   record_id: string;
-  origin: "file" | "manual";
   price_date: string | null;
   original: Record<string, unknown>; // the record exactly as supplied
   usd: {
@@ -89,30 +88,6 @@ export interface SummaryStat {
   };
 }
 
-// A record in the original companies.json schema (all fields required; values may be null)
-export interface RawRecord {
-  id: string;
-  ticker: string;
-  name: string;
-  description: string;
-  sector: string;
-  industry: string;
-  sub_industry: string;
-  country: string;
-  price_currency: string;
-  reporting_currency: string;
-  units: "millions" | "thousands";
-  fiscal_year_end: string;
-  price: number | null;
-  price_date: string;
-  shares_outstanding: number | null;
-  total_debt: number | null;
-  cash: number | null;
-  revenue: number | null;
-  ebitda: number | null;
-  net_income: number | null;
-}
-
 export interface CompsResponse {
   dataset_version: string;
   method: { name: string; version: string };
@@ -145,26 +120,11 @@ export interface CompsResponse {
   summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only
 }
 
-export interface IngestResult {
-  accepted: boolean; // false if a blocking error would reject it
-  resolution: {
-    key: string | null;
-    action:
-      | "create"
-      | "add_observation"
-      | "update_text"
-      | "duplicate"
-      | "rejected";
-  };
-  entity: EntityDetail | null; // the entity as it would look after saving
-  findings: Finding[]; // findings raised by this record
-}
-
 export interface DatasetResponse {
   dataset_version: string;
   reference_date: string;
   source: { data_dir: string; files: { name: string; sha256: string }[] };
-  counts: { records: number; entities: number; manual_additions: number };
+  counts: { records: number; entities: number };
   findings_by_severity: Record<Severity, number>;
   findings_by_code: {
     code: string;
@@ -187,7 +147,7 @@ export interface FindingsResponse {
 }
 export interface ApiErrorBody {
   error: {
-    code: "not_found" | "invalid_request" | "rejected";
+    code: "not_found" | "invalid_request";
     message: string;
     details: Record<string, unknown>;
   };

@@ -11,9 +11,9 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. Mocks are enabled by default; `NEXT_PUBLIC_USE_MOCKS=1` makes the choice explicit. Compare is `/`; dataset health, findings, companies and manual additions are `/data`.
+Open <http://localhost:3000>. Mocks are enabled by default; `NEXT_PUBLIC_USE_MOCKS=1` makes the choice explicit. Compare is `/`; dataset health, findings and companies are `/data`.
 
-All browser requests use `/api`. In mock mode, a Next.js route serves synthetic JSON fixtures from `mocks/`. No supplied assignment data is included. Additions live only in the mock server process and disappear on restart.
+All browser requests use `/api`. In mock mode, a Next.js route serves synthetic JSON fixtures from `mocks/`. No supplied assignment data is included.
 
 ## Run against the Python API
 
@@ -68,7 +68,10 @@ Peer removal and undo request a new comps response. Summary values, counts and C
 ## Decisions and assumptions
 
 - **2026-11-21, owner confirmed:** peer count is user input, defaulting to 10. The named constant is `DEFAULT_K` in the Compare view. The valid range is 1–50, as specified by the API contract.
-- The decision is recorded here because this task is restricted to `web/`; the owner can copy it to the root decision log.
+- **2026-11-22, owner confirmed:** remove manual additions first, then add share classes, then wire Compare to the real API, with approval before each step.
+- **2026-11-22, owner confirmed:** show a compact Share Classes section for multi-class issuers, including whether each class counts toward market cap.
+- **2026-11-22, owner confirmed:** show the server note above the Compare table and a collapsed Skipped Companies list below. Keep peer evidence in the Compare drawer.
+- UI decisions are recorded here because this task is restricted to `web/`.
 - System fonts keep build and runtime independent of font services.
 - Mocks support UI development, not a measured retrieval or finance evaluation. They must not be used as evidence of Python backend behavior.
 
@@ -80,4 +83,4 @@ Codex implemented the UI, synthetic mock service, Docker setup and browser check
 
 The fixture contains 15 synthetic records across 14 entities, including two observations and aliases for `US:NOMA`. Searching `NOMA` demonstrates ticker ambiguity (`US:NOMA`, `GB:NOMA`); `US:NOMA.B` demonstrates same-issuer exclusion. Other fixtures cover missing EBITDA (`US:ARCL`), negative net income/NM (`US:MESA`), a model-derived classification warning (`US:ORBT`), stale prices (`DE:LUMA`), thousands-to-millions conversion (`US:ALTO`) and CAD conversion (`CA:NOVA`).
 
-The mock HTTP server computes financial metrics and summaries on the server so exclusions and additions can be exercised end to end. Retrieval uses deterministic fixture order and scores, not a TF-IDF index. Validation and ingestion simulate the documented resolution actions but do not replace the full Python pipeline. Mock FX is limited to the synthetic USD, CAD, GBP and EUR rates in its fixture. Restart the mock server to reset additions.
+The mock HTTP server computes financial metrics and summaries on the server so exclusions can be exercised end to end. Retrieval uses deterministic fixture order and scores, not a TF-IDF index. Mock FX is limited to the synthetic USD, CAD, GBP and EUR rates in its fixture.

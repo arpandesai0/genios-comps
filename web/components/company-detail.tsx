@@ -153,7 +153,7 @@ export function CompanyDetail({
               {current.observations.map((o, i) => (
                 <details key={`${o.record_id}-${i}`}>
                   <summary>
-                    {o.price_date || "Undated"} · {o.record_id} · {titleLabel(o.origin)}
+                    {o.price_date || "Undated"} · {o.record_id}
                   </summary>
                   <CalculationTrace observation={o} />
                 </details>
