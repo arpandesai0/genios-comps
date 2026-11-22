@@ -689,14 +689,26 @@ def build(out: Path = HERE) -> None:
     business = {keys[t]: b for t, _, _, b, *_ in COMPANIES}
     tags = {keys[t]: list(tg) for t, _, _, _, tg, *_ in COMPANIES}
 
-    # 50/50 split, alternating within each business (sorted by key) so both halves cover every business;
-    # the starting side alternates between businesses so odd-sized ones don't all favour dev.
-    dev, held_out = [], []
-    for i, b in enumerate(TAXONOMY):
+    # 50/50 split. Within each business the halves alternate (so both cover every business); ties go to
+    # the half with fewer companies of the same hard-case tags, then to the smaller half, so the tags are
+    # spread evenly too. Decided before held-out was ever scored.
+    halves: dict[str, list[str]] = {"dev": [], "held_out": []}
+    tag_count = {
+        h: {t: 0 for t in ("paraphrase", "cross_country", "mislabelled", "boilerplate", "geo_trap")} for h in halves
+    }
+    for b in TAXONOMY:
         members = sorted(k for k, v in business.items() if v == b)
-        first, second = (dev, held_out) if i % 2 == 0 else (held_out, dev)
-        first += members[0::2]
-        second += members[1::2]
+        in_business = {h: 0 for h in halves}
+        for key in members:
+            half = min(
+                halves,
+                key=lambda h: (in_business[h], sum(tag_count[h][t] for t in tags[key]), len(halves[h]), h),
+            )
+            halves[half].append(key)
+            in_business[half] += 1
+            for t in tags[key]:
+                tag_count[half][t] += 1
+    dev, held_out = halves["dev"], halves["held_out"]
 
     labels = {
         target: {other: relevance(business[target], business[other]) for other in sorted(business) if other != target}

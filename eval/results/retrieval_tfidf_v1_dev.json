@@ -5,179 +5,150 @@
   },
   "dataset_version": "83d288b6959e",
   "split": "dev",
-  "targets": 30,
+  "targets": 29,
   "relevant_threshold": 3,
   "overall": {
-    "ndcg@5": 0.6997,
-    "precision@5": 0.44,
-    "precision@5_ceiling": 0.6933,
-    "recall@5": 0.6361,
-    "ndcg@10": 0.7296,
-    "precision@10": 0.2733,
-    "precision@10_ceiling": 0.3467,
-    "recall@10": 0.7917
+    "ndcg@5": 0.6568,
+    "precision@5": 0.4138,
+    "precision@5_ceiling": 0.6897,
+    "recall@5": 0.5948,
+    "ndcg@10": 0.6971,
+    "precision@10": 0.269,
+    "precision@10_ceiling": 0.3448,
+    "recall@10": 0.7874
   },
   "by_tag": {
     "paraphrase": {
-      "targets": 3,
-      "ndcg@10": 0.4011,
-      "precision@10": 0.1333
+      "targets": 7,
+      "ndcg@10": 0.6137,
+      "precision@10": 0.2429
     },
     "cross_country": {
-      "targets": 10,
-      "ndcg@10": 0.8156,
-      "precision@10": 0.31
+      "targets": 11,
+      "ndcg@10": 0.7607,
+      "precision@10": 0.2727
     },
     "mislabelled": {
-      "targets": 3,
-      "ndcg@10": 0.8663,
+      "targets": 2,
+      "ndcg@10": 0.8144,
       "precision@10": 0.3
     },
     "boilerplate": {
       "targets": 4,
-      "ndcg@10": 0.282,
-      "precision@10": 0.2
+      "ndcg@10": 0.3369,
+      "precision@10": 0.225
     },
     "geo_trap": {
-      "targets": 6,
-      "ndcg@10": 0.79,
-      "precision@10": 0.3
+      "targets": 5,
+      "ndcg@10": 0.6761,
+      "precision@10": 0.26
     },
     "(none)": {
-      "targets": 10,
-      "ndcg@10": 0.8801,
+      "targets": 8,
+      "ndcg@10": 0.838,
       "precision@10": 0.3
     }
   },
   "duplicate_listing_returned": 0,
   "geography": {
-    "irrelevant_returned": 155,
-    "same_country_returned": 109,
-    "irrelevant_pool": 1424,
-    "same_country_pool": 621,
-    "same_country_share_returned": 0.7032,
-    "same_country_share_pool": 0.4361,
-    "lift": 1.6125
+    "irrelevant_returned": 149,
+    "same_country_returned": 87,
+    "irrelevant_pool": 1381,
+    "same_country_pool": 559,
+    "same_country_share_returned": 0.5839,
+    "same_country_share_pool": 0.4048,
+    "lift": 1.4424
   },
   "per_target": [
     {
-      "target": "CA:QSRC",
-      "business": "quick_service_restaurants",
+      "target": "CA:DRLC",
+      "business": "oil_gas_drilling",
       "tags": [
+        "paraphrase",
         "cross_country"
       ],
       "returned": [
-        "US:QSRA",
-        "DE:QSRD",
-        "CA:MTGC",
+        "US:DRLA",
+        "GB:DRLB",
+        "US:DRLD",
         "CA:TRKC",
-        "CA:DRLC",
-        "US:HRSE",
-        "GB:RBNC",
-        "US:QSRB",
-        "DE:HRSD",
-        "DE:TRKD"
+        "US:TRKB",
+        "US:HRSB",
+        "CA:QSRC",
+        "SG:SHPC",
+        "CA:MTGC",
+        "US:TRKA"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.7654,
-      "precision@5": 0.4,
+      "ndcg@5": 1.0,
+      "precision@5": 0.6,
       "precision@5_ceiling": 0.6,
-      "recall@5": 0.6667,
-      "ndcg@10": 0.9134,
+      "recall@5": 1.0,
+      "ndcg@10": 1.0,
       "precision@10": 0.3,
       "precision@10_ceiling": 0.3,
       "recall@10": 1.0
     },
     {
-      "target": "DE:HRSD",
-      "business": "hr_software",
+      "target": "CH:ORTC",
+      "business": "orthopedic_devices",
       "tags": [
-        "cross_country",
-        "geo_trap"
+        "cross_country"
       ],
       "returned": [
-        "US:HRSA",
-        "GB:HRSC",
-        "US:HRSE",
-        "IL:CYBC",
-        "US:CYBA",
-        "DE:TRKD",
-        "DE:LABC",
-        "DE:WNDD",
-        "DE:PAYC",
-        "DE:SHPB"
-      ],
-      "duplicate_returned": [],
-      "note": null,
-      "ndcg@5": 0.9098,
-      "precision@5": 0.6,
-      "precision@5_ceiling": 0.8,
-      "recall@5": 0.75,
-      "ndcg@10": 0.7857,
-      "precision@10": 0.3,
-      "precision@10_ceiling": 0.4,
-      "recall@10": 0.75
-    },
-    {
-      "target": "DE:LABC",
-      "business": "lab_diagnostics",
-      "tags": [
-        "cross_country",
-        "geo_trap"
-      ],
-      "returned": [
-        "US:LABA",
-        "US:LABE",
-        "JP:LABD",
-        "CH:ORTC",
-        "US:LABB",
         "US:ORTA",
-        "DE:HRSD",
-        "DE:TRKD",
+        "US:ORTD",
+        "IL:CYBC",
+        "DE:LABC",
+        "JP:PAYD",
         "DE:WNDD",
-        "DE:PAYC"
+        "US:LABB",
+        "US:SOLA",
+        "US:WNDA",
+        "US:HRSA"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.9856,
-      "precision@5": 0.8,
-      "precision@5_ceiling": 0.8,
-      "recall@5": 1.0,
-      "ndcg@10": 0.9528,
-      "precision@10": 0.4,
-      "precision@10_ceiling": 0.4,
-      "recall@10": 1.0
+      "ndcg@5": 0.753,
+      "precision@5": 0.4,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.6667,
+      "ndcg@10": 0.7277,
+      "precision@10": 0.2,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.6667
     },
     {
-      "target": "DE:PAYC",
-      "business": "payments",
+      "target": "DE:QSRD",
+      "business": "quick_service_restaurants",
       "tags": [
         "cross_country",
-        "geo_trap"
+        "geo_trap",
+        "boilerplate"
       ],
       "returned": [
-        "US:PAYA",
-        "JP:PAYD",
+        "US:SOLD",
+        "US:CYBD",
         "US:PAYE",
-        "US:HRSB",
+        "US:ORTD",
+        "US:RBNE",
+        "CA:QSRC",
+        "US:QSRA",
         "US:HRSE",
-        "DE:HRSD",
-        "DE:TRKD",
-        "US:QSRB",
-        "DE:LABC",
-        "US:TRKA"
+        "US:WNDE",
+        "US:SOLA"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.8143,
-      "precision@5": 0.6,
-      "precision@5_ceiling": 0.8,
-      "recall@5": 0.75,
-      "ndcg@10": 0.7491,
-      "precision@10": 0.3,
-      "precision@10_ceiling": 0.4,
-      "recall@10": 0.75
+      "ndcg@5": 0.0,
+      "precision@5": 0.0,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.0,
+      "ndcg@10": 0.3236,
+      "precision@10": 0.2,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.6667
     },
     {
       "target": "DE:RBND",
@@ -270,6 +241,37 @@
       "recall@10": 0.6667
     },
     {
+      "target": "DE:WNDD",
+      "business": "wind_power",
+      "tags": [
+        "cross_country",
+        "geo_trap",
+        "mislabelled"
+      ],
+      "returned": [
+        "US:WNDE",
+        "US:WNDA",
+        "US:SOLA",
+        "ES:SOLC",
+        "GB:WNDB",
+        "IL:CYBC",
+        "CH:ORTC",
+        "DE:HRSD",
+        "DE:TRKD",
+        "US:SOLD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8861,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.8044,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
       "target": "ES:SOLC",
       "business": "solar_power",
       "tags": [
@@ -299,62 +301,91 @@
       "recall@10": 1.0
     },
     {
-      "target": "GB:DRLB",
-      "business": "oil_gas_drilling",
+      "target": "GB:HRSC",
+      "business": "hr_software",
       "tags": [
         "cross_country"
       ],
       "returned": [
-        "US:DRLD",
+        "US:HRSA",
+        "DE:HRSD",
+        "US:HRSE",
+        "IL:CYBC",
         "GB:WNDB",
-        "US:DRLA",
-        "CA:DRLC",
-        "GB:HRSC",
-        "GB:RBNC",
-        "US:SHPD",
-        "US:SOLA",
-        "US:WNDA",
-        "DE:TRKD"
-      ],
-      "duplicate_returned": [],
-      "note": null,
-      "ndcg@5": 0.906,
-      "precision@5": 0.6,
-      "precision@5_ceiling": 0.6,
-      "recall@5": 1.0,
-      "ndcg@10": 0.906,
-      "precision@10": 0.3,
-      "precision@10_ceiling": 0.3,
-      "recall@10": 1.0
-    },
-    {
-      "target": "GB:WNDB",
-      "business": "wind_power",
-      "tags": [
-        "cross_country"
-      ],
-      "returned": [
         "GB:DRLB",
-        "US:WNDA",
-        "US:WNDE",
-        "US:SOLA",
-        "DE:WNDD",
-        "GB:HRSC",
-        "US:SOLD",
-        "US:WNDC",
+        "US:CYBA",
         "GB:RBNC",
-        "ES:SOLC"
+        "DE:RBND",
+        "US:SOLA"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.6242,
+      "ndcg@5": 0.849,
       "precision@5": 0.6,
       "precision@5_ceiling": 0.8,
       "recall@5": 0.75,
-      "ndcg@10": 0.7234,
-      "precision@10": 0.4,
+      "ndcg@10": 0.7784,
+      "precision@10": 0.3,
       "precision@10_ceiling": 0.4,
-      "recall@10": 1.0
+      "recall@10": 0.75
+    },
+    {
+      "target": "JP:LABD",
+      "business": "lab_diagnostics",
+      "tags": [
+        "cross_country"
+      ],
+      "returned": [
+        "US:LABA",
+        "US:LABE",
+        "DE:LABC",
+        "JP:PAYD",
+        "US:ORTB",
+        "DE:HRSD",
+        "DE:TRKD",
+        "CA:TRKC",
+        "CA:QSRC",
+        "GB:HRSC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8354,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.792,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "JP:PAYD",
+      "business": "payments",
+      "tags": [
+        "cross_country"
+      ],
+      "returned": [
+        "US:PAYA",
+        "DE:PAYC",
+        "US:PAYE",
+        "US:MTGB",
+        "DE:TRKD",
+        "JP:LABD",
+        "CH:ORTC",
+        "GB:RBNC",
+        "US:RBNA",
+        "CA:MTGC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8378,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.8162,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
     },
     {
       "target": "US:CYBA",
@@ -384,33 +415,33 @@
       "recall@10": 1.0
     },
     {
-      "target": "US:CYBD",
+      "target": "US:CYBB",
       "business": "cybersecurity",
       "tags": [
-        "boilerplate"
+        "paraphrase"
       ],
       "returned": [
+        "US:LABB",
+        "US:CYBA",
+        "IL:CYBC",
+        "US:PAYA",
+        "US:RBNB",
         "US:SOLD",
-        "US:ORTD",
+        "US:CYBD",
         "US:PAYE",
-        "DE:QSRD",
-        "US:RBNE",
-        "US:HRSE",
-        "US:WNDE",
-        "US:SOLA",
-        "US:WNDA",
-        "GB:HRSC"
+        "US:ORTD",
+        "DE:QSRD"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.0,
-      "precision@5": 0.0,
+      "ndcg@5": 0.4558,
+      "precision@5": 0.4,
       "precision@5_ceiling": 0.6,
-      "recall@5": 0.0,
-      "ndcg@10": 0.095,
-      "precision@10": 0.0,
+      "recall@5": 0.6667,
+      "ndcg@10": 0.5028,
+      "precision@10": 0.3,
       "precision@10_ceiling": 0.3,
-      "recall@10": 0.0
+      "recall@10": 1.0
     },
     {
       "target": "US:DRLD",
@@ -496,60 +527,33 @@
       "recall@10": 0.75
     },
     {
-      "target": "US:LABA",
-      "business": "lab_diagnostics",
-      "tags": [],
-      "returned": [
-        "US:LABE",
-        "JP:LABD",
-        "DE:LABC",
-        "US:PAYA",
-        "US:ORTB",
-        "US:TRKA",
-        "US:SOLB",
-        "US:RBNE",
-        "US:WNDC",
-        "CA:DRLC"
-      ],
-      "duplicate_returned": [],
-      "note": null,
-      "ndcg@5": 0.8354,
-      "precision@5": 0.6,
-      "precision@5_ceiling": 0.8,
-      "recall@5": 0.75,
-      "ndcg@10": 0.792,
-      "precision@10": 0.3,
-      "precision@10_ceiling": 0.4,
-      "recall@10": 0.75
-    },
-    {
-      "target": "US:LABE",
+      "target": "US:LABB",
       "business": "lab_diagnostics",
       "tags": [
-        "mislabelled"
+        "paraphrase"
       ],
       "returned": [
-        "US:LABA",
-        "JP:LABD",
+        "US:ORTA",
         "DE:LABC",
+        "US:CYBB",
+        "CH:ORTC",
         "US:HRSE",
+        "US:LABE",
         "US:WNDE",
         "GB:HRSC",
         "US:SOLA",
-        "US:ORTA",
-        "US:WNDA",
-        "GB:WNDB"
+        "US:WNDA"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.8143,
-      "precision@5": 0.6,
+      "ndcg@5": 0.3192,
+      "precision@5": 0.2,
       "precision@5_ceiling": 0.8,
-      "recall@5": 0.75,
-      "ndcg@10": 0.7883,
-      "precision@10": 0.3,
+      "recall@5": 0.25,
+      "ndcg@10": 0.4316,
+      "precision@10": 0.2,
       "precision@10_ceiling": 0.4,
-      "recall@10": 0.75
+      "recall@10": 0.5
     },
     {
       "target": "US:MTGA",
@@ -579,57 +583,30 @@
       "recall@10": 1.0
     },
     {
-      "target": "US:MTGD",
+      "target": "US:MTGB",
       "business": "mortgage_lender",
       "tags": [
-        "mislabelled"
+        "paraphrase"
       ],
       "returned": [
+        "US:MTGD",
         "US:MTGA",
-        "CA:MTGC",
-        "US:MTGB",
-        "US:RBNB",
-        "US:RBNE",
-        "GB:RBNC",
+        "US:PAYA",
+        "JP:PAYD",
         "DE:RBND",
         "US:RBNA",
-        "US:PAYA",
+        "CA:MTGC",
+        "DE:PAYC",
+        "US:HRSB",
         "US:SOLB"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 1.0,
-      "precision@5": 0.6,
+      "ndcg@5": 0.7777,
+      "precision@5": 0.4,
       "precision@5_ceiling": 0.6,
-      "recall@5": 1.0,
-      "ndcg@10": 0.9862,
-      "precision@10": 0.3,
-      "precision@10_ceiling": 0.3,
-      "recall@10": 1.0
-    },
-    {
-      "target": "US:ORTA",
-      "business": "orthopedic_devices",
-      "tags": [],
-      "returned": [
-        "CH:ORTC",
-        "US:ORTD",
-        "US:ORTB",
-        "US:LABB",
-        "DE:LABC",
-        "US:HRSE",
-        "US:LABE",
-        "US:WNDE",
-        "GB:HRSC",
-        "US:SOLA"
-      ],
-      "duplicate_returned": [],
-      "note": null,
-      "ndcg@5": 1.0,
-      "precision@5": 0.6,
-      "precision@5_ceiling": 0.6,
-      "recall@5": 1.0,
-      "ndcg@10": 0.9599,
+      "recall@5": 0.6667,
+      "ndcg@10": 0.8213,
       "precision@10": 0.3,
       "precision@10_ceiling": 0.3,
       "recall@10": 1.0
@@ -664,87 +641,62 @@
       "recall@10": 0.6667
     },
     {
-      "target": "US:PAYA",
-      "business": "payments",
-      "tags": [],
-      "returned": [
-        "DE:PAYC",
-        "JP:PAYD",
-        "US:PAYE",
-        "US:MTGB",
-        "DE:RBND",
-        "US:LABA",
-        "IL:CYBC",
-        "US:PAYB",
-        "US:CYBB",
-        "US:MTGD"
-      ],
-      "duplicate_returned": [],
-      "note": null,
-      "ndcg@5": 0.8589,
-      "precision@5": 0.6,
-      "precision@5_ceiling": 0.8,
-      "recall@5": 0.75,
-      "ndcg@10": 0.9155,
-      "precision@10": 0.4,
-      "precision@10_ceiling": 0.4,
-      "recall@10": 1.0
-    },
-    {
-      "target": "US:PAYE",
+      "target": "US:PAYB",
       "business": "payments",
       "tags": [
-        "boilerplate"
+        "paraphrase"
       ],
       "returned": [
-        "US:SOLD",
-        "US:CYBD",
-        "US:ORTD",
-        "DE:QSRD",
-        "US:RBNE",
+        "GB:RBNC",
         "US:PAYA",
-        "DE:PAYC",
         "JP:PAYD",
+        "US:TRKB",
+        "US:HRSA",
         "US:HRSE",
-        "US:WNDE"
+        "SG:SHPC",
+        "DE:RBND",
+        "US:RBNA",
+        "US:PAYE"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.0211,
-      "precision@5": 0.0,
+      "ndcg@5": 0.4868,
+      "precision@5": 0.4,
       "precision@5_ceiling": 0.8,
-      "recall@5": 0.0,
-      "ndcg@10": 0.3727,
+      "recall@5": 0.5,
+      "ndcg@10": 0.5803,
       "precision@10": 0.3,
       "precision@10_ceiling": 0.4,
       "recall@10": 0.75
     },
     {
-      "target": "US:QSRA",
+      "target": "US:QSRB",
       "business": "quick_service_restaurants",
-      "tags": [],
+      "tags": [
+        "paraphrase"
+      ],
       "returned": [
-        "CA:QSRC",
-        "DE:QSRD",
-        "US:QSRB",
-        "US:SHPA",
+        "US:QSRA",
+        "US:RBNB",
+        "US:MTGA",
+        "DE:PAYC",
         "US:HRSE",
-        "US:TRKA",
-        "US:RBNE",
-        "US:DRLA",
-        "GB:RBNC",
-        "DE:TRKD"
+        "CA:TRKC",
+        "CA:QSRC",
+        "US:SOLB",
+        "US:WNDC",
+        "US:HRSB"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 1.0,
-      "precision@5": 0.6,
+      "ndcg@5": 0.4693,
+      "precision@5": 0.2,
       "precision@5_ceiling": 0.6,
-      "recall@5": 1.0,
-      "ndcg@10": 1.0,
-      "precision@10": 0.3,
+      "recall@5": 0.3333,
+      "ndcg@10": 0.6257,
+      "precision@10": 0.2,
       "precision@10_ceiling": 0.3,
-      "recall@10": 1.0
+      "recall@10": 0.6667
     },
     {
       "target": "US:RBNA",
@@ -803,57 +755,57 @@
       "recall@10": 0.75
     },
     {
-      "target": "US:SHPA",
+      "target": "US:SHPD",
       "business": "container_shipping",
       "tags": [],
       "returned": [
         "DE:SHPB",
-        "US:SHPD",
-        "US:TRKA",
-        "US:DRLA",
-        "DE:TRKD",
-        "US:QSRA",
-        "CA:TRKC",
+        "US:SHPA",
+        "GB:DRLB",
+        "SG:SHPC",
+        "US:WNDE",
+        "US:WNDA",
         "US:DRLD",
-        "US:MTGA",
-        "US:RBNA"
+        "ES:SOLC",
+        "DE:WNDD",
+        "US:SOLD"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.8105,
-      "precision@5": 0.4,
+      "ndcg@5": 0.8309,
+      "precision@5": 0.6,
       "precision@5_ceiling": 0.6,
-      "recall@5": 0.6667,
-      "ndcg@10": 0.7757,
-      "precision@10": 0.2,
+      "recall@5": 1.0,
+      "ndcg@10": 0.7424,
+      "precision@10": 0.3,
       "precision@10_ceiling": 0.3,
-      "recall@10": 0.6667
+      "recall@10": 1.0
     },
     {
-      "target": "US:SOLB",
+      "target": "US:SOLD",
       "business": "solar_power",
       "tags": [
-        "paraphrase"
+        "boilerplate"
       ],
       "returned": [
-        "US:WNDC",
+        "US:CYBD",
+        "US:ORTD",
+        "US:PAYE",
+        "DE:QSRD",
+        "US:RBNE",
+        "US:SOLA",
+        "US:WNDE",
+        "US:WNDA",
         "ES:SOLC",
-        "US:QSRB",
-        "GB:WNDB",
-        "US:TRKA",
-        "US:LABA",
-        "US:MTGD",
-        "US:SOLD",
-        "US:PAYA",
-        "US:MTGB"
+        "GB:WNDB"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.5014,
-      "precision@5": 0.2,
+      "ndcg@5": 0.0,
+      "precision@5": 0.0,
       "precision@5_ceiling": 0.6,
-      "recall@5": 0.3333,
-      "ndcg@10": 0.5356,
+      "recall@5": 0.0,
+      "ndcg@10": 0.3637,
       "precision@10": 0.2,
       "precision@10_ceiling": 0.3,
       "recall@10": 0.6667
@@ -888,33 +840,58 @@
       "recall@10": 0.3333
     },
     {
-      "target": "US:WNDC",
+      "target": "US:WNDA",
       "business": "wind_power",
-      "tags": [
-        "paraphrase"
-      ],
+      "tags": [],
       "returned": [
-        "US:SOLB",
-        "US:DRLD",
+        "US:WNDE",
+        "US:SOLA",
+        "DE:WNDD",
+        "ES:SOLC",
         "GB:WNDB",
-        "US:QSRB",
-        "GB:DRLB",
-        "CA:DRLC",
+        "US:SOLD",
+        "US:RBNE",
         "US:TRKA",
-        "US:LABA",
-        "US:MTGD",
-        "US:SOLD"
+        "US:CYBD",
+        "US:ORTD"
       ],
       "duplicate_returned": [],
       "note": null,
-      "ndcg@5": 0.3405,
-      "precision@5": 0.2,
+      "ndcg@5": 0.8586,
+      "precision@5": 0.6,
       "precision@5_ceiling": 0.8,
-      "recall@5": 0.25,
-      "ndcg@10": 0.3333,
-      "precision@10": 0.1,
+      "recall@5": 0.75,
+      "ndcg@10": 0.7899,
+      "precision@10": 0.3,
       "precision@10_ceiling": 0.4,
-      "recall@10": 0.25
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:WNDE",
+      "business": "wind_power",
+      "tags": [],
+      "returned": [
+        "US:WNDA",
+        "DE:WNDD",
+        "US:SOLA",
+        "ES:SOLC",
+        "GB:WNDB",
+        "US:SOLD",
+        "US:CYBD",
+        "US:ORTD",
+        "US:PAYE",
+        "DE:QSRD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8861,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.8136,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
     }
   ]
 }

@@ -23,7 +23,8 @@ PYTHONPATH=src .venv/bin/python eval/retrieval_eval.py --split held_out   # only
 
 - The dataset labels in the records are what a data file would say. For companies tagged `mislabelled` they are deliberately wrong; relevance never uses them.
 - Hard-case tags: `paraphrase` (few words shared with peers), `cross_country`, `mislabelled`, `boilerplate` (a long generic corporate paragraph), `geo_trap` (the same country phrase as unrelated companies). `aliases` maps the duplicate listing to its original; it must never be returned as a peer.
-- Splits: 50/50 dev / held-out, alternating within each business so both halves cover every business. Iterate on dev only; score held-out once a configuration is final.
+- Splits: 50/50 dev / held-out (29 / 28). Within each business the halves alternate, so both cover every business; ties go to the half with fewer companies of the same hard-case tags, so tags are spread evenly (paraphrase 7 / 6, boilerplate 4 / 2, geo_trap 5 / 3, mislabelled 2 / 2, cross_country 11 / 11). Iterate on dev only; score held-out once a configuration is final.
+- **Held-out is not independent of dev.** Both halves come from the same 13 businesses, the same author and the same boilerplate paragraph. It guards against tuning to individual dev companies, not against tuning to this universe's style.
 
 ### Metrics
 
@@ -38,4 +39,4 @@ Each evaluated configuration has a JSON result and a short interpretation in `re
 
 | Configuration | nDCG@10 (dev) | Interpretation |
 |---|---|---|
-| `tfidf-description` v1 | 0.730 | [retrieval_tfidf_v1_dev.md](results/retrieval_tfidf_v1_dev.md) |
+| `tfidf-description` v1 | 0.697 | [retrieval_tfidf_v1_dev.md](results/retrieval_tfidf_v1_dev.md) |

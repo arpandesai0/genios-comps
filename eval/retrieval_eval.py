@@ -102,7 +102,7 @@ def evaluate(snapshot: Snapshot, spec: Mapping, split: str) -> dict:
             "business": spec["business"][target],
             "tags": spec["tags"][target],
             "returned": returned,
-            "duplicate_returned": [k for k in returned if k in aliases or aliases.get(target) == k],
+            "duplicate_returned": [k for k in returned if k in aliases],
             "note": result.selection.note,
         }
         for k in CUTOFFS:
