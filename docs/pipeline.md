@@ -6,8 +6,7 @@ How a request for a comps table flows through the service, stage by stage, and w
 
 ```
 DATA_DIR/companies.json ─┐
-DATA_DIR/fx_rates.json  ─┼─► 1. Ingestion ─► 2. Quality ─► Dataset ─► 3. Resolve ─► 4. Retrieve ─► 5. Finance ─► 6. Service ─► 7. API ─► 8. UI
-manual additions (memory)┘
+DATA_DIR/fx_rates.json  ─┴─► 1. Ingestion ─► 2. Quality ─► Dataset ─► 3. Resolve ─► 4. Retrieve ─► 5. Finance ─► 6. Service ─► 7. API ─► 8. UI
 ```
 
 Each stage talks to the next only through plain data types from `src/comps/models.py`. No stage reaches into another's internals, so a stage can be changed, or swapped in the case of retrievers, without touching the rest.
@@ -19,15 +18,15 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | 3 | **Resolve**: turn an analyst's query (key, ticker, exact name or alias, partial name) into the matching companies, best match first; the analyst always chooses the target, and comps take a key | query → entity key(s) with match type | ✅ done | `service.search`, served by `GET /api/companies` | [API.md](API.md#get-apicompanies) |
 | 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ⏳ planned | `retrieval/` | |
 | 5 | **Finance**: glossary metrics (ok, NM or missing), rounding, peer summary stats | `Observation` → `Metrics`; peers' `Metrics` → `Summary` | ✅ done | `finance.py` | [finance.md](finance.md) |
-| 6 | **Service**: build an immutable snapshot, swap it atomically, assemble comps responses | dataset → snapshot; request → comps response | 🟡 snapshot built at start-up and read-only queries (including stage 3's `search`); no swap, no comps yet | `service.py` | |
-| 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | 🟡 read-only endpoints (health, dataset, findings, companies); comps and ingest return 404 | `api.py` | [API.md](API.md) |
-| 8 | **UI**: Next.js + shadcn/ui compare view and data-health view | HTTP only | 🟡 Data view wired to the real API (`make start`); Compare and "Add company" hidden until served | `web/` | |
+| 6 | **Service**: build an immutable snapshot once at start-up, assemble comps responses | dataset → snapshot; request → comps response | 🟡 snapshot built at start-up and read-only queries (including stage 3's `search`); no comps yet | `service.py` | |
+| 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | 🟡 read-only endpoints (health, dataset, findings, companies); comps return 404 | `api.py` | [API.md](API.md) |
+| 8 | **UI**: Next.js + shadcn/ui compare view and data-health view | HTTP only | 🟡 Data view wired to the real API (`make start`); Compare hidden until served | `web/` | |
 
 ## What each hand-off carries
 
 | From → to | Data type | What the receiver can rely on |
 |---|---|---|
-| Ingestion → everything | `Dataset` | Immutable. Values are in USD, and `None` means unavailable, never zero. Each entity's `latest` is the only observation used for comps. Every doubtful value has a finding. `version` identifies the input files and manual additions, but not settings such as `STALE_AFTER_DAYS`. |
+| Ingestion → everything | `Dataset` | Immutable. Values are in USD, and `None` means unavailable, never zero. Each entity's `latest` is the only observation used for comps. Every doubtful value has a finding. `version` identifies the input files, but not settings such as `STALE_AFTER_DAYS`. |
 | Dataset → Finance | `Observation` | `usd.*` in USD millions, `price` in USD per share, `shares_outstanding` in millions. `conversion` says which factor failed when a value is `None`. |
 | Finance → Service | `Metrics`, `Summary`, findings | Every value is `ok`, `nm` or `missing`, with `raw` (unrounded apart from cleaning float noise at 9 dp) and `display` (final, 1 dp). Stats are computed over exactly the rows passed in. |
 

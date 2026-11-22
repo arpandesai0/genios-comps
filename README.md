@@ -25,7 +25,7 @@ make stop                        # stops them
 - API: <http://localhost:8000/api/health>. The endpoints are described in [`docs/API.md`](docs/API.md).
 - **Using a different data file:** point `DIR` at another folder with the same two files. The data is mounted read-only and never copied into an image.
 
-Status: the read-only data endpoints are served. Comps (peer selection) and manual additions are not built yet, so the Compare page and the "Add company" form are hidden when the UI talks to the real API.
+Status: the read-only data endpoints are served. Comps (peer selection) is not built yet, so the Compare page is hidden when the UI talks to the real API. The input files are the whole dataset: there is no way to add or edit companies at runtime.
 
 ## Assumptions
 
