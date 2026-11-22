@@ -63,6 +63,11 @@ def test_dedup_scoring_finds_the_strictest_cut_without_false_duplicates():
     assert out["by_kind"]["y"] == {"pairs": 2, "duplicate": True, "min": 0.7, "max": 0.7, "mean": 0.7}
 
 
+def test_latency_stats_use_nearest_rank_percentiles():
+    stats = run.latency_stats([float(x) for x in range(1, 21)])  # 1..20 ms
+    assert stats == {"n": 20, "min": 1.0, "mean": 10.5, "p50": 10.0, "p95": 19.0, "max": 20.0}
+
+
 def test_pair_score_reads_peers_and_skipped():
     response = {
         "peers": [{"entity": {"key": "B"}, "evidence": {"similarity": 0.5}}],
@@ -130,8 +135,12 @@ def test_capture_over_http_and_score(tmp_path):
     fixture = FIXTURES["retrieval_v1"]
     data, queries, spec = run.prepare(fixture, tmp_path)
     with TestClient(create_app(lambda: _snapshot(data))) as client:
-        captured = run.capture(lambda path, params: client.get(path, params=params).json(), queries, fixture.k)
-    assert set(captured) == set(queries)
+        captured, latencies = run.capture(
+            lambda path, params: client.get(path, params=params).json(), queries, fixture.k
+        )
+    assert set(captured) == set(queries) and len(latencies) == len(queries)
+    stats = run.latency_stats(latencies)
+    assert stats["n"] == len(queries) and stats["min"] <= stats["p50"] <= stats["p95"] <= stats["max"]
     result = run.score(fixture, captured, spec, ["dev", "held_out"])
     for split in ("dev", "held_out"):
         assert result[split]["duplicate_listing_returned"] == 0
@@ -157,10 +166,10 @@ def _entry(log, number, **kw):
 
 
 def test_experiment_log_numbers_runs_and_the_commit_is_not_a_key(tmp_path):
-    log = tmp_path / "experiments.jsonl"
+    log = tmp_path / "experiments.json"
     when = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
     first = _entry(log, 1, now=when)
-    log.write_text(log.read_text().rstrip("\n"))  # a hand-saved file without a final newline
+    assert log.read_text().startswith('[\n  {\n    "experiment": 1,')  # pretty-printed
     _entry(log, 2, settings={"EMBEDDING_MODEL": "other"})  # same commit, other settings: a new row
     assert [e["experiment"] for e in experiments.read(log)] == [1, 2]
     assert first["date"] == "2026-11-22T12:00:00+00:00" and first["schema"] == 2

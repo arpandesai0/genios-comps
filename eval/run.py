@@ -8,7 +8,7 @@ The pipeline is a black box. For each fixture this script:
 3. calls ``GET /api/peers`` for every query and saves the responses as served
    (``eval/runs/<NNN>/<fixture>.json``);
 4. scores them with ``score.py`` against the fixture's golden labels and appends one row to the
-   experiment log (``experiments.jsonl``).
+   experiment log (``experiments.json``).
 
 The experiment number, not the commit, identifies a run: one commit can be run with several settings.
 
@@ -24,8 +24,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import socket
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -64,6 +66,10 @@ FIXTURES = (
 )
 
 Get = Callable[[str, Mapping[str, Any]], Any]
+
+
+def pretty(obj: Any) -> str:
+    return json.dumps(obj, indent=2, ensure_ascii=False)
 
 
 def sha(data: bytes) -> str:
@@ -146,9 +152,44 @@ def input_hash(data_dir: Path) -> str:
 # --- running the pipeline (black box over HTTP) ----------------------------------------------------
 
 
-def capture(get: Get, queries: Sequence[str], k: int) -> dict[str, Any]:
-    """``GET /api/peers`` for every query, responses kept as served."""
-    return {q: get("/api/peers", {"target": q, "k": k}) for q in queries}
+def capture(get: Get, queries: Sequence[str], k: int) -> tuple[dict[str, Any], list[float]]:
+    """``GET /api/peers`` for every query: responses kept as served, and each request's latency (ms)."""
+    responses, latencies = {}, []
+    for q in queries:
+        start = time.perf_counter()
+        responses[q] = get("/api/peers", {"target": q, "k": k})
+        latencies.append((time.perf_counter() - start) * 1000)
+    return responses, latencies
+
+
+def latency_stats(ms: Sequence[float]) -> dict[str, float | int]:
+    """min / mean / p50 / p95 / max in ms (nearest-rank percentiles)."""
+    xs = sorted(ms)
+
+    def pct(p: float) -> float:
+        return xs[max(0, math.ceil(p * len(xs)) - 1)]
+
+    return {
+        "n": len(xs),
+        "min": round(xs[0], 2),
+        "mean": round(statistics.fmean(xs), 2),
+        "p50": round(pct(0.5), 2),
+        "p95": round(pct(0.95), 2),
+        "max": round(xs[-1], 2),
+    }
+
+
+def model_info(settings: Mapping[str, str]) -> dict[str, Any] | None:
+    """Vector size and download size of the configured embedding model, from fastembed's registry."""
+    name = settings.get("EMBEDDING_MODEL")
+    if not name:
+        return None
+    from fastembed import TextEmbedding
+
+    for m in TextEmbedding.list_supported_models():
+        if m["model"].lower() == name.lower():
+            return {"name": m["model"], "dim": m["dim"], "size_gb": m.get("size_in_GB")}
+    return {"name": name, "dim": None, "size_gb": None}
 
 
 def _free_port() -> int:
@@ -256,11 +297,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         for fixture in fixtures:
             data_dir, queries, spec = prepare(fixture, Path(tmp))
             with serve(tree, data_dir, settings) as (get, startup_s, pid):
-                captured = capture(get, queries, fixture.k)
-                runtime[fixture.name] = {"startup_s": startup_s, "rss_mb": rss_mb(pid)}
+                captured, latencies = capture(get, queries, fixture.k)
+                runtime[fixture.name] = {
+                    "startup_s": startup_s,
+                    "rss_mb": rss_mb(pid),
+                    "latency_ms": latency_stats(latencies),
+                }
             run_dir.mkdir(parents=True, exist_ok=True)
             out_path = run_dir / f"{fixture.name}.json"
-            body = json.dumps({"commit": commit, "settings": settings, "k": fixture.k, "responses": captured})
+            body = pretty({"commit": commit, "settings": settings, "k": fixture.k, "responses": captured})
             out_path.write_text(body + "\n")
             inputs[fixture.name] = {
                 "input": input_hash(data_dir),
@@ -277,6 +322,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description=args.desc,
         commit=commit,
         settings=settings,
+        model=model_info(settings),
         inputs=inputs,
         outputs=outputs,
         runtime=runtime,

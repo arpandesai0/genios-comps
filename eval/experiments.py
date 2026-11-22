@@ -1,10 +1,11 @@
-"""Append-only experiment log for the evals (``experiments.jsonl``).
+"""Append-only experiment log for the evals (``experiments.json``).
 
-One JSON line per run of ``run.py``. The **experiment number** identifies a run; the commit is only
-metadata, since one commit can be run with several settings (e.g. three embedding models). Each entry
+A pretty-printed JSON array, one entry per run of ``run.py``. The **experiment number** identifies a
+run; the commit is only metadata, since one commit can be run with several settings. Each entry
 records when it ran, what it tests, the commit and service settings, the hashes of every input and
-golden file, where the captured pipeline output is and its hash, start-up time and memory, and the
-scores. Lines are never rewritten or removed; a wrong run is corrected by a later one that says so.
+golden file, the model's vector size, where the captured pipeline output is and its hash, start-up
+time, memory and per-request latency, and the scores. Entries are never rewritten or removed; a wrong
+run is corrected by a later one that says so.
 
     .venv/bin/python eval/experiments.py      # the log as a table
 
@@ -24,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-LOG = HERE / "experiments.jsonl"
+LOG = HERE / "experiments.json"
 SCHEMA = 2
 METRICS = ("ndcg@5", "ndcg@10", "precision@10", "recall@10")
 
@@ -33,7 +34,12 @@ def read(log: Path | None = None) -> list[dict]:
     log = log or LOG
     if not log.exists():
         return []
-    return [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+    entries: list[dict] = json.loads(log.read_text())
+    return entries
+
+
+def write(log: Path, entries: Sequence[Mapping[str, Any]]) -> None:
+    log.write_text(json.dumps(list(entries), indent=2, ensure_ascii=False) + "\n")
 
 
 def next_number(log: Path | None = None) -> int:
@@ -55,6 +61,7 @@ def record(
     commit: str,
     settings: Mapping[str, str],
     inputs: Mapping[str, Any],
+    model: Mapping[str, Any] | None = None,
     outputs: Mapping[str, Any],
     runtime: Mapping[str, Any],
     results: Mapping[str, Any],
@@ -74,6 +81,7 @@ def record(
         "description": description.strip(),
         "commit": commit,
         "settings": dict(settings),
+        "model": dict(model) if model else None,
         "env": {
             "python": platform.python_version(),
             **{p: _version(p) for p in ("numpy", "scikit-learn", "fastembed", "onnxruntime")},
@@ -83,9 +91,7 @@ def record(
         "runtime": dict(runtime),
         "results": dict(results),
     }
-    text = log.read_text() if log.exists() else ""
-    with log.open("a") as f:
-        f.write(("\n" if text and not text.endswith("\n") else "") + json.dumps(entry) + "\n")
+    write(log, [*read(log), entry])
     return entry
 
 
@@ -94,7 +100,7 @@ def _rows(e: Mapping[str, Any]) -> list[tuple[str, ...]]:
     if e.get("schema", 1) == 1:
         o, i = e["results"]["overall"], e["inputs"]
         cfg = f"{i['method']['name']} v{i['method']['version']}"
-        nums = tuple(f"{o[m]:.3f}" for m in METRICS) + ("",)
+        nums = tuple(f"{o[m]:.3f}" for m in METRICS) + ("", "", "", "")
         return [
             (
                 str(e["experiment"]),
@@ -109,13 +115,18 @@ def _rows(e: Mapping[str, Any]) -> list[tuple[str, ...]]:
     cfg = e["settings"].get("EMBEDDING_MODEL", "(commit default)")
     rows = []
     for fixture, by_split in e["results"].items():
+        rt = e["runtime"].get(fixture, {})
+        lat = rt.get("latency_ms", {})
+        perf = (f"{rt.get('startup_s', '')}", f"{lat.get('mean', '')}", f"{lat.get('p95', '')}")
         dev = by_split.get("dev", {})
         if "overall" in dev:
             nums = tuple(f"{dev['overall'][m]:.3f}" for m in METRICS) + ("",)
         else:
             r = dev.get("recall_at_zero_false_duplicates")
             nums = ("", "", "", "", "" if r is None else f"{r:.3f}")
-        rows.append((str(e["experiment"]), e["date"][:10], e["commit"][:7], cfg, fixture, *nums, e["description"]))
+        rows.append(
+            (str(e["experiment"]), e["date"][:10], e["commit"][:7], cfg, fixture, *nums, *perf, e["description"])
+        )
     return rows
 
 
@@ -141,4 +152,5 @@ def table(entries: Sequence[Mapping[str, Any]]) -> str:
 if __name__ == "__main__":
     print(table(read()))
     print("\nDev split. dedup R@0FP = duplicate recall at the strictest cut that flags no non-duplicate.")
+    print("start s = service start-up incl. indexing; mean / p95 ms = GET /api/peers latency over HTTP.")
     sys.exit(0)
