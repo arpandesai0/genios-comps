@@ -65,7 +65,7 @@ With `k = 10`, three peers come back (`BANKB`, `SOFT`, `STEEL`) with the note "O
 
 `tests/test_retrieval.py` checks the index, each skip reason and its precedence, exclusions, running out, the no-description cases, ties, the endpoints (JSON and CSV), the errors, and invariants (a target is never its own peer; no repeats; near-duplicates never both appear).
 
-Ranking quality is measured separately, by the retrieval eval (next stage): graded relevance labels on synthetic fixtures, nDCG@k, precision@k and recall@k, on dev and held-out targets.
+Ranking quality is measured separately by the retrieval eval ([eval/README.md](../eval/README.md)): graded relevance labels on a synthetic universe, nDCG@k, precision@k and recall@k. Current result (dev): nDCG@10 0.697; strong on plain and mislabelled companies, weaker on paraphrased (0.61) and boilerplate-heavy (0.34) descriptions, with a measurable geography leak (lift 1.44). See [the interpretation](../eval/results/retrieval_tfidf_v1_dev.md).
 
 ## Known gaps
 
