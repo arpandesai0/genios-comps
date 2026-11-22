@@ -107,7 +107,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
           Immutable Snapshot (versioned by input-file hash)
      entities · findings · TF-IDF index · derived label-conflict warnings
                                   ↓
-     Resolver (key / ticker / name → match, or a list of choices if ambiguous)
+     Resolve (service.search): key / ticker / name → every match; the analyst chooses
                                   ↓
      Retriever: TF-IDF on descriptions
        walks the full ranking until k peers: skips the target, near-duplicates and
@@ -163,6 +163,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | **Currency.** `fx_rates.json` may have any `base`; each rate is read as base units per one unit of the currency. Values are converted to USD whenever the file gives a USD rate (glossary), otherwise to the base currency, with a dataset-level `currency_not_usd` finding and money labelled with the currency. A currency without a rate is a data issue (`unknown_currency`, values blank). Listed in README Assumptions. |
 | 2026-11-21 | **Only ingestion handles currency.** It picks the dataset currency and normalizes every value into it; finance, retrieval, the API and the UI are currency-agnostic and only display the `currency` label. API names drop `usd` (`market_cap_m`, `enterprise_value_m`, `normalized`). |
 | 2026-11-21 | Remove the `REFERENCE_DATE` setting and the `future_price_date` finding. Staleness is always measured from the dataset's latest valid `price_date`. |
+| 2026-11-21 | **Resolve is done as it is.** Resolution stays in `service.search` behind `GET /api/companies`: every match is returned, the analyst always chooses, and `/api/comps?target=` takes a key only. No separate `resolve.py`, no automatic resolution. |
 | 2026-11-21 | **Three distinct API roles.** (1) `GET /api/companies/{key}`: exact lookup by `COUNTRY:TICKER`, **case-insensitive**; record `id`s are not accepted. (2) `GET /api/companies?q=`: text matching on key, ticker and names, kept for picking a target and documented as not similarity. (3) A separate retrieval (peers) endpoint, company key → `k` similar companies with explanations, ships with stage 4. It is in addition to `/api/comps`, which remains the comps-table endpoint and does not replace it. Every endpoint gets a Swagger description. |
 | 2026-11-21 | Sequencing: the Swagger descriptions and this contract wording land first. The peers endpoint is added to `API.md` (next to the existing `/api/comps` section) in stage 4's contract PR. Whether comps take a free-text query is decided separately. |
 | 2026-11-22 | **The grader runs a hidden dataset of the same format.** The supplied `data/` is a pre-test only. No rule, threshold or "this never happens" claim is calibrated on it alone; cases it lacks are covered by synthetic fixtures. |
@@ -196,9 +197,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/quality.py` | Checks across companies: shared names, stale price dates (the share-class merge moves to ingestion). (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
-| `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
-| `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints. Snapshot swapping and comps assembly come later. |
+| `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints, including resolution (`search`: key, ticker, exact name or alias, partial name). Snapshot swapping and comps assembly come later. |
 | `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps and ingest return 404. |
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
 | `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
