@@ -1,0 +1,920 @@
+{
+  "method": {
+    "name": "tfidf-description",
+    "version": "1"
+  },
+  "dataset_version": "83d288b6959e",
+  "split": "dev",
+  "targets": 30,
+  "relevant_threshold": 3,
+  "overall": {
+    "ndcg@5": 0.6997,
+    "precision@5": 0.44,
+    "precision@5_ceiling": 0.6933,
+    "recall@5": 0.6361,
+    "ndcg@10": 0.7296,
+    "precision@10": 0.2733,
+    "precision@10_ceiling": 0.3467,
+    "recall@10": 0.7917
+  },
+  "by_tag": {
+    "paraphrase": {
+      "targets": 3,
+      "ndcg@10": 0.4011,
+      "precision@10": 0.1333
+    },
+    "cross_country": {
+      "targets": 10,
+      "ndcg@10": 0.8156,
+      "precision@10": 0.31
+    },
+    "mislabelled": {
+      "targets": 3,
+      "ndcg@10": 0.8663,
+      "precision@10": 0.3
+    },
+    "boilerplate": {
+      "targets": 4,
+      "ndcg@10": 0.282,
+      "precision@10": 0.2
+    },
+    "geo_trap": {
+      "targets": 6,
+      "ndcg@10": 0.79,
+      "precision@10": 0.3
+    },
+    "(none)": {
+      "targets": 10,
+      "ndcg@10": 0.8801,
+      "precision@10": 0.3
+    }
+  },
+  "duplicate_listing_returned": 0,
+  "geography": {
+    "irrelevant_returned": 155,
+    "same_country_returned": 109,
+    "irrelevant_pool": 1424,
+    "same_country_pool": 621,
+    "same_country_share_returned": 0.7032,
+    "same_country_share_pool": 0.4361,
+    "lift": 1.6125
+  },
+  "per_target": [
+    {
+      "target": "CA:QSRC",
+      "business": "quick_service_restaurants",
+      "tags": [
+        "cross_country"
+      ],
+      "returned": [
+        "US:QSRA",
+        "DE:QSRD",
+        "CA:MTGC",
+        "CA:TRKC",
+        "CA:DRLC",
+        "US:HRSE",
+        "GB:RBNC",
+        "US:QSRB",
+        "DE:HRSD",
+        "DE:TRKD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.7654,
+      "precision@5": 0.4,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.6667,
+      "ndcg@10": 0.9134,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "DE:HRSD",
+      "business": "hr_software",
+      "tags": [
+        "cross_country",
+        "geo_trap"
+      ],
+      "returned": [
+        "US:HRSA",
+        "GB:HRSC",
+        "US:HRSE",
+        "IL:CYBC",
+        "US:CYBA",
+        "DE:TRKD",
+        "DE:LABC",
+        "DE:WNDD",
+        "DE:PAYC",
+        "DE:SHPB"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.9098,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.7857,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "DE:LABC",
+      "business": "lab_diagnostics",
+      "tags": [
+        "cross_country",
+        "geo_trap"
+      ],
+      "returned": [
+        "US:LABA",
+        "US:LABE",
+        "JP:LABD",
+        "CH:ORTC",
+        "US:LABB",
+        "US:ORTA",
+        "DE:HRSD",
+        "DE:TRKD",
+        "DE:WNDD",
+        "DE:PAYC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.9856,
+      "precision@5": 0.8,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 1.0,
+      "ndcg@10": 0.9528,
+      "precision@10": 0.4,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 1.0
+    },
+    {
+      "target": "DE:PAYC",
+      "business": "payments",
+      "tags": [
+        "cross_country",
+        "geo_trap"
+      ],
+      "returned": [
+        "US:PAYA",
+        "JP:PAYD",
+        "US:PAYE",
+        "US:HRSB",
+        "US:HRSE",
+        "DE:HRSD",
+        "DE:TRKD",
+        "US:QSRB",
+        "DE:LABC",
+        "US:TRKA"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8143,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.7491,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "DE:RBND",
+      "business": "regional_bank",
+      "tags": [
+        "cross_country",
+        "geo_trap"
+      ],
+      "returned": [
+        "US:RBNA",
+        "GB:RBNC",
+        "US:RBNE",
+        "US:HRSE",
+        "DE:TRKD",
+        "GB:HRSC",
+        "US:MTGB",
+        "US:MTGD",
+        "US:PAYA",
+        "DE:HRSD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.7813,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.7562,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "DE:SHPB",
+      "business": "container_shipping",
+      "tags": [
+        "cross_country",
+        "geo_trap"
+      ],
+      "returned": [
+        "US:SHPD",
+        "US:SHPA",
+        "DE:TRKD",
+        "SG:SHPC",
+        "CA:TRKC",
+        "DE:HRSD",
+        "US:HRSB",
+        "JP:PAYD",
+        "DE:LABC",
+        "US:DRLD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.984,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 0.8793,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "DE:TRKD",
+      "business": "trucking",
+      "tags": [
+        "cross_country",
+        "geo_trap"
+      ],
+      "returned": [
+        "DE:SHPB",
+        "CA:TRKC",
+        "DE:RBND",
+        "US:SHPA",
+        "JP:PAYD",
+        "DE:HRSD",
+        "US:TRKB",
+        "SG:SHPC",
+        "DE:LABC",
+        "DE:WNDD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.5014,
+      "precision@5": 0.2,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.3333,
+      "ndcg@10": 0.6168,
+      "precision@10": 0.2,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.6667
+    },
+    {
+      "target": "ES:SOLC",
+      "business": "solar_power",
+      "tags": [
+        "cross_country"
+      ],
+      "returned": [
+        "US:SOLA",
+        "US:WNDE",
+        "DE:WNDD",
+        "US:WNDA",
+        "US:SOLD",
+        "GB:WNDB",
+        "US:SOLB",
+        "GB:HRSC",
+        "US:SHPD",
+        "US:DRLD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8286,
+      "precision@5": 0.4,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.6667,
+      "ndcg@10": 0.873,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "GB:DRLB",
+      "business": "oil_gas_drilling",
+      "tags": [
+        "cross_country"
+      ],
+      "returned": [
+        "US:DRLD",
+        "GB:WNDB",
+        "US:DRLA",
+        "CA:DRLC",
+        "GB:HRSC",
+        "GB:RBNC",
+        "US:SHPD",
+        "US:SOLA",
+        "US:WNDA",
+        "DE:TRKD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.906,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 0.906,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "GB:WNDB",
+      "business": "wind_power",
+      "tags": [
+        "cross_country"
+      ],
+      "returned": [
+        "GB:DRLB",
+        "US:WNDA",
+        "US:WNDE",
+        "US:SOLA",
+        "DE:WNDD",
+        "GB:HRSC",
+        "US:SOLD",
+        "US:WNDC",
+        "GB:RBNC",
+        "ES:SOLC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.6242,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.7234,
+      "precision@10": 0.4,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:CYBA",
+      "business": "cybersecurity",
+      "tags": [],
+      "returned": [
+        "IL:CYBC",
+        "US:HRSE",
+        "GB:HRSC",
+        "DE:HRSD",
+        "US:HRSA",
+        "US:CYBB",
+        "US:CYBD",
+        "US:HRSB",
+        "US:LABE",
+        "US:WNDE"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.7396,
+      "precision@5": 0.2,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.3333,
+      "ndcg@10": 0.9134,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:CYBD",
+      "business": "cybersecurity",
+      "tags": [
+        "boilerplate"
+      ],
+      "returned": [
+        "US:SOLD",
+        "US:ORTD",
+        "US:PAYE",
+        "DE:QSRD",
+        "US:RBNE",
+        "US:HRSE",
+        "US:WNDE",
+        "US:SOLA",
+        "US:WNDA",
+        "GB:HRSC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.0,
+      "precision@5": 0.0,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.0,
+      "ndcg@10": 0.095,
+      "precision@10": 0.0,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.0
+    },
+    {
+      "target": "US:DRLD",
+      "business": "oil_gas_drilling",
+      "tags": [],
+      "returned": [
+        "US:DRLA",
+        "GB:DRLB",
+        "CA:DRLC",
+        "US:WNDC",
+        "GB:WNDB",
+        "DE:SHPB",
+        "US:SHPA",
+        "US:TRKB",
+        "US:WNDE",
+        "US:SHPD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 1.0,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 1.0,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:HRSA",
+      "business": "hr_software",
+      "tags": [],
+      "returned": [
+        "GB:HRSC",
+        "DE:HRSD",
+        "US:HRSE",
+        "IL:CYBC",
+        "US:CYBA",
+        "US:PAYB",
+        "US:CYBD",
+        "US:TRKA",
+        "DE:WNDD",
+        "DE:PAYC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.9098,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.8309,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:HRSE",
+      "business": "hr_software",
+      "tags": [
+        "mislabelled"
+      ],
+      "returned": [
+        "GB:HRSC",
+        "US:HRSA",
+        "DE:HRSD",
+        "IL:CYBC",
+        "DE:RBND",
+        "US:CYBA",
+        "US:RBNA",
+        "US:CYBD",
+        "DE:PAYC",
+        "DE:QSRD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.849,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.8243,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:LABA",
+      "business": "lab_diagnostics",
+      "tags": [],
+      "returned": [
+        "US:LABE",
+        "JP:LABD",
+        "DE:LABC",
+        "US:PAYA",
+        "US:ORTB",
+        "US:TRKA",
+        "US:SOLB",
+        "US:RBNE",
+        "US:WNDC",
+        "CA:DRLC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8354,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.792,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:LABE",
+      "business": "lab_diagnostics",
+      "tags": [
+        "mislabelled"
+      ],
+      "returned": [
+        "US:LABA",
+        "JP:LABD",
+        "DE:LABC",
+        "US:HRSE",
+        "US:WNDE",
+        "GB:HRSC",
+        "US:SOLA",
+        "US:ORTA",
+        "US:WNDA",
+        "GB:WNDB"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8143,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.7883,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:MTGA",
+      "business": "mortgage_lender",
+      "tags": [],
+      "returned": [
+        "US:MTGD",
+        "CA:MTGC",
+        "US:RBNA",
+        "GB:RBNC",
+        "US:MTGB",
+        "US:DRLA",
+        "US:SOLA",
+        "US:WNDA",
+        "US:TRKA",
+        "US:QSRB"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.9739,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 0.8065,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:MTGD",
+      "business": "mortgage_lender",
+      "tags": [
+        "mislabelled"
+      ],
+      "returned": [
+        "US:MTGA",
+        "CA:MTGC",
+        "US:MTGB",
+        "US:RBNB",
+        "US:RBNE",
+        "GB:RBNC",
+        "DE:RBND",
+        "US:RBNA",
+        "US:PAYA",
+        "US:SOLB"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 1.0,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 0.9862,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:ORTA",
+      "business": "orthopedic_devices",
+      "tags": [],
+      "returned": [
+        "CH:ORTC",
+        "US:ORTD",
+        "US:ORTB",
+        "US:LABB",
+        "DE:LABC",
+        "US:HRSE",
+        "US:LABE",
+        "US:WNDE",
+        "GB:HRSC",
+        "US:SOLA"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 1.0,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 0.9599,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:ORTD",
+      "business": "orthopedic_devices",
+      "tags": [
+        "boilerplate"
+      ],
+      "returned": [
+        "US:SOLD",
+        "US:CYBD",
+        "US:PAYE",
+        "DE:QSRD",
+        "US:RBNE",
+        "US:ORTA",
+        "CH:ORTC",
+        "US:WNDE",
+        "US:SOLA",
+        "US:WNDA"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.0,
+      "precision@5": 0.0,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.0,
+      "ndcg@10": 0.2884,
+      "precision@10": 0.2,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.6667
+    },
+    {
+      "target": "US:PAYA",
+      "business": "payments",
+      "tags": [],
+      "returned": [
+        "DE:PAYC",
+        "JP:PAYD",
+        "US:PAYE",
+        "US:MTGB",
+        "DE:RBND",
+        "US:LABA",
+        "IL:CYBC",
+        "US:PAYB",
+        "US:CYBB",
+        "US:MTGD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8589,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.9155,
+      "precision@10": 0.4,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:PAYE",
+      "business": "payments",
+      "tags": [
+        "boilerplate"
+      ],
+      "returned": [
+        "US:SOLD",
+        "US:CYBD",
+        "US:ORTD",
+        "DE:QSRD",
+        "US:RBNE",
+        "US:PAYA",
+        "DE:PAYC",
+        "JP:PAYD",
+        "US:HRSE",
+        "US:WNDE"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.0211,
+      "precision@5": 0.0,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.0,
+      "ndcg@10": 0.3727,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:QSRA",
+      "business": "quick_service_restaurants",
+      "tags": [],
+      "returned": [
+        "CA:QSRC",
+        "DE:QSRD",
+        "US:QSRB",
+        "US:SHPA",
+        "US:HRSE",
+        "US:TRKA",
+        "US:RBNE",
+        "US:DRLA",
+        "GB:RBNC",
+        "DE:TRKD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 1.0,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 1.0,
+      "ndcg@10": 1.0,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 1.0
+    },
+    {
+      "target": "US:RBNA",
+      "business": "regional_bank",
+      "tags": [],
+      "returned": [
+        "GB:RBNC",
+        "DE:RBND",
+        "US:MTGA",
+        "US:RBNE",
+        "US:HRSE",
+        "CA:MTGC",
+        "US:MTGB",
+        "JP:PAYD",
+        "US:SOLA",
+        "US:WNDA"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8345,
+      "precision@5": 0.6,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.75,
+      "ndcg@10": 0.807,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:RBNE",
+      "business": "regional_bank",
+      "tags": [
+        "boilerplate"
+      ],
+      "returned": [
+        "US:SOLD",
+        "US:CYBD",
+        "US:PAYE",
+        "US:ORTD",
+        "DE:QSRD",
+        "US:RBNA",
+        "DE:RBND",
+        "GB:RBNC",
+        "US:MTGD",
+        "US:SOLA"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.0262,
+      "precision@5": 0.0,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.0,
+      "ndcg@10": 0.3718,
+      "precision@10": 0.3,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.75
+    },
+    {
+      "target": "US:SHPA",
+      "business": "container_shipping",
+      "tags": [],
+      "returned": [
+        "DE:SHPB",
+        "US:SHPD",
+        "US:TRKA",
+        "US:DRLA",
+        "DE:TRKD",
+        "US:QSRA",
+        "CA:TRKC",
+        "US:DRLD",
+        "US:MTGA",
+        "US:RBNA"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.8105,
+      "precision@5": 0.4,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.6667,
+      "ndcg@10": 0.7757,
+      "precision@10": 0.2,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.6667
+    },
+    {
+      "target": "US:SOLB",
+      "business": "solar_power",
+      "tags": [
+        "paraphrase"
+      ],
+      "returned": [
+        "US:WNDC",
+        "ES:SOLC",
+        "US:QSRB",
+        "GB:WNDB",
+        "US:TRKA",
+        "US:LABA",
+        "US:MTGD",
+        "US:SOLD",
+        "US:PAYA",
+        "US:MTGB"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.5014,
+      "precision@5": 0.2,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.3333,
+      "ndcg@10": 0.5356,
+      "precision@10": 0.2,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.6667
+    },
+    {
+      "target": "US:TRKB",
+      "business": "trucking",
+      "tags": [
+        "paraphrase"
+      ],
+      "returned": [
+        "SG:SHPC",
+        "CA:DRLC",
+        "DE:TRKD",
+        "JP:PAYD",
+        "GB:DRLB",
+        "US:PAYB",
+        "US:DRLD",
+        "US:DRLA",
+        "CA:MTGC",
+        "CA:QSRC"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.3742,
+      "precision@5": 0.2,
+      "precision@5_ceiling": 0.6,
+      "recall@5": 0.3333,
+      "ndcg@10": 0.3344,
+      "precision@10": 0.1,
+      "precision@10_ceiling": 0.3,
+      "recall@10": 0.3333
+    },
+    {
+      "target": "US:WNDC",
+      "business": "wind_power",
+      "tags": [
+        "paraphrase"
+      ],
+      "returned": [
+        "US:SOLB",
+        "US:DRLD",
+        "GB:WNDB",
+        "US:QSRB",
+        "GB:DRLB",
+        "CA:DRLC",
+        "US:TRKA",
+        "US:LABA",
+        "US:MTGD",
+        "US:SOLD"
+      ],
+      "duplicate_returned": [],
+      "note": null,
+      "ndcg@5": 0.3405,
+      "precision@5": 0.2,
+      "precision@5_ceiling": 0.8,
+      "recall@5": 0.25,
+      "ndcg@10": 0.3333,
+      "precision@10": 0.1,
+      "precision@10_ceiling": 0.4,
+      "recall@10": 0.25
+    }
+  ]
+}

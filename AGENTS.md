@@ -183,6 +183,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | **`/api/comps` takes a company key only** (share-class keys resolve). Free text goes through `GET /api/companies?q=`: one match goes straight to comps, several let the analyst choose. `/api/peers` is the similarity endpoint (retrieval only); comps reuse its selection. |
 | 2026-11-22 | **Retrieval eval uses ranking metrics**, not METEOR (which scores generated text): graded 0–3 relevance labels on synthetic fixtures, nDCG@k as the main metric, plus precision@k and recall@k, with separate dev and held-out targets. |
 | 2026-11-22 | Stage 4: the owner allowed the implementation PR to be stacked on the unmerged contract PR. Owner wants to be asked at each stage before it is built. |
+| 2026-11-22 | **Retrieval eval design.** Synthetic universe hand-written with planted hard cases (paraphrase, cross-country, mislabelled, boilerplate, geo trap, duplicate listing); each company's true business is fixed before any score is run and labels follow from it by the 0–3 rubric. Report nDCG@5/@10 (main), precision and recall at both cut-offs, per-tag breakdowns and a geography lift. Targets split 50/50 into dev and held-out; held-out is scored only when a configuration is final. Precision/recall count label 3 (same business) as relevant. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -218,7 +219,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `web/` | Next.js + shadcn/ui front end, currently running on synthetic mocks. It talks to the API over HTTP only. |
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
 | `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
-| `eval/fixtures/` | Synthetic evaluation universe and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
+| `eval/fixtures/retrieval/` | Synthetic retrieval universe, its builder (`build_fixture.py`) and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
+| `eval/retrieval_eval.py`, `eval/README.md` | The retrieval eval (nDCG@k, precision@k, recall@k, per-tag, geography lift) and how to run and read it. |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
 | `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=...` validates the data folder and runs the API (port 8000) and web (port 3000) containers. Data is mounted read-only. |
 
@@ -233,6 +235,7 @@ pre-commit install                                   # optional: ruff and nbstri
 uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
 make start DIR=~/Downloads/genios-takehome/data      # API + web via docker compose; make stop to stop
+make eval                                            # retrieval eval (dev split) -> eval/results/
 ```
 
 Update this section as the service, evaluation, and Docker commands land.
