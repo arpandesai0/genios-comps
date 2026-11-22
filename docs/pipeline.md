@@ -16,11 +16,11 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | 1 | **Ingestion**: validate, normalize to USD, group by `COUNTRY:TICKER`, build time series | JSON files → `Dataset` of `Entity` + `Observation` + `Finding` | ✅ done | `ingest.py` | [ingestion.md](ingestion.md) |
 | 2 | **Issuers and quality**: merge share classes into issuers (disjoint-set union), then checks across companies (shared names, freshness) | listings → issuers + extra findings | ✅ done | `issuers.py`, `quality.py` | [ingestion.md § 6](ingestion.md#6-merge-share-classes-issuerspy), [§ 7](ingestion.md#7-checks-across-companies-qualitypy) |
 | 3 | **Resolve**: turn an analyst's query (key, ticker, exact name or alias, partial name) into the matching companies, best match first; the analyst always chooses the target, and comps take a key | query → entity key(s) with match type | ✅ done | `service.search`, served by `GET /api/companies` | [API.md](API.md#get-apicompanies) |
-| 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ⏳ planned | `retrieval/` | |
+| 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ✅ done (TF-IDF; eval next) | `retrieval/` | [retrieval.md](retrieval.md) |
 | 5 | **Finance**: glossary metrics (ok, NM or missing), rounding, peer summary stats | `Observation` → `Metrics`; peers' `Metrics` → `Summary` | ✅ done | `finance.py` | [finance.md](finance.md) |
-| 6 | **Service**: build an immutable snapshot once at start-up, assemble comps responses | dataset → snapshot; request → comps response | 🟡 snapshot built at start-up and read-only queries (including stage 3's `search`); no comps yet | `service.py` | |
-| 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | 🟡 read-only endpoints (health, dataset, findings, companies); comps return 404 | `api.py` | [API.md](API.md) |
-| 8 | **UI**: Next.js + shadcn/ui compare view and data-health view | HTTP only | 🟡 Data view wired to the real API (`make start`); Compare hidden until served | `web/` | |
+| 6 | **Service**: build an immutable snapshot once at start-up, assemble comps responses | dataset → snapshot; request → comps response | ✅ snapshot (with the retrieval index) built at start-up; read-only queries, peers and comps | `service.py` | |
+| 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | ✅ read-only endpoints, `/api/peers`, `/api/comps`, `/api/comps.csv` | `api.py` | [API.md](API.md) |
+| 8 | **UI**: Next.js + shadcn/ui compare view and data-health view | HTTP only | 🟡 Data view wired to the real API (`make start`); Compare still on mocks until wired to the new comps contract | `web/` | |
 
 ## What each hand-off carries
 
