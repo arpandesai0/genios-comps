@@ -196,7 +196,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/config.py` | Settings from env vars: `DATA_DIR`, staleness threshold. |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
-| `src/comps/quality.py` | Checks across companies: shared names, stale price dates (the share-class merge moves to ingestion). (The derived label-conflict warning is planned; it needs retrieval.) |
+| `src/comps/issuers.py` | Share-class merge: a disjoint-set union groups listings with identical issuer-level data into one issuer, re-rooted at the shown key; `Dataset.parents` maps every listing key to it. |
+| `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
 | `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints, including resolution (`search`: key, ticker, exact name or alias, partial name). Comps assembly comes later. |

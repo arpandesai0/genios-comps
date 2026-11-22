@@ -49,6 +49,27 @@ Where the brief is silent, the service assumes the following:
     - A currency with no rate in the file is a data issue: values in it are blank, with an `unknown_currency` finding.
     - Only ingestion handles currency. Later stages use whatever currency it reports.
 13. **One company → one exchange → one country.** Each country is assumed to have a single stock exchange, and each listing trades on one exchange, so `country:ticker` identifies a listing. The same ticker in two countries (e.g. `US:ABC` and `CA:ABC`) is treated as two different companies.
+14. **Share classes of one issuer are one company.** Listings in the same country whose issuer-level data is identical are merged; see [Share classes](#share-classes-disjoint-set-union).
+
+## Share classes (disjoint-set union)
+
+One issuer can list several share classes, e.g. `US:BLT.A` and `US:BLT.B`. A comps table needs **one row per issuer**, otherwise the same company shows up as its own peer and is counted twice in the statistics. So ingestion merges share classes into one company.
+
+**Which listings merge.** Two listings are share classes of one issuer when they are in the same country (never the unknown-country placeholder `*`), have different tickers, and their latest records agree on every issuer-level field: description, sector, industry, sub-industry, fiscal year end, reporting currency, units, price date, total debt, cash, revenue, EBITDA and net income. Ticker, name, price, price currency and share count may differ, because they belong to the class. Two near-empty records never merge just because both are missing data, and tickers that merely look like classes (`ABC.A` / `ABC.B`) but report different financials stay separate.
+
+**How: union-find.** `src/comps/issuers.py` implements a disjoint-set union (DSU):
+
+```
+start      every listing is its own parent      US:BLT.A → US:BLT.A    US:BLT.B → US:BLT.B    US:ACME → US:ACME
+union      same issuer signature → one set      {US:BLT.A, US:BLT.B}   {US:ACME}
+re-root    each set points at its shown key     US:BLT.A → US:BLT.A    US:BLT.B → US:BLT.A    US:ACME → US:ACME
+```
+
+- Each merge rule unions pairs of keys, so the grouping is always transitive and consistent, and a new rule can be added without touching the rest. Listings are bucketed by a hash of the issuer-level fields (compared as ingestion reads them: trimmed text, upper-case currency codes, numbers by value), so building and re-rooting the sets takes linear time, not a comparison of every pair.
+- The **shown key** is the class with the largest market value (price × shares). A class without one ranks last, and ties go to the alphabetically first key.
+- The parent pointer of every listing is kept (`Dataset.parents`), so any class key resolves to its issuer: `GET /api/companies/US:BLT.B` returns the issuer under `US:BLT.A`, and search reports which class matched (`matched_key`).
+
+**Market cap** is the sum of price × shares over the issuer's classes, each converted to USD. Two classes with the same price, price currency and share count are taken to be the same shares listed twice and counted once. If any counted class has no usable price or share count, market cap and everything built on it are left blank rather than summed from the other classes. Debt, cash and the financials are counted once. Every merge, every class counted once and every incomplete class is reported as a finding.
 
 ## Development
 

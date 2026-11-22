@@ -1,4 +1,4 @@
-"""Ingestion: load → validate/normalize → resolve entities → dataset.
+"""Ingestion: load → validate/normalize → resolve entities → merge share classes → dataset.
 
 Ingestion knows nothing about retrieval or finance. It produces normalized USD values,
 observation histories per company, and structured findings. It never imputes, rescales,
@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from comps import quality
+from comps import issuers, quality
 from comps.config import IngestConfig
 from comps.models import (
     Conversion,
@@ -182,7 +182,9 @@ def build_dataset(
 
     if not normalized:
         raise DatasetError("no usable company records", dataset_findings)
-    entities = resolve_entities(normalized)
+    listings = resolve_entities(normalized)
+    # Share classes of one issuer become one company (disjoint-set union; see issuers.py).
+    entities, parents = issuers.merge_share_classes(listings)
 
     # Freshness is measured from the latest valid price_date, so results don't depend on when the service runs.
     reference_date = max((e.latest.price_date for e in entities.values() if e.latest.price_date), default=None)
@@ -201,6 +203,7 @@ def build_dataset(
         entities=entities,
         findings=tuple(dataset_findings),
         metadata={"manual_records": len(extra_records)},
+        parents=parents,
     )
 
 

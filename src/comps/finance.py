@@ -5,7 +5,9 @@ about where an observation came from or how peers were chosen.
 
 Rules (GLOSSARY.md plus owner decisions in AGENTS.md):
 
-- market cap = USD price x shares (millions); EV = market cap + debt - cash.
+- market cap = USD price x shares (millions), summed over an issuer's counted share classes;
+  EV = market cap + debt - cash. A class without a usable price or share count makes market cap
+  missing, never a partial sum.
 - EV/Revenue, EV/EBITDA and P/E. A zero or negative denominator gives NM.
 - A missing input gives ``missing`` (blank), and this takes precedence over NM.
 - A negative EV is used as given, and a zero or negative EV raises an info finding.
@@ -133,20 +135,57 @@ def _value(obs: Observation, name: str) -> tuple[float | None, list[str]]:
     return v, ([] if v is not None else _causes(obs, name))
 
 
-def compute_metrics(obs: Observation) -> tuple[Metrics, tuple[Finding, ...]]:
+def listing_value(obs: Observation) -> tuple[float | None, tuple[str, ...]]:
+    """Price x shares of one listing (millions), cleaned of float noise.
+
+    Returns None with the record fields to blame when an input is unusable, or None with no fields
+    when the product is too large to represent.
+    """
+    v, missing = _market_cap([obs])
+    if v is None:
+        return None, missing
+    return (clean(v), ()) if math.isfinite(v) else (None, ())
+
+
+def _market_cap(listings: Sequence[Observation]) -> tuple[float | None, tuple[str, ...]]:
+    """Unrounded sum of price x shares over ``listings``, or None with the fields to blame.
+
+    Price causes come before share causes, whichever class they come from, so the list reads like a
+    single listing's (``price``, ``price_currency``, then ``shares_outstanding``).
+    """
+    total = 0.0
+    price_causes: list[str] = []
+    share_causes: list[str] = []
+    for listing in listings:
+        price, m_price = _value(listing, "price")
+        shares, m_shares = _value(listing, "shares_outstanding")
+        price_causes += m_price
+        share_causes += m_shares
+        if price is not None and shares is not None:
+            total += price * shares
+    missing = _dedupe(price_causes + share_causes)
+    return (None, missing) if missing else (total, ())
+
+
+def compute_metrics(
+    obs: Observation, listings: Sequence[Observation] | None = None
+) -> tuple[Metrics, tuple[Finding, ...]]:
     """Compute the comps-table metrics for one observation (normally an entity's latest).
+
+    ``listings`` are the latest observations of the share classes whose price x shares add up to
+    market cap (an issuer's counted classes); by default just ``obs``. Debt, cash and the
+    financials always come from ``obs``.
 
     Returns the metrics and any findings raised while computing them (``nonpositive_ev``).
     The findings carry the record id. The caller adds entity keys if it needs them.
     """
-    price, m_price = _value(obs, "price")
-    shares, m_shares = _value(obs, "shares_outstanding")
     debt, m_debt = _value(obs, "total_debt")
     cash, m_cash = _value(obs, "cash")
 
     overflowed: list[str] = []
-    mc_missing = m_price + m_shares
-    mc = _finite(price * shares if price is not None and shares is not None else None, "market_cap_usd_m", overflowed)
+    total, missing = _market_cap(listings if listings is not None else (obs,))
+    mc_missing = list(missing)
+    mc = _finite(total, "market_cap_usd_m", overflowed)
     ev_missing = mc_missing + m_debt + m_cash
     ev = _finite(
         mc + debt - cash if mc is not None and debt is not None and cash is not None else None,

@@ -22,7 +22,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from comps.config import load_settings
-from comps.models import Finding, Metrics, MetricValue, Observation, Severity
+from comps.finance import listing_value
+from comps.models import Finding, Metrics, MetricValue, Observation, Severity, ShareClass
 from comps.service import CompanyView, Snapshot, build_snapshot, dataset_overview, list_companies, list_findings
 
 
@@ -73,7 +74,25 @@ def summary_json(c: CompanyView) -> dict[str, Any]:
         "industry": e.industry,
         "sub_industry": e.sub_industry,
         "latest_price_date": _iso(e.latest.price_date),
+        "share_class_keys": list(e.share_class_keys),
         "finding_counts": c.finding_counts,
+    }
+
+
+def share_class_json(c: ShareClass) -> dict[str, Any]:
+    e = c.entity
+    value, missing = listing_value(e.latest)
+    return {
+        "key": e.key,
+        "ticker": e.ticker,
+        "name": e.name,
+        "record_id": e.latest.record_id,
+        "price_currency": e.latest.original.get("price_currency"),
+        "price": e.latest.usd.price,
+        "shares_outstanding": e.latest.shares_outstanding,
+        "market_value_m": value,
+        "missing_inputs": list(missing),
+        "counted": c.counted,
     }
 
 
@@ -85,6 +104,7 @@ def detail_json(c: CompanyView) -> dict[str, Any]:
         "fiscal_year_end": e.fiscal_year_end,
         "aliases": list(e.aliases),
         "record_ids": list(e.record_ids),
+        "share_classes": [share_class_json(sc) for sc in e.classes],
         "latest": observation_json(e.latest),
         "observations": [observation_json(o) for o in e.observations],
         "metrics": metrics_json(c.metrics),
@@ -162,7 +182,8 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
             "`COUNTRY:TICKER`), `ticker`, `name_exact` (current or old name) or `name_partial` "
             "(substring of a current or old name). Results are sorted by match type, then key. "
             "Every match is counted in `total` and paged by `limit`/`offset`; the caller chooses one. "
-            "Without `q` it lists all companies. "
+            "Without `q` it lists all companies. Share classes of one issuer are one company: any class's "
+            "key, ticker or name matches it, and `matched_key` names the class when it is not the shown key. "
             "Use `GET /api/companies/{key}` for one company's full details."
         ),
         responses=_INVALID,
@@ -186,7 +207,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         return {
             "dataset_version": s.dataset.version,
             "total": total,
-            "items": [{**summary_json(c), "match": m} for c, m in page],
+            "items": [{**summary_json(h.company), "match": h.match, "matched_key": h.matched_key} for h in page],
         }
 
     @app.get(
@@ -194,9 +215,10 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         tags=["companies"],
         summary="Get one company by its exact key",
         description=(
-            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`. Case-sensitive for now: write "
-            "the key as shown in results (`gb:irov` returns 404). A bare ticker (`IROV`) "
+            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`, ignoring case (`gb:irov` works; "
+            "the response carries the canonical key). A bare ticker (`IROV`) "
             "or a name is not a key and returns 404: find the key with `GET /api/companies?q=` first. "
+            "A share-class key resolves to its issuer, and the response carries the issuer's shown key. "
             "Returns the company's details, observation history, metrics and findings."
         ),
         responses=_NOT_FOUND,
@@ -206,7 +228,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         key: Annotated[str, Path(description="Company key `COUNTRY:TICKER`.", examples=["GB:IROV"])],
     ) -> Any:
         s = snap(request)  # read the snapshot once, so the company and the version always agree
-        c = s.companies.get(key)
+        c = s.resolve(key, ignore_case=True)
         if c is None:
             return _error(404, "not_found", f"No company with key {key!r}.")
         return {"dataset_version": s.dataset.version, **detail_json(c)}
@@ -249,7 +271,10 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         code: Annotated[str | None, Query(description="Only findings with this code (exact).")] = None,
         entity: Annotated[
             str | None,
-            Query(description="Only this company's own findings (exact, case-sensitive key; unknown key: no results)."),
+            Query(
+                description="Only this company's own findings (exact, case-sensitive key; a share-class key "
+                "resolves to its issuer; unknown key: no results)."
+            ),
         ] = None,
         limit: Annotated[int, Query(ge=1, le=500, description="Page size.")] = 50,
         offset: Annotated[int, Query(ge=0, description="Number of results to skip.")] = 0,

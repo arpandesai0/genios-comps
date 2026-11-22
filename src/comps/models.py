@@ -81,7 +81,12 @@ class TextVersion:
 
 @dataclass(frozen=True)
 class Entity:
-    """A company identified by ``COUNTRY:TICKER``, with its observation history."""
+    """A company identified by ``COUNTRY:TICKER``, with its observation history.
+
+    After the share-class merge, an entity in ``Dataset.entities`` is an **issuer**: ``key`` is its
+    shown key (its most valuable class), its own fields come from that class, and ``share_classes``
+    lists every listing when there is more than one. A single listing has ``share_classes == ()``.
+    """
 
     key: str
     ticker: str
@@ -97,14 +102,37 @@ class Entity:
     superseded: tuple[Observation, ...] = ()  # exact duplicates / same-date losers, kept as provenance
     text_history: tuple[TextVersion, ...] = ()
     findings: tuple[Finding, ...] = ()
+    share_classes: tuple[ShareClass, ...] = ()  # shown class first; empty for a single listing
 
     @property
     def latest(self) -> Observation:
         return self.observations[-1]
 
     @property
+    def classes(self) -> tuple[ShareClass, ...]:
+        """Every listing of this issuer, shown class first. A single listing is its own only class."""
+        return self.share_classes or (ShareClass(entity=self, counted=True),)
+
+    @property
+    def share_class_keys(self) -> tuple[str, ...]:
+        return tuple(c.entity.key for c in self.classes)
+
+    @property
     def record_ids(self) -> tuple[str, ...]:
-        return tuple(o.record_id for o in self.observations + self.superseded)
+        own = tuple(o.record_id for o in self.observations + self.superseded)
+        return own + tuple(r for c in self.share_classes[1:] for r in c.entity.record_ids)
+
+
+@dataclass(frozen=True)
+class ShareClass:
+    """One listing (``COUNTRY:TICKER``) of an issuer, as it was before the merge.
+
+    ``counted`` is False when the listing has the same price, price currency and share count as an
+    earlier class: the same shares listed twice, so they enter the issuer's market cap once.
+    """
+
+    entity: Entity
+    counted: bool
 
 
 @dataclass(frozen=True)
@@ -122,16 +150,19 @@ class Dataset:
     fx_rates: Mapping[str, float]  # USD per unit of currency, including USD itself
     files: tuple[SourceFile, ...]
     record_count: int
-    entities: Mapping[str, Entity]  # key -> entity, ordered by key
+    entities: Mapping[str, Entity]  # shown key -> issuer, ordered by key
     findings: tuple[Finding, ...]  # dataset-level findings (cross-record checks, fx issues)
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    # Disjoint-set parent pointer of every listing key: its issuer's shown key (a shown key points to itself).
+    parents: Mapping[str, str] = field(default_factory=dict)
 
     def all_findings(self) -> list[Finding]:
         out = list(self.findings)
-        for e in self.entities.values():
-            out.extend(e.findings)
-            for o in e.observations + e.superseded:
-                out.extend(o.findings)
+        for issuer in self.entities.values():
+            for e in (issuer, *(c.entity for c in issuer.share_classes[1:])):
+                out.extend(e.findings)
+                for o in e.observations + e.superseded:
+                    out.extend(o.findings)
         return out
 
 
