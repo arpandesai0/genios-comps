@@ -82,24 +82,32 @@ export function CompanyDetail({
   companyKey: string | null;
   onClose: () => void;
 }) {
-  const [detail, setDetail] = useState<EntityDetail | null>(null);
-  const [error, setError] = useState("");
+  const [result, setResult] = useState<{
+    requestedKey: string;
+    detail?: EntityDetail;
+    error?: string;
+  } | null>(null);
   useEffect(() => {
     if (!companyKey) return;
     const controller = new AbortController();
     api<EntityDetail>(`/companies/${encodeURIComponent(companyKey)}`, {
       signal: controller.signal,
     })
-      .then((d) => {
-        setDetail(d);
-        setError("");
+      .then((detail) => {
+        if (!controller.signal.aborted)
+          setResult({ requestedKey: companyKey, detail });
       })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(String(e.message));
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted)
+          setResult({
+            requestedKey: companyKey,
+            error: cause instanceof Error ? cause.message : "Unable to load company.",
+          });
       });
     return () => controller.abort();
   }, [companyKey]);
-  const current = detail?.key === companyKey ? detail : null;
+  const active = result?.requestedKey === companyKey ? result : null;
+  const current = active?.detail;
   return (
     <Sheet
       open={!!companyKey}
@@ -111,12 +119,12 @@ export function CompanyDetail({
         <SheetHeader>
           <SheetTitle>{current?.name || "Company Detail"}</SheetTitle>
           <SheetDescription>
-            {companyKey} · Latest Observation and Provenance
+            {current?.key ?? companyKey} · Latest Observation and Provenance
           </SheetDescription>
         </SheetHeader>
-        {error ? (
+        {active?.error ? (
           <p role="alert" className="error">
-            {error}
+            {active.error}
           </p>
         ) : !current ? (
           <p role="status">Loading company…</p>
@@ -129,6 +137,26 @@ export function CompanyDetail({
                 .join(" / ")}
             </p>
             <MetricsView metrics={current.metrics} />
+            {current.share_classes.length > 1 && (
+              <section aria-labelledby="share-classes-heading">
+                <h3 id="share-classes-heading">Share Classes</h3>
+                <ul className="divide-y">
+                  {current.share_classes.map((listing) => (
+                    <li className="flex flex-wrap justify-between gap-x-3 py-2" key={listing.key}>
+                      <span>
+                        <code>{listing.key}</code>
+                        {listing.name && <span className="ml-2">{listing.name}</span>}
+                      </span>
+                      <span className="muted text-sm">
+                        {listing.counted
+                          ? "Counted Toward Market Cap"
+                          : "Duplicate Listing · Shares Counted Once"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <section>
               <h3>Aliases</h3>
               <p>{current.aliases.join(", ") || "—"}</p>
@@ -148,7 +176,7 @@ export function CompanyDetail({
             <section>
               <h3>Observation History</h3>
               <p className="muted">
-                Oldest first. Calculations use only the latest observation.
+                Observations for <code>{current.key}</code>, oldest first.
               </p>
               {current.observations.map((o, i) => (
                 <details key={`${o.record_id}-${i}`}>

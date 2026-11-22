@@ -290,6 +290,9 @@ export default function ComparePage() {
                     <span>
                       <strong>{c.name}</strong>
                       <small>{c.industry || c.sector || "Unclassified"}</small>
+                      {c.matched_key && (
+                        <small>Matched Share Class <code>{c.matched_key}</code></small>
+                      )}
                     </span>
                     <code>{c.key}</code>
                   </button>

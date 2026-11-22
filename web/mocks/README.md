@@ -9,7 +9,7 @@ These mocks are not the Python ingestion or retrieval implementation and do not 
 Fixture cases:
 
 - `US:NOMA` / `GB:NOMA`: ticker ambiguity.
-- `US:NOMA.B`: possible same issuer, excluded when comparing `US:NOMA`.
+- `US:NOMA.B`: duplicate listing of `US:NOMA`. Both class keys resolve to the issuer and the shared shares count once in its market cap.
 - `US:NOMA`: two observations, with a historical name alias.
 - `US:ARCL`: missing EBITDA.
 - `US:MESA`: negative net income, producing NM for P/E.
@@ -18,4 +18,4 @@ Fixture cases:
 - `CA:NOVA`: CAD conversion.
 - `US:ALTO`: reporting in thousands.
 
-There are 15 records and 14 entities. The dataset is built from the fixture files.
+There are 15 records and 13 issuers. The dataset is built from the fixture files.

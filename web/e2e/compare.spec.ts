@@ -43,12 +43,14 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
     dialog.getByRole("heading", { name: "Observation History" }),
   ).toBeVisible();
   await expect(
-    dialog.getByText("Noma Software, Noma Cloud Systems", { exact: true }),
+    dialog.getByText("Noma Software, Noma Cloud Systems, Noma Cloud Systems Class B", {
+      exact: true,
+    }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByLabel("Target Company").fill("US:NOMA");
+  await page.getByLabel("Target Company").fill("US:NOMA.B");
   await page
-    .getByRole("button", { name: /Noma Cloud Systems.*US:NOMA$/ })
+    .getByRole("button", { name: /Noma Cloud Systems.*Matched Share Class US:NOMA.B.*US:NOMA$/ })
     .click();
   await expect(
     page.getByRole("heading", { name: "Valuation Summary" }),

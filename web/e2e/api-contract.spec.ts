@@ -14,21 +14,17 @@ test("mock search preserves ambiguous keys and rejects invalid peer counts", asy
   expect((await invalid.json()).error.code).toBe("invalid_request");
 });
 
-test("mock excludes siblings and computes peer-only summary after removal", async ({
+test("mock resolves share class targets and computes peer-only summary after removal", async ({
   request,
 }) => {
-  const response = await request.get("/api/comps?target=US%3ANOMA&k=3");
+  const response = await request.get("/api/comps?target=US%3ANOMA.B&k=3");
   expect(response.ok()).toBeTruthy();
   const initial = await response.json();
   expect(initial.peers).toHaveLength(3);
-  expect(initial.excluded).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        reason: "possible_same_issuer",
-        entity: expect.objectContaining({ key: "US:NOMA.B" }),
-      }),
-    ]),
-  );
+  expect(initial.target.entity.key).toBe("US:NOMA");
+  expect(initial.target.entity.share_class_keys).toEqual(["US:NOMA", "US:NOMA.B"]);
+  expect(initial.target.metrics.market_cap_usd_m.display).toBe("4,000.0");
+  expect(initial.excluded).toEqual([]);
   const removed = initial.peers[0].entity.key;
   const query = new URLSearchParams({
     target: "US:NOMA",
@@ -49,6 +45,32 @@ test("mock excludes siblings and computes peer-only summary after removal", asyn
   expect(text).toContain("US:NOMA");
   expect(text).not.toContain(removed);
   expect(text).toContain(updated.summary.ev_revenue.display.mean);
+});
+
+test("mock class keys return the issuer and identify the matched listing", async ({
+  request,
+}) => {
+  const search = await (await request.get("/api/companies?q=Noma+Cloud+Systems+Class+B")).json();
+  expect(search.total).toBe(1);
+  expect(search.items[0]).toMatchObject({
+    key: "US:NOMA",
+    matched_key: "US:NOMA.B",
+    match: "name_exact",
+  });
+
+  const detail = await (await request.get("/api/companies/us%3Anoma.b")).json();
+  expect(detail.key).toBe("US:NOMA");
+  expect(detail.share_classes).toMatchObject([
+    { key: "US:NOMA", counted: true },
+    { key: "US:NOMA.B", counted: false },
+  ]);
+  expect(detail.observations).toHaveLength(2);
+  expect(detail.record_ids).toContain("synthetic-014");
+
+  const comps = await (await request.get("/api/comps?target=GB%3ANOMA&exclude=US%3ANOMA.B")).json();
+  expect(comps.excluded).toMatchObject([
+    { reason: "user_excluded", entity: { key: "US:NOMA" } },
+  ]);
 });
 
 test("dataset hashes match fixture files", async ({

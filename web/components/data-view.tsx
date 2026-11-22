@@ -7,7 +7,6 @@ import { api } from "@/lib/api";
 import type {
   CompaniesResponse,
   DatasetResponse,
-  EntitySummary,
   Finding,
   FindingsResponse,
   Severity,
@@ -203,7 +202,7 @@ export default function DataPage() {
   const findings = useResource<FindingsResponse>(
     `/dataset/findings?${findingParams}`,
   );
-  const companyColumns: ColumnDef<EntitySummary>[] = [
+  const companyColumns: ColumnDef<CompaniesResponse["items"][number]>[] = [
     {
       accessorKey: "name",
       header: "Company",
@@ -213,13 +212,18 @@ export default function DataPage() {
           className="text-left font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
           onClick={(event) => {
             event.stopPropagation();
-            setSelectedCompany(row.original.key);
+            setSelectedCompany(row.original.matched_key ?? row.original.key);
           }}
         >
           {row.original.name}
           <span className="muted mt-1 block font-mono text-sm">
             {row.original.key}
           </span>
+          {row.original.matched_key && (
+            <span className="muted block text-sm">
+              Matched Share Class <code>{row.original.matched_key}</code>
+            </span>
+          )}
         </button>
       ),
     },
@@ -491,7 +495,9 @@ export default function DataPage() {
             <DataTable
               columns={companyColumns}
               data={companies.data.items}
-              onRowClick={(company) => setSelectedCompany(company.key)}
+              onRowClick={(company) =>
+                setSelectedCompany(company.matched_key ?? company.key)
+              }
             />
             <Pager
               offset={companyOffset}
