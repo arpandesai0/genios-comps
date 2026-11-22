@@ -1,11 +1,12 @@
 # HTTP API contract (v0 draft)
 
-This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps`, `/api/comps.csv` and `/api/ingest/*` are not yet: they return 404, and the UI keeps using mocks for them. If a field needs to change, change this file in its own PR first.
+This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps`, `/api/comps.csv` and `/api/ingest/*` are not yet: they return 404, and the UI keeps using mocks for them. If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules below (`share_class_keys`, `share_classes`, class keys resolving to their issuer) are agreed but not implemented yet; until they land, every key is its own issuer.
 
 ## Conventions
 
 - Base path: `/api`. JSON in and out, except the CSV export.
-- **Company key**: `COUNTRY:TICKER`, e.g. `US:NOMA`. This is the company's identity. Record `id`s are internal provenance only. URL-encode the key in paths (`US%3ANOMA`).
+- **Company key**: `COUNTRY:TICKER`, e.g. `US:NOMA`. It identifies a listing: each country is assumed to have one exchange, so the same ticker in two countries is two different companies. Record `id`s are internal provenance only. URL-encode the key in paths (`US%3ANOMA`).
+- **Issuers and share classes**: listings of one issuer (share classes, e.g. `US:ABC.A` and `US:ABC.B`) are merged into **one company**, with one row in every list and table. The company is shown under the key of its most valuable class (price × shares; ties go to the alphabetically first key), and `share_class_keys` lists every class. Any class key can be used wherever a key is accepted and resolves to the issuer. The merge rule and market-cap rule are in the README (*Share classes*).
 - Money values are in **millions of the dataset currency**, given as `currency` in every response that carries money. The dataset currency is **USD** whenever `fx_rates.json` provides a USD rate (always true when its `base` is USD). If the base is another currency and no valid USD rate is given, it is the base currency, and a `currency_not_usd` finding (severity `warning`, dataset-level: empty `entity_keys`, listed only by `/api/dataset` and `/api/dataset/findings`) says so. Ingestion decides the currency; no other stage converts anything. The conversion rule is defined in README Assumption 12 and, once implemented, in `docs/ingestion.md`.
 - Metric names are currency-neutral everywhere, including `Finding.affects`: `market_cap_m`, `enterprise_value_m`, `ev_revenue`, `ev_ebitda`, `pe`.
 - Multiples (EV/Revenue, EV/EBITDA, P/E) and the revenue ratio are plain ratios. They are the same in any currency.
@@ -19,7 +20,7 @@ This is the contract between the Python backend and the web UI. **Status:** the 
 type Severity = "error" | "limitation" | "warning" | "info";
 
 interface Finding {
-  code: string;               // e.g. "missing_value", "possible_same_issuer", "stale_price"
+  code: string;               // e.g. "missing_value", "share_classes_merged", "stale_price"
   severity: Severity;
   message: string;            // human-readable
   fields: string[];           // affected record fields
@@ -40,7 +41,7 @@ interface MetricValue {
 }
 
 interface Metrics {
-  market_cap_m: MetricValue;            // millions of the dataset currency
+  market_cap_m: MetricValue;            // millions of the dataset currency; sum over the issuer's counted share classes
   enterprise_value_m: MetricValue;      // millions of the dataset currency
   ev_revenue: MetricValue;
   ev_ebitda: MetricValue;
@@ -48,7 +49,8 @@ interface Metrics {
 }
 
 interface EntitySummary {
-  key: string;                // "US:NOMA"
+  key: string;                // "US:NOMA"; for a merged issuer, its shown key
+  share_class_keys: string[]; // every listing of this issuer, the shown key first; ["US:NOMA"] for most companies
   ticker: string;
   country: string;
   name: string;
@@ -75,15 +77,27 @@ interface Observation {
   conversion: { price_fx: number | null; reporting_fx: number | null; unit_factor: number | null }; // factors into the dataset currency; null = conversion failed
 }
 
+interface ShareClass {
+  key: string;
+  ticker: string;
+  name: string | null;
+  record_id: string;                  // latest record of this class
+  price: number | null;               // per share, dataset currency
+  shares_outstanding: number | null;  // millions
+  market_value_m: number | null;      // price × shares, millions of the dataset currency; null if either is missing
+  counted: boolean;                   // false when identical (price, price currency, shares) to an earlier class: the same shares listed twice, counted once
+}
+
 interface EntityDetail extends EntitySummary {
   currency: string;                   // dataset currency of `metrics` and every `normalized` block
   description: string | null;
   fiscal_year_end: string | null;
-  aliases: string[];                  // every name seen for this key
+  aliases: string[];                  // every name seen for this issuer, across its share classes
   record_ids: string[];
-  latest: Observation;                // the only observation used in calculations
-  observations: Observation[];        // full history, oldest first
-  metrics: Metrics;                   // computed from `latest`
+  share_classes: ShareClass[];        // same order as share_class_keys
+  latest: Observation;                // latest observation of the shown key; the only one used for debt, cash and the financials
+  observations: Observation[];        // full history of the shown key, oldest first
+  metrics: Metrics;                   // market cap from `share_classes`, everything else from `latest`
   findings: Finding[];
 }
 
@@ -114,12 +128,12 @@ Returns `{ "status": "ok", "dataset_version": string, "currency": string, "entit
 ### `GET /api/companies`
 Find companies by **text matching** on key, ticker or name. Used both for target search (with ambiguity) and for the data table. This is not similarity search: it never returns peers.
 
-Query parameters: `q` (optional; case-insensitive, surrounding whitespace ignored, and a blank `q` counts as no query; matches the key `COUNTRY:TICKER`, the ticker, the current name or an old name exactly, or a substring of a current or old name), `sector`, `has_findings` (`error|limitation|warning|info`), `limit` (default 20, max 200), `offset`.
+Query parameters: `q` (optional; case-insensitive, surrounding whitespace ignored, and a blank `q` counts as no query; matches the key `COUNTRY:TICKER`, the ticker, the current name or an old name exactly, or a substring of a current or old name; any share class's key, ticker or name matches its issuer), `sector`, `has_findings` (`error|limitation|warning|info`), `limit` (default 20, max 200), `offset`.
 
-Returns `{ "dataset_version", "total": number, "items": (EntitySummary & { "match": "key" | "ticker" | "name_exact" | "name_partial" | null })[] }`. Each company appears once, with its best match type. Items are sorted by match type (`key`, `ticker`, `name_exact`, `name_partial`), then by key. Without a query every company is listed with `match: null`. When a query matches several companies, return all of them (paged by `limit`/`offset`, with `total` giving the full count); the UI asks the analyst to choose. For example, a bare ticker listed in two countries gives two `ticker` matches.
+Returns `{ "dataset_version", "total": number, "items": (EntitySummary & { "match": "key" | "ticker" | "name_exact" | "name_partial" | null })[] }`. Each company (issuer) appears once, under its shown key, with its best match type. Items are sorted by match type (`key`, `ticker`, `name_exact`, `name_partial`), then by key. Without a query every company is listed with `match: null`. When a query matches several companies, return all of them (paged by `limit`/`offset`, with `total` giving the full count); the UI asks the analyst to choose. For example, a bare ticker listed in two countries gives two `ticker` matches.
 
 ### `GET /api/companies/{key}`
-Exact lookup of one company by its key `COUNTRY:TICKER` (e.g. `GB:IROV`), ignoring case. Ignoring case applies to this endpoint only; other parameters that take a key match it exactly. The response always carries the canonical key, as in `GB:IROV`. Returns `EntityDetail`, or 404 if no company has that key. A bare ticker or a name is not a key: use `GET /api/companies?q=` to find one.
+Exact lookup of one company by its key `COUNTRY:TICKER` (e.g. `GB:IROV`), ignoring case. Ignoring case applies to this endpoint only; other parameters that take a key match it exactly. The response always carries the canonical key, as in `GB:IROV`. A share-class key resolves to its issuer, so `GET /api/companies/US:ABC.B` returns the issuer with `key: "US:ABC.A"` when that is the shown key. Returns `EntityDetail`, or 404 if no company has that key. A bare ticker or a name is not a key: use `GET /api/companies?q=` to find one.
 
 ### `GET /api/comps`
 Builds the comps table.
@@ -151,7 +165,7 @@ interface CompsResponse {
   }[];
   excluded: {
     entity: EntitySummary;
-    reason: "possible_same_issuer" | "user_excluded";
+    reason: "near_duplicate" | "user_excluded";   // provisional; finalised in stage 4's contract PR
     detail: string;
   }[];
   summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only
@@ -174,7 +188,7 @@ Data-health overview.
   fx: { base: string };                      // base currency as given in fx_rates.json
   reference_date: string | null;             // latest valid price_date in the data (stale-price checks measure from it); null if no record has a valid date
   source: { data_dir: string; files: { name: string; sha256: string }[] };
-  counts: { records: number; entities: number; manual_additions: number };
+  counts: { records: number; entities: number; manual_additions: number };   // entities = issuers, share classes merged
   findings_by_severity: Record<Severity, number>;
   findings_by_code: { code: string; severity: Severity; source: "validation" | "derived"; count: number }[];
 }

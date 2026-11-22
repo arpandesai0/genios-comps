@@ -48,6 +48,7 @@ Where the brief is silent, the service assumes the following:
     - Otherwise, values are converted into the base currency (`v × rate[X]`). Market cap and EV are then shown in that currency and labelled with it, and a `currency_not_usd` warning says so. A USD rate that is zero, negative or not a number also raises `invalid_fx_rate`. The multiples are unchanged, because they are ratios.
     - A currency with no rate in the file is a data issue: values in it are blank, with an `unknown_currency` finding.
     - Only ingestion handles currency. Later stages use whatever currency it reports.
+13. **One company → one exchange → one country.** Each country is assumed to have a single stock exchange, and each listing trades on one exchange, so `country:ticker` identifies a listing. The same ticker in two countries (e.g. `US:ABC` and `CA:ABC`) is treated as two different companies.
 
 ## Development
 
