@@ -30,8 +30,8 @@ eval:
 
 # Same run, appended to the experiment log (eval/experiments.jsonl). Usage: make experiment DESC="what it tests"
 experiment:
-	@test -n "$(DESC)" || { echo 'usage: make experiment DESC="what this run tests"'; exit 2; }
-	PYTHONPATH=src $(BIN)/python eval/retrieval_eval.py --split dev --out eval/results/retrieval_tfidf_v1_dev.json --log "$(DESC)"
+	@test -n "$$DESC" || { echo 'usage: make experiment DESC="what this run tests"'; exit 2; }
+	PYTHONPATH=src $(BIN)/python eval/retrieval_eval.py --split dev --out eval/results/retrieval_tfidf_v1_dev.json --log "$$DESC"
 
 # Start the API (http://localhost:8000) and the web UI (http://localhost:3000) with Docker.
 # Usage: make start DIR=/path/to/data   (the folder must contain companies.json and fx_rates.json)

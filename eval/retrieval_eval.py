@@ -39,7 +39,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from experiments import file_hash, record
+from experiments import ROOT, file_hash, record
 
 from comps.config import IngestConfig, Settings
 from comps.retrieval.select import NEAR_DUPLICATE_COSINE
@@ -169,6 +169,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, help="write the full result as JSON here")
     parser.add_argument("--log", metavar="DESCRIPTION", help="append this run to eval/experiments.jsonl")
     args = parser.parse_args(argv)
+    if args.log is not None and not args.log.strip():
+        parser.error("--log needs a description of what the run tests")
     snapshot, spec = load()
     result = evaluate(snapshot, spec, args.split)
     keys = ("method", "split", "targets", "overall", "by_tag", "duplicate_listing_returned", "geography")
@@ -184,8 +186,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             inputs={
                 "method": result["method"],
                 "split": args.split,
-                "fixture": str(FIXTURE.relative_to(FIXTURE.parents[2])),
-                "dataset_version": result["dataset_version"],
+                "fixture": FIXTURE.resolve().relative_to(ROOT).as_posix(),
+                "dataset_version": result["dataset_version"],  # hash of companies.json and fx_rates.json
                 "labels_sha": file_hash(FIXTURE / "labels.json"),
                 "cutoffs": list(CUTOFFS),
                 "relevant_threshold": result["relevant_threshold"],
