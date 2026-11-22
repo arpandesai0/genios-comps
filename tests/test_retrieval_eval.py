@@ -62,3 +62,106 @@ def test_committed_dev_result_matches_a_fresh_run():
     """Any change to what is served must come with an updated eval result (AGENTS.md): run `make eval`."""
     snapshot, spec = load()
     assert json.loads(RESULT.read_text()) == evaluate(snapshot, spec, "dev")
+
+
+def _result():
+    snapshot, spec = load()
+    return evaluate(snapshot, spec, "dev")
+
+
+def test_experiment_log_appends_numbered_entries(tmp_path):
+    from datetime import UTC, datetime
+
+    from experiments import read, record, table
+
+    result = _result()
+    log = tmp_path / "experiments.jsonl"
+    inputs = {"method": result["method"], "split": "dev"}
+    when = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
+    first = record(result, description=" baseline ", eval_name="retrieval", inputs=inputs, log=log, now=when)
+    log.write_text(log.read_text().rstrip("\n"))  # a hand-saved file without a final newline
+    second = record(result, description="rerun", eval_name="retrieval", inputs=inputs, log=log)
+    entries = read(log)
+    assert [e["experiment"] for e in entries] == [1, 2] == [first["experiment"], second["experiment"]]
+    assert first["date"] == "2026-11-22T12:00:00+00:00" and first["description"] == "baseline"
+    assert first["results"]["overall"] == result["overall"] and first["inputs"]["split"] == "dev"
+    assert first["result_file"] is None and first["result_sha"] is None
+    lines = table(entries).splitlines()
+    assert lines[1].startswith("1 ") and lines[1].endswith("baseline") and "0.697" in lines[1]
+    with pytest.raises(ValueError):
+        record(result, description="  ", eval_name="retrieval", inputs=inputs, log=log)
+    assert len(read(log)) == 2
+
+
+def test_git_info_reports_dirty_inputs_and_ignores_outputs(tmp_path):
+    import subprocess
+
+    from experiments import git_info
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("x = 1\n")
+    (tmp_path / "notes.txt").write_text("not an input\n")
+    git("add", ".")
+    git("commit", "-q", "-m", "init")
+    clean = git_info(tmp_path)
+    assert clean["dirty"] is False and clean["branch"] == "main" and len(clean["commit"]) == 40
+
+    (tmp_path / "notes.txt").write_text("changed, but not an input\n")
+    (tmp_path / "src" / "out.json").write_text("{}\n")
+    assert git_info(tmp_path, outputs=[tmp_path / "src" / "out.json"])["dirty"] is False
+
+    git("mv", "src/a.py", "src/b.py")
+    (tmp_path / "src" / "my file.py").write_text("y = 2\n")
+    dirty = git_info(tmp_path, outputs=[tmp_path / "src" / "out.json"])
+    assert dirty["dirty"] is True and dirty["dirty_paths"] == ["src/b.py", "src/my file.py"]
+
+    git("checkout", "-q", "--detach")
+    assert git_info(tmp_path)["branch"] is None
+
+
+def test_git_info_is_unknown_outside_a_repository(tmp_path):
+    from experiments import git_info
+
+    info = git_info(tmp_path)
+    assert info == {"commit": None, "branch": None, "dirty": None, "dirty_paths": None}
+
+
+def test_main_with_log_writes_the_result_and_appends(tmp_path, monkeypatch, capsys):
+    import experiments
+    import retrieval_eval
+
+    log, out = tmp_path / "experiments.jsonl", tmp_path / "result.json"
+    monkeypatch.setattr(experiments, "LOG", log)
+    assert retrieval_eval.main(["--split", "dev", "--out", str(out), "--log", "end to end"]) == 0
+    (entry,) = experiments.read(log)
+    assert entry["description"] == "end to end" and entry["inputs"]["fixture"] == "eval/fixtures/retrieval"
+    assert entry["result_file"] == out.resolve().as_posix()  # outside the repo: absolute
+    assert entry["result_sha"] == experiments.file_hash(out)
+    assert json.loads(out.read_text())["overall"] == entry["results"]["overall"]
+
+
+def test_main_rejects_a_blank_description_before_writing_anything(tmp_path):
+    import retrieval_eval
+
+    out = tmp_path / "result.json"
+    with pytest.raises(SystemExit):
+        retrieval_eval.main(["--out", str(out), "--log", "   "])
+    assert not out.exists()
+
+
+def test_committed_experiment_log_is_well_formed():
+    """Numbered 1..n in order, each entry complete and run on a clean, committed tree."""
+    from experiments import LOG, read
+
+    entries = read(LOG)
+    assert entries, "experiment 1 (the baseline) is committed"
+    assert [e["experiment"] for e in entries] == list(range(1, len(entries) + 1))
+    for e in entries:
+        assert e["description"] and e["git"]["commit"] and e["results"]["overall"]
+        assert e["git"]["dirty"] is False, f"experiment {e['experiment']} ran with uncommitted changes"

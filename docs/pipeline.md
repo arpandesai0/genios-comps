@@ -16,7 +16,7 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | 1 | **Ingestion**: validate, normalize to USD, group by `COUNTRY:TICKER`, build time series | JSON files → `Dataset` of `Entity` + `Observation` + `Finding` | ✅ done | `ingest.py` | [ingestion.md](ingestion.md) |
 | 2 | **Issuers and quality**: merge share classes into issuers (disjoint-set union), then checks across companies (shared names, freshness) | listings → issuers + extra findings | ✅ done | `issuers.py`, `quality.py` | [ingestion.md § 6](ingestion.md#6-merge-share-classes-issuerspy), [§ 7](ingestion.md#7-checks-across-companies-qualitypy) |
 | 3 | **Resolve**: turn an analyst's query (key, ticker, exact name or alias, partial name) into the matching companies, best match first; the analyst always chooses the target, and comps take a key | query → entity key(s) with match type | ✅ done | `service.search`, served by `GET /api/companies` | [API.md](API.md#get-apicompanies) |
-| 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ✅ done (TF-IDF; eval next) | `retrieval/` | [retrieval.md](retrieval.md) |
+| 4 | **Retrieve**: pick `k` peers by TF-IDF description similarity and explain each one | target + dataset → ranked peers with evidence | ✅ done (TF-IDF, evaluated: nDCG@10 0.697 on the synthetic dev split) | `retrieval/`, `eval/` | [retrieval.md](retrieval.md), [eval.md](eval.md) |
 | 5 | **Finance**: glossary metrics (ok, NM or missing), rounding, peer summary stats | `Observation` → `Metrics`; peers' `Metrics` → `Summary` | ✅ done | `finance.py` | [finance.md](finance.md) |
 | 6 | **Service**: build an immutable snapshot once at start-up, assemble comps responses | dataset → snapshot; request → comps response | ✅ snapshot (with the retrieval index) built at start-up; read-only queries, peers and comps | `service.py` | |
 | 7 | **API**: FastAPI adapter, JSON and CSV, no business logic | HTTP ↔ service | ✅ read-only endpoints, `/api/peers`, `/api/comps`, `/api/comps.csv` | `api.py` | [API.md](API.md) |
@@ -55,4 +55,11 @@ Each stage talks to the next only through plain data types from `src/comps/model
 | #10 | Stages 6–7 (partial): read-only API on an immutable snapshot; `make start DIR=...` runs API + web with docker compose. |
 | #11 | Tests: end-to-end planted-defects acceptance test for ingestion and finance (no behaviour change). |
 | #13 | Stage 2: remove the `REFERENCE_DATE` setting and the `future_price_date` check; staleness is always measured from the latest `price_date` in the data. |
-| this PR | Stage 3: marked done as it is. Resolution is `service.search` behind `GET /api/companies`; the separate `resolve.py` module is dropped from the plan (docs only, no behaviour change). |
+| #14 | Stage 3: marked done as it is. Resolution is `service.search` behind `GET /api/companies`; the separate `resolve.py` module is dropped from the plan (docs only, no behaviour change). |
+| #19 | API contract: share classes are one company, shown under the most valuable class. |
+| #20 | Manual additions dropped: the input files are the whole dataset, and the snapshot is never swapped. |
+| #21 | Stage 2: share classes merged into issuers with a disjoint-set union; issuer market cap summed over classes. |
+| #22 | API contract: `GET /api/peers`, the final `GET /api/comps` and the CSV layout. |
+| #23 | Stage 4: TF-IDF retrieval, the k-filling peer walk with near-duplicate skips, and the peers, comps and CSV endpoints. |
+| #24 | Stage 4 eval: synthetic universe with graded labels, nDCG / precision / recall, first result for TF-IDF v1 ([eval.md](eval.md)). |
+| #29 | Eval: append-only experiment log (`eval/experiments.jsonl`) and [eval.md](eval.md). |

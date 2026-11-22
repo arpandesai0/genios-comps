@@ -2,7 +2,7 @@
 PYTHON ?= 3.11
 BIN := .venv/bin
 
-.PHONY: install lint format typecheck test check eval start stop
+.PHONY: install lint format typecheck test check eval experiment start stop
 
 install:
 	uv venv -p $(PYTHON) --allow-existing .venv
@@ -27,6 +27,11 @@ check: lint typecheck test
 # Retrieval eval on the synthetic fixture (dev split); writes eval/results/retrieval_<method>_dev.json.
 eval:
 	PYTHONPATH=src $(BIN)/python eval/retrieval_eval.py --split dev --out eval/results/retrieval_tfidf_v1_dev.json
+
+# Same run, appended to the experiment log (eval/experiments.jsonl). Usage: make experiment DESC="what it tests"
+experiment:
+	@test -n "$$DESC" || { echo 'usage: make experiment DESC="what this run tests"'; exit 2; }
+	PYTHONPATH=src $(BIN)/python eval/retrieval_eval.py --split dev --out eval/results/retrieval_tfidf_v1_dev.json --log "$$DESC"
 
 # Start the API (http://localhost:8000) and the web UI (http://localhost:3000) with Docker.
 # Usage: make start DIR=/path/to/data   (the folder must contain companies.json and fx_rates.json)

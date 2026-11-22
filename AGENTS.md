@@ -214,6 +214,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
 | `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
 | `docs/finance.md` | Formulas, ok/NM/missing statuses, rounding and display, summary statistics, with worked examples. |
+| `docs/eval.md` | Retrieval evaluation: fixture, labels rubric, splits, metrics, the experiment log and its workflow, results. |
 | `docs/API.md` | HTTP contract shared by the backend and the UI. Change it in its own PR, before the code that depends on it. |
 | `scripts/dev/` | Developer notebooks and scripts for exploring modules against a local `DATA_DIR`. Commit notebooks with outputs cleared, because outputs would contain the supplied data. |
 | `web/` | Next.js + shadcn/ui front end, currently running on synthetic mocks. It talks to the API over HTTP only. |
@@ -221,6 +222,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
 | `eval/fixtures/retrieval/` | Synthetic retrieval universe, its builder (`build_fixture.py`) and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
 | `eval/retrieval_eval.py`, `eval/README.md` | The retrieval eval (nDCG@k, precision@k, recall@k, per-tag, geography lift) and how to run and read it. |
+| `eval/experiments.py`, `eval/experiments.jsonl` | Append-only experiment log: every logged eval run with its number, date, description, git commit, inputs and headline metrics (`make experiment DESC=...`). |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
 | `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=...` validates the data folder and runs the API (port 8000) and web (port 3000) containers. Data is mounted read-only. |
 
@@ -236,6 +238,7 @@ uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
 make start DIR=~/Downloads/genios-takehome/data      # API + web via docker compose; make stop to stop
 make eval                                            # retrieval eval (dev split) -> eval/results/
+make experiment DESC="what it tests"                 # same, appended to eval/experiments.jsonl
 ```
 
 Update this section as the service, evaluation, and Docker commands land.
