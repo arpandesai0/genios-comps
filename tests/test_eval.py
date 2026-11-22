@@ -181,6 +181,12 @@ def test_experiment_log_numbers_runs_and_the_commit_is_not_a_key(tmp_path):
     assert "other" in rows[2] and rows[1].endswith("baseline")
 
 
+def _contains(actual, expected):
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(k in actual and _contains(actual[k], v) for k, v in expected.items())
+    return actual == expected
+
+
 def test_committed_experiment_log_is_well_formed_and_reproducible_from_captured_output():
     """Numbered 1..n; every black-box run's captured output is committed, unchanged, and rescores to the log."""
     entries = experiments.read()
@@ -195,7 +201,9 @@ def test_committed_experiment_log_is_well_formed_and_reproducible_from_captured_
             fixture = FIXTURES[name]
             assert run.sha(run.golden_path(fixture).read_bytes()) == e["inputs"][name]["golden"]
             captured = json.loads(path.read_text())["responses"]
-            assert run.score(fixture, captured, run.golden(fixture), list(e["results"][name])) == e["results"][name]
+            rescored = run.score(fixture, captured, run.golden(fixture), list(e["results"][name]))
+            # Metrics added after a run was logged may appear; every logged value must be reproduced.
+            assert _contains(rescored, e["results"][name]), f"experiment {e['experiment']} {name}: rescore differs"
 
 
 def test_score_retrieval_maps_aliases_to_their_original():
@@ -210,3 +218,4 @@ def test_score_retrieval_maps_aliases_to_their_original():
     countries = {"US:A": "US", "US:B": "US", "US:C": "CA", "US:DUP": "US"}
     out = score_retrieval(responses, spec, countries, "dev")
     assert out["overall"]["ndcg@5"] == 1.0 and out["duplicate_listing_returned"] == 1
+    assert out["both_copies_returned"] == 1  # US:DUP and its original US:B in one list

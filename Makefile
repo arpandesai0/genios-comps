@@ -36,9 +36,10 @@ model:
 	PYTHONPATH=src $(BIN)/python -m comps.retrieval.embedding
 
 # Start the API (http://localhost:8000) and the web UI (http://localhost:3000) with Docker.
-# Usage: make start DIR=/path/to/data   (the folder must contain companies.json and fx_rates.json)
+# Usage: make start DIR=/path/to/data [SERVICES="api web"]   (the folder must contain companies.json and
+# fx_rates.json). SERVICES defaults to all; e.g. SERVICES=api starts the API only (no front end).
 start:
-	@scripts/start.sh "$(DIR)"
+	@scripts/start.sh "$(DIR)" $(SERVICES)
 
 stop:
 	DIR=. docker compose down

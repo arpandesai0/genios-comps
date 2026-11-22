@@ -17,9 +17,14 @@ This project is under active development. Setup instructions, design notes and e
 You need Docker. The service reads its data from a folder you name at start-up. The folder must contain `companies.json` and `fx_rates.json`.
 
 ```bash
-make start DIR=/path/to/data     # builds and starts the API and the web UI
-make stop                        # stops them
+make start DIR=/path/to/data                # builds and starts every service (API and web UI)
+make start DIR=/path/to/data SERVICES=api   # only the named services, e.g. the API without the front end
+make stop                                   # stops them
 ```
+
+`SERVICES` takes a space-separated list of compose services (`api`, `web`); it defaults to all of them. An unknown name is an error.
+
+The first build downloads the embedding model (`sentence-transformers/all-MiniLM-L6-v2`, about 90 MB) into the image; this is the only network use. At runtime the service is fully offline, and it refuses to start if the model is missing. Start-up embeds every company description once (a few seconds for a few hundred companies).
 
 - UI: <http://localhost:3000>. It opens the **Data** view: dataset health, every company, and each company's observation history, normalized USD values, conversion factors, metrics and findings.
 - API: <http://localhost:8000/api/health>. The endpoints are described in [`docs/API.md`](docs/API.md).
@@ -50,6 +55,8 @@ Where the brief is silent, the service assumes the following:
     - Only ingestion handles currency. Later stages use whatever currency it reports.
 13. **One company → one exchange → one country.** Each country is assumed to have a single stock exchange, and each listing trades on one exchange, so `country:ticker` identifies a listing. The same ticker in two countries (e.g. `US:ABC` and `CA:ABC`) is treated as two different companies.
 14. **Share classes of one issuer are one company.** Listings in the same country whose issuer-level data is identical are merged; see [Share classes](#share-classes-disjoint-set-union).
+15. **Peers are chosen by meaning, with one local embedding model.** Descriptions are compared with `sentence-transformers/all-MiniLM-L6-v2`, run locally. It was chosen over TF-IDF and two other models by the retrieval eval ([eval/README.md](eval/README.md)). One model does both ranking and duplicate detection: a hybrid (for example, TF-IDF for duplicates) is out of scope for now. The model is a required part of the service, and there is no fallback.
+16. **Two companies are near-duplicates at a description similarity of 0.88 or more** (or identical text), and are then never each other's peers. Hiding a genuine peer is treated as worse than showing a duplicate, so the cut is the lowest one that flags none of the labelled non-duplicates. These are the 40 most similar pairs in the supplied data (all genuine peers, the highest at 0.873) plus synthetic pairs. This threshold is the one rule tuned on the supplied pre-test data (an exception the owner made on 2026-11-22). Heavily reworded duplicate listings can still score below it and appear as peers.
 
 ## Requesting a comps table
 
@@ -57,7 +64,7 @@ Where the brief is silent, the service assumes the following:
 2. Build the table: `GET /api/comps?target=CA:DOLG&k=10`. Add `exclude=US:AAAA,US:BBBB` to remove peers; the summary statistics are recomputed.
 3. Download it: `GET /api/comps.csv?target=CA:DOLG&k=10`.
 
-`GET /api/peers?target=...` returns the same peers with the evidence for each (similarity, shared description terms, classification and country match, revenue ratio) but no metrics. How peers are chosen is in [`docs/retrieval.md`](docs/retrieval.md).
+`GET /api/peers?target=...` returns the same peers with the evidence for each (description similarity, classification and country match, revenue ratio) but no metrics. How peers are chosen is in [`docs/retrieval.md`](docs/retrieval.md).
 
 ## Share classes (disjoint-set union)
 
@@ -87,8 +94,12 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.11.
 make install     # create .venv and install the package with dev tools
 make check       # lint, typecheck and tests (the same checks CI runs)
 make format      # apply ruff fixes and formatting
+make model       # download the embedding model to MODEL_CACHE_DIR (first local run only)
 DATA_DIR=/path/to/data .venv/bin/uvicorn comps.api:app --reload   # API only, without Docker
+make experiment DESC="what it tests"   # retrieval eval: runs the pipeline at a commit, scores it, logs it
 ```
+
+Retrieval settings (environment variables): `EMBEDDING_MODEL`, `NEAR_DUPLICATE_THRESHOLD`, `MODEL_CACHE_DIR`, `MODEL_OFFLINE`; see [`docs/retrieval.md`](docs/retrieval.md). The tests use the light TF-IDF ranker, so they need no model download. The eval and its results are described in [`eval/README.md`](eval/README.md).
 
 CI runs four workflows on every pull request and push to `main`: `lint`, `typecheck`, `tests` (Python 3.11 and 3.12, with a coverage report) and `repo-hygiene` (notebooks cleared, no supplied data or local state committed).
 

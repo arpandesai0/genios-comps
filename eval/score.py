@@ -9,7 +9,8 @@ Retrieval metrics (docs/eval.md):
 - precision@k: share of the k slots holding a relevant peer (rel >= threshold); empty slots are misses.
   Reported with its ceiling, min(#relevant, k) / k.
 - recall@k: relevant peers in the top k / all relevant candidates.
-- per-tag means, the duplicate listings returned, and the geography lift (same-country share among
+- per-tag means, how often a duplicate listing appeared and how often both copies of one company
+  appeared in the same list (the real failure), and the geography lift (same-country share among
   irrelevant peers returned / that share among all irrelevant candidates).
 
 Dedup metrics: each pair's score is the similarity of ``b`` in ``a``'s response (as a peer or as a
@@ -92,6 +93,7 @@ def score_retrieval(
             "tags": spec["tags"][target],
             "returned": returned,
             "duplicate_returned": [k for k in returned if k in aliases],
+            "both_copies_returned": [a for a, o in aliases.items() if a in returned and o in returned],
         }
         relevant = sum(1 for rel in labels.values() if rel >= threshold)
         for k in CUTOFFS:
@@ -117,7 +119,10 @@ def score_retrieval(
         "targets": len(rows),
         "overall": {m: _mean(r[m] for r in rows) for m in metrics},
         "by_tag": by_tag,
+        # Times a second listing appeared among the peers (fine on its own: it stands in for its original).
         "duplicate_listing_returned": sum(len(r["duplicate_returned"]) for r in rows),
+        # Times both listings of one company appeared in the same peer list: the failure dedup must prevent.
+        "both_copies_returned": sum(len(r["both_copies_returned"]) for r in rows),
         "geography_lift": _ratio(returned_share, pool_share),
         "per_target": rows,
     }

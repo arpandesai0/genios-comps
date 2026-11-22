@@ -105,11 +105,11 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
        → issuers with observation history + findings
                                   ↓
           Immutable Snapshot (versioned by input-file hash)
-     entities · findings · TF-IDF index · derived label-conflict warnings
+     entities · findings · embedding index (EMBEDDING_MODEL) · derived label-conflict warnings
                                   ↓
      Resolve (service.search): key / ticker / name → every match; the analyst chooses
                                   ↓
-     Retriever: TF-IDF on descriptions
+     Retriever: local sentence embeddings (MiniLM-L6) on descriptions
        walks the full ranking until k peers: skips the target, near-duplicates and
        analyst exclusions, with reasons; returns fewer (and says why) if it runs out;
        size and geography are shown as evidence only
@@ -136,7 +136,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-21 | Latest text value is empty → use the most recent non-empty value, with a finding (an append-style update). |
 | 2026-11-21 | Stale price (> 90 days before the dataset's latest price date) is a warning only; never blocks serving. |
 | 2026-11-21 | The user picks `k`. There is **no similarity floor or abstention**. |
-| 2026-11-21 | Retrieval = TF-IDF on descriptions. Size and geography are evidence, not ranking inputs. No hard industry filter. Valuation multiples are never used to select peers. |
+| 2026-11-21 | Retrieval = TF-IDF on descriptions *(ranker replaced by embeddings 2026-11-22, see below)*. Size and geography are evidence, not ranking inputs. No hard industry filter. Valuation multiples are never used to select peers. |
 | 2026-11-21 | A derived classification-conflict warning comes from description neighbours. It is marked model-derived, and labels are never rewritten. |
 | 2026-11-21 | ~~Manual company additions are **in-memory only**. They never touch the input files.~~ **Reversed 2026-11-22:** no manual additions. |
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
@@ -172,7 +172,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | **Merging uses a disjoint-set union (DSU).** Every key starts as its own parent; each merge rule unions pairs; after all unions each set is re-rooted at its shown key. Every key keeps a parent pointer, so looking up any class key resolves to its issuer. Documented in the README's *Share classes* section, added with the implementation. |
 | 2026-11-22 | **Shown key** of a merged issuer = the class with the largest market value (price × shares); a class whose value can't be computed ranks last; ties go to the alphabetically first key. Text fields come from that class; every class name is an alias. |
 | 2026-11-22 | **Issuer market cap = sum over share classes of price × shares** (each class converted to the dataset currency). Classes with identical price, price currency and shares are the same shares listed twice and are counted once, with a finding. If any counted class lacks a usable price or share count, market cap (and everything built on it) is missing, never a partial sum. Debt, cash, revenue, EBITDA and net income are counted once. |
-| 2026-11-22 | **Near-duplicates (retrieval).** Two issuers whose descriptions are identical after normalizing case and whitespace, or whose description TF-IDF cosine is ≥ 0.95, are excluded from each other's peer lists with a finding naming the score. *(Clarified 2026-11-22: neither can be the other's peer; when both are candidates for one target, the higher-ranked one is kept. The "finding" is the request's `skipped` entry, whose `detail` names the score.)* |
+| 2026-11-22 | **Near-duplicates (retrieval).** Two issuers whose descriptions are identical after normalizing case and whitespace, or whose description TF-IDF cosine is ≥ 0.95 *(now: embedding similarity ≥ 0.88, 2026-11-22 below)*, are excluded from each other's peer lists with a finding naming the score. *(Clarified 2026-11-22: neither can be the other's peer; when both are candidates for one target, the higher-ranked one is kept. The "finding" is the request's `skipped` entry, whose `detail` names the score.)* |
 | 2026-11-22 | **Peer selection walks the full ranking until it has k peers.** It skips the target, the target's near-duplicates, analyst exclusions, and any candidate that is a near-duplicate of a peer already chosen (the higher-ranked one is kept). Each skip carries a reason. If the ranking runs out, it returns fewer peers with `requested_k`, `returned_k` and the reasons; it never pads. |
 | 2026-11-22 | Sequencing: the API contract for share classes lands first (this PR), then the ingestion/finance implementation with the README's DSU section and `docs/ingestion.md` update, then stage 4 (retrieval). |
 | 2026-11-22 | **No runtime additions.** The input files (`companies.json`, `fx_rates.json`) are the whole dataset. The manual-addition feature (`/api/ingest/*`, the "Add company" form, `origin`, `manual_additions`) is dropped, so the snapshot is built once at start-up and never swapped. Contract first (this PR); code and UI removal follow. |
@@ -184,6 +184,18 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | **Retrieval eval uses ranking metrics**, not METEOR (which scores generated text): graded 0–3 relevance labels on synthetic fixtures, nDCG@k as the main metric, plus precision@k and recall@k, with separate dev and held-out targets. |
 | 2026-11-22 | Stage 4: the owner allowed the implementation PR to be stacked on the unmerged contract PR. Owner wants to be asked at each stage before it is built. |
 | 2026-11-22 | **Retrieval eval design.** Synthetic universe hand-written with planted hard cases (paraphrase, cross-country, mislabelled, boilerplate, geo trap, duplicate listing); each company's true business is fixed before any score is run and labels follow from it by the 0–3 rubric. Report nDCG@5/@10 (main), precision and recall at both cut-offs, per-tag breakdowns and a geography lift. Targets split 50/50 into dev and held-out, balanced by business and by hard-case tag; held-out is scored only when a configuration is final. Precision/recall count label 3 (same business) as relevant. |
+| 2026-11-22 | **Embedding stage.** Candidate models: all-MiniLM-L6-v2, bge-small-en-v1.5, EmbeddingGemma-300M, run with ONNX via `fastembed`; description only. The licence is not a concern (personal project). |
+| 2026-11-22 | **The model is required and the service is offline at runtime** (brief: models may be downloaded only while building the image). The image downloads the model at build (a failure fails the build); start-up fails if the model can't be loaded, with no fallback. |
+| 2026-11-22 | **The model is a start-up setting** (`EMBEDDING_MODEL`); one model is loaded per process, and only that model is downloaded. |
+| 2026-11-22 | **No hybrid in this scope:** one model does both ranking and near-duplicate detection. Listed in README Assumptions. |
+| 2026-11-22 | **The analyst doesn't see what runs underneath:** `method`, `shared_terms` and the cosine numbers in skip details are removed from responses; `similarity` stays as a plain 0–1 score. |
+| 2026-11-22 | **Adoption rule: the best dev nDCG@10 wins**, within ~60 s start-up and a < 2 GB image. When fixtures disagree, the independent fixture decides. **MiniLM serves both ranking and dedup.** |
+| 2026-11-22 | **Eval fixtures:** the original fixture is kept unchanged; an independent fixture and the dedup pairs are written by a sub-agent on a different model (Sonnet) that never sees the ranker. |
+| 2026-11-22 | **Dedup threshold:** a false duplicate (hiding a genuine peer) is worse than a missed one. The threshold = the lowest cut with no false duplicate, tuned on labelled pairs from the supplied pre-test data and checked on the synthetic pairs. This **reverses** the "nothing calibrated on the pre-test data" rule for this one threshold. Result: 0.88. |
+| 2026-11-22 | **Evals are decoupled from the pipeline:** each run checks out a commit, runs its API as a black box on the same inputs, captures the output and compares it with golden labels. The experiment number (not the commit) identifies a run; one commit can have several runs with different settings. Captured outputs are committed per experiment. The log and outputs are pretty-printed JSON, with latency (min/mean/p50/p95/max), memory, start-up time and the model's vector size. |
+| 2026-11-22 | Held-out is scored once, for the winner and the TF-IDF reference. Embeddings may also be run on the pre-test data for qualitative checks only (git-ignored `local_*`). Geography leak: measure only, for now. |
+| 2026-11-22 | **One PR for the embedding stage** (contract, retriever, evals, serving, docs). |
+| 2026-11-22 | `make start` takes `SERVICES` (default: all compose services); naming services starts only those, e.g. `SERVICES=api` for local testing and evals without the front end. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -197,17 +209,17 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `DESIGN.md` *(planned)* | Scope, the definition of a relevant peer, key decisions and alternatives, data problems and how each was handled, acceptance criteria. |
 | `TIMELOG.md` *(planned)* | Rough breakdown of the time actually spent. |
 | `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test, lint and type-check tools; ruff and mypy are configured here). |
-| `Makefile` | Developer shortcuts: `install`, `lint`, `format`, `typecheck`, `test`, `check`. |
+| `Makefile` | Developer shortcuts: `install`, `lint`, `format`, `typecheck`, `test`, `check`, `experiment`, `model`, `start`, `stop`. |
 | `.pre-commit-config.yaml` | Optional local hooks: ruff check, ruff format, and nbstripout for notebook outputs. |
 | `.github/workflows/` | CI, one concern per workflow: `lint`, `typecheck`, `tests` (3.11 and 3.12, with coverage), `repo-hygiene`. |
 | `src/comps/` | The Python service package. |
-| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, staleness threshold. |
+| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, staleness threshold, `EMBEDDING_MODEL`, `NEAR_DUPLICATE_THRESHOLD`, `MODEL_CACHE_DIR`, `MODEL_OFFLINE`. |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/issuers.py` | Share-class merge: a disjoint-set union groups listings with identical issuer-level data into one issuer, re-rooted at the shown key; `Dataset.parents` maps every listing key to it. |
 | `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
-| `src/comps/retrieval/` | `Retriever` / `Index` interface (`base.py`), the served TF-IDF ranker (`tfidf.py`), and the near-duplicate test and k-filling peer selection (`select.py`). |
+| `src/comps/retrieval/` | `Retriever` / `Index` interface (`base.py`), the served embedding ranker (`embedding.py`), the earlier TF-IDF ranker used by the tests (`tfidf.py`), and the near-duplicate test and k-filling peer selection (`select.py`). |
 | `docs/retrieval.md` | How peers are chosen: index, walk and skip reasons, evidence, example, known gaps. |
 | `src/comps/service.py` | Builds the immutable snapshot (dataset, metrics, retrieval index) at start-up, and holds the query logic for every endpoint: search and resolution, findings, peers (selection + evidence) and comps (peers + metrics + peer-only summary). |
 | `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints, peers and comps (JSON and CSV); handlers only parse and serialise. |
@@ -220,11 +232,11 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `web/` | Next.js + shadcn/ui front end, currently running on synthetic mocks. It talks to the API over HTTP only. |
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
 | `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
-| `eval/fixtures/retrieval/` | Synthetic retrieval universe, its builder (`build_fixture.py`) and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
-| `eval/retrieval_eval.py`, `eval/README.md` | The retrieval eval (nDCG@k, precision@k, recall@k, per-tag, geography lift) and how to run and read it. |
-| `eval/experiments.py`, `eval/experiments.jsonl` | Append-only experiment log: every logged eval run with its number, date, description, git commit, inputs and headline metrics (`make experiment DESC=...`). |
+| `eval/fixtures/` | `retrieval/` (first universe), `independent/` (written by a different model) and `dedup/` (labelled pairs): builders, inputs and golden labels. |
+| `eval/run.py`, `eval/score.py`, `eval/README.md` | Black-box eval: run a commit's API on the fixtures, capture `/api/peers`, score against golden labels. The README opens with the results table. |
+| `eval/experiments.py`, `eval/experiments.json`, `eval/runs/` | Append-only experiment log (pretty-printed JSON) and each run's captured output (`make experiment DESC=...`). |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
-| `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=...` validates the data folder and runs the API (port 8000) and web (port 3000) containers. Data is mounted read-only. |
+| `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=... [SERVICES=api]` validates the data folder and runs the API (port 8000) and web (port 3000) containers, or only the named ones. Data is mounted read-only; the embedding model is baked into the API image. |
 
 ## 6. Commands
 
@@ -237,8 +249,9 @@ pre-commit install                                   # optional: ruff and nbstri
 uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
 make start DIR=~/Downloads/genios-takehome/data      # API + web via docker compose; make stop to stop
-make eval                                            # retrieval eval (dev split) -> eval/results/
-make experiment DESC="what it tests"                 # same, appended to eval/experiments.jsonl
+make start DIR=... SERVICES=api                      # API only (no front end)
+make model                                           # download the configured embedding model
+make experiment DESC="what it tests"                 # black-box eval at HEAD (COMMIT=, MODEL=, HELD_OUT=1)
 ```
 
 Update this section as the service, evaluation, and Docker commands land.
