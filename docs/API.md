@@ -136,27 +136,29 @@ Query parameters: `target` (company key, required; any share-class key resolves)
 **How peers are chosen** (AGENTS.md §4, 2026-11-22):
 
 - Candidates are ranked by **description similarity** (`method` names the ranker; the first is TF-IDF cosine). Size, geography and classification are shown as evidence and are never ranking inputs. Valuation multiples are never used. There is no similarity floor.
-- The ranking is walked from the top until `k` peers are chosen. A candidate is **skipped**, with a reason, when it is a near-duplicate of the target, a near-duplicate of a peer already chosen (the higher-ranked one stays), or in `exclude`. Two companies are **near-duplicates** when their descriptions are identical after normalizing case and whitespace, or their description TF-IDF cosine is ≥ 0.95.
-- A company without a usable description cannot be ranked: as a candidate it is skipped with `no_description`; as the target, no peers are returned and `note` says why.
-- If the ranking runs out first, fewer peers are returned (`returned_k < requested_k`) and `note` says why. The list is never padded.
-- Ties in similarity are ordered by key.
+- The ranking is walked from the top until `k` peers are chosen. A candidate is **skipped**, with a reason, when it is in `exclude` (`user_excluded`), a near-duplicate of the target (`near_duplicate_of_target`), or a near-duplicate of a peer already chosen (`near_duplicate_of_peer`; the higher-ranked one stays). When several apply, that order decides the reason. Skipped candidates never count toward `k`, and only chosen peers are checked for `near_duplicate_of_peer`.
+- Two companies are **near-duplicates** when their descriptions are identical after normalizing case and whitespace, or their description TF-IDF cosine (unrounded) is ≥ 0.95. Neither can be the other's peer.
+- A **usable description** is non-empty after trimming and has at least one term the ranker can use (for TF-IDF: a word that is not an English stop word). A company without one cannot be ranked: as a candidate it is skipped with `no_description`; as the target, no peers are returned and `note` says why.
+- If the ranking runs out first, fewer peers are returned and `note` says why. The list is never padded.
+- Ties in similarity are ordered by key. `rank` is the position among the returned peers (1 … `returned_k`).
+- `exclude`: empty items are ignored and repeats count once; a key of the target is ignored; an unknown key is a 422.
 
 ```ts
 type SkipReason = "near_duplicate_of_target" | "near_duplicate_of_peer" | "user_excluded" | "no_description";
 
 interface Evidence {                         // why this peer was chosen
-  similarity: number;                        // description similarity under `method`, 0–1; NOT a probability
-  shared_terms: string[];                    // up to 5 description terms that contributed most to the match, strongest first
-  classification: { sector: boolean; industry: boolean; sub_industry: boolean };   // same label as the target (evidence only)
-  country_match: boolean;                    // evidence only
-  revenue_ratio: number | null;              // peer revenue / target revenue; null if either is unavailable or the target's is ≤ 0
+  similarity: number;                        // description similarity to the target under `method`, 0–1, rounded to 4 dp; NOT a probability
+  shared_terms: string[];                    // up to 5 terms present in both descriptions, ranked by the product of their weights (ties alphabetical); may be empty
+  classification: { sector: boolean; industry: boolean; sub_industry: boolean };   // label equal to the target's (false if either is missing); evidence only
+  country_match: boolean;                    // same country (false if either is the unknown "*"); evidence only
+  revenue_ratio: number | null;              // peer revenue / target revenue (latest observation, dataset currency), rounded to 2 dp; may be ≤ 0 when the peer's revenue is; null if either is unavailable or the target's is ≤ 0
 }
 
 interface Skipped {
   entity: EntitySummary;
   reason: SkipReason;
   detail: string;                            // human-readable, e.g. "Near-duplicate of US:ABC (description cosine 0.97)."
-  similarity: number | null;                 // to the target; null for no_description
+  similarity: number | null;                 // to the target (4 dp), even for near_duplicate_of_peer, whose candidate-to-peer cosine is in `detail`; null for no_description and for exclusions not met in the walk
   duplicate_of: string | null;               // the shown key it duplicates (target or chosen peer); null otherwise
 }
 
@@ -167,12 +169,12 @@ interface PeersResponse {
   requested_k: number;
   returned_k: number;
   peers: { rank: number; entity: EntitySummary; evidence: Evidence }[];   // rank 1 = most similar
-  skipped: Skipped[];                        // every skip met while walking the ranking, in ranking order, then every no_description company
-  note: string | null;                       // set when returned_k < requested_k (including 0): why
+  skipped: Skipped[];                        // in order: skips met while walking the ranking (ranking order); then every `exclude` key not met before the walk ended (by key); then every no_description company except the target (by key)
+  note: string | null;                       // non-null exactly when returned_k < requested_k (including a target with no description); display text only
 }
 ```
 
-Errors: 404 for an unknown `target`, 422 for an invalid `k` or an unknown key in `exclude`.
+Errors: 404 for an unknown `target` (exact case, like every key parameter except `GET /api/companies/{key}`); 422 for a missing `target`, a `k` that is not an integer in 1–50, or an unknown key in `exclude`.
 
 ### `GET /api/comps`
 Builds the comps table: the peers chosen exactly as `/api/peers` chooses them, with every company's metrics and peer-only summary statistics. `target` must be a company key (any share-class key resolves). Free text goes through `GET /api/companies?q=` first: one match can go straight to comps; several let the analyst choose.
@@ -194,19 +196,24 @@ interface CompsResponse {
     entity: EntitySummary;
     metrics: Metrics;
     findings: Finding[];
-    evidence: Evidence & { limitations: string[] };   // limitations: finding codes affecting this peer's metrics
+    evidence: Evidence & { limitations: string[] };   // distinct codes of this peer's findings whose `affects` names one of its metrics, sorted; the findings themselves are in `findings`
   }[];
   skipped: Skipped[];
   note: string | null;
-  summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only; all null when there are no peers
+  summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only; with no peers each has n = n_nm = n_missing = 0 and null values
 }
 ```
 
 Errors: as `/api/peers`.
 
 ### `GET /api/comps.csv`
-Same parameters as `/api/comps`. Returns `text/csv` with the target row, the peer rows (key, name, rank, similarity, market cap, EV, EV/Revenue, EV/EBITDA, P/E using display values) and the summary rows.
-The money columns are headed `Market cap (<currency> m)` and `EV (<currency> m)`, e.g. `Market cap (USD m)`. The summary rows use the same columns, with values only under the three multiples.
+Same parameters and errors (as JSON) as `/api/comps`. Returns `text/csv; charset=utf-8`, RFC 4180 quoting, with `Content-Disposition: attachment; filename="comps_<target key with : replaced by _>.csv"`.
+
+Header: `Row,Rank,Key,Name,Similarity,Market cap (<currency> m),EV (<currency> m),EV/Revenue,EV/EBITDA,P/E`, e.g. `Market cap (USD m)`.
+
+- One `target` row (blank `Rank` and `Similarity`), then one `peer` row per peer in rank order, then four summary rows `mean`, `median`, `high`, `low` (blank `Rank`, `Key`, `Name`, `Similarity` and money columns) and one `n` row giving the number of values used for each multiple.
+- Values are the `display` strings: `NM` for not meaningful, blank for missing. Similarity uses 4 dp.
+- With no peers (including a target without a usable description) the file has the target row and the summary rows, whose multiples are blank and whose `n` is 0.
 
 ### `GET /api/dataset`
 Data-health overview.
