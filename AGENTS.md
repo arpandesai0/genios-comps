@@ -101,7 +101,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
                     └─────────────┬─────────────┘
                         Ingestion pipeline
    raw → validate/normalize (USD, units) → group by country:ticker
-       → entities with observation history + findings
+       → share classes merged into one issuer (disjoint-set union)
+       → issuers with observation history + findings
                                   ↓
           Immutable Snapshot (versioned by input-file hash)
      entities · findings · TF-IDF index · derived label-conflict warnings
@@ -109,7 +110,8 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
      Resolver (key / ticker / name → match, or a list of choices if ambiguous)
                                   ↓
      Retriever: TF-IDF on descriptions
-       user-chosen k; excludes the target and its same-issuer siblings, with reasons;
+       walks the full ranking until k peers: skips the target, near-duplicates and
+       analyst exclusions, with reasons; returns fewer (and says why) if it runs out;
        size and geography are shown as evidence only
                                   ↓
      Finance: latest observation → market cap, EV, EV/Revenue, EV/EBITDA, P/E
@@ -123,11 +125,11 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | Date | Decision |
 |---|---|
 | 2026-11-21 | Repo lives in `~/Desktop/genios-finance`; the service reads the brief's data through `DATA_DIR`. |
-| 2026-11-21 | **Identity = `country:ticker`.** Record `id` is internal provenance only. |
+| 2026-11-21 | **Identity = `country:ticker`.** Record `id` is internal provenance only. *(Narrowed 2026-11-22: the key identifies a listing; share classes of one issuer merge into one company.)* |
 | 2026-11-21 | Same key with identical content → one entity (exact duplicates collapse). |
 | 2026-11-21 | Same key with different content → text fields (name, description, labels) take the value with the latest `price_date`. A tie goes to the later record in the file and is logged as a conflict finding. A text-only change raises an info finding and keeps the previous value in provenance. |
 | 2026-11-21 | Numeric fields are kept as a **time series** of observations keyed by `price_date`. Comps use the **latest observation only**; fields are never mixed across dates. |
-| 2026-11-21 | Different keys with identical content → separate entities flagged **possible same issuer** (e.g. share classes). They are excluded from each other's peer lists and the reason is shown. |
+| 2026-11-21 | ~~Different keys with identical content → separate entities flagged **possible same issuer** (e.g. share classes). They are excluded from each other's peer lists and the reason is shown.~~ **Reversed 2026-11-22:** share classes are merged into one issuer (see below). |
 | 2026-11-21 | Supplied numbers are the source of truth: no magnitude or unit-error checks, never rescaled. |
 | 2026-11-21 | No ticker → treated as **not listed** and excluded (finding `unlisted_excluded`). Missing country → placeholder `*` (key `*:TICKER`). |
 | 2026-11-21 | Record `id`s may repeat; this is not a conflict. |
@@ -154,7 +156,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). |
 | 2026-11-21 | `make start DIR=<folder>` runs **docker compose** (API + web). `DIR` is required and must contain `companies.json` and `fx_rates.json`; there is no default path. `make stop` stops it. |
 | 2026-11-21 | Until comps and ingest exist, the UI in API mode hides the Compare page and the "Add company" form, and `/` redirects to `/data`. Mock mode still shows everything. |
-| 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. A share-class sibling's mirror-image finding is not repeated. |
+| 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. ~~A share-class sibling's mirror-image finding is not repeated.~~ (Moot since 2026-11-22: share classes are one issuer.) |
 | 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
 | 2026-11-21 | **Priorities: data normalization (input) and retrieval (output) matter most.** The pipeline's outputs must match the expected results exactly. Findings are supporting statistics: keep them accurate, but don't spend effort polishing their granularity. |
 | 2026-11-21 | An empty latest text value keeps raising both `text_from_older_record` and `text_updated` (current behaviour). Lower-case currency codes in `fx_rates.json` are upper-cased without a finding. |
@@ -163,6 +165,15 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Remove the `REFERENCE_DATE` setting and the `future_price_date` finding. Staleness is always measured from the dataset's latest valid `price_date`. |
 | 2026-11-21 | **Three distinct API roles.** (1) `GET /api/companies/{key}`: exact lookup by `COUNTRY:TICKER`, **case-insensitive**; record `id`s are not accepted. (2) `GET /api/companies?q=`: text matching on key, ticker and names, kept for picking a target and documented as not similarity. (3) A separate retrieval (peers) endpoint, company key → `k` similar companies with explanations, ships with stage 4. It is in addition to `/api/comps`, which remains the comps-table endpoint and does not replace it. Every endpoint gets a Swagger description. |
 | 2026-11-21 | Sequencing: the Swagger descriptions and this contract wording land first. The peers endpoint is added to `API.md` (next to the existing `/api/comps` section) in stage 4's contract PR. Whether comps take a free-text query is decided separately. |
+| 2026-11-22 | **The grader runs a hidden dataset of the same format.** The supplied `data/` is a pre-test only. No rule, threshold or "this never happens" claim is calibrated on it alone; cases it lacks are covered by synthetic fixtures. |
+| 2026-11-22 | **One company → one exchange → one country.** Each country is assumed to have one stock exchange, so `country:ticker` identifies a listing. The same ticker in two countries means two different companies. Listed in README Assumptions. |
+| 2026-11-22 | **Share classes are merged into one issuer in ingestion** (one entity, one comps row). Two keys merge when they are in the same country (never `*`), have different tickers, and their latest records agree on every issuer-level field: `description`, `sector`, `industry`, `sub_industry`, `fiscal_year_end`, `reporting_currency`, `units`, `price_date`, `total_debt`, `cash`, `revenue`, `ebitda`, `net_income`. Ticker, name, price, price currency and shares may differ. A merge needs a non-empty description and at least one financial value, so two near-empty records never merge on missing data. Ticker look-alikes (`ABC.A` / `ABC.B`) with different financials are not merged. |
+| 2026-11-22 | **Merging uses a disjoint-set union (DSU).** Every key starts as its own parent; each merge rule unions pairs; after all unions each set is re-rooted at its shown key. Every key keeps a parent pointer, so looking up any class key resolves to its issuer. Documented in the README's *Share classes* section, added with the implementation. |
+| 2026-11-22 | **Shown key** of a merged issuer = the class with the largest market value (price × shares); a class whose value can't be computed ranks last; ties go to the alphabetically first key. Text fields come from that class; every class name is an alias. |
+| 2026-11-22 | **Issuer market cap = sum over share classes of price × shares** (each class converted to the dataset currency). Classes with identical price, price currency and shares are the same shares listed twice and are counted once, with a finding. If any counted class lacks a usable price or share count, market cap (and everything built on it) is missing, never a partial sum. Debt, cash, revenue, EBITDA and net income are counted once. |
+| 2026-11-22 | **Near-duplicates (retrieval).** Two issuers whose descriptions are identical after normalizing case and whitespace, or whose description TF-IDF cosine is ≥ 0.95, are excluded from each other's peer lists with a finding naming the score. |
+| 2026-11-22 | **Peer selection walks the full ranking until it has k peers.** It skips the target, the target's near-duplicates, analyst exclusions, and any candidate that is a near-duplicate of a peer already chosen (the higher-ranked one is kept). Each skip carries a reason. If the ranking runs out, it returns fewer peers with `requested_k`, `returned_k` and the reasons; it never pads. |
+| 2026-11-22 | Sequencing: the API contract for share classes lands first (this PR), then the ingestion/finance implementation with the README's DSU section and `docs/ingestion.md` update, then stage 4 (retrieval). |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -183,7 +194,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/config.py` | Settings from env vars: `DATA_DIR`, staleness threshold. |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
-| `src/comps/quality.py` | Checks across companies: possible same issuer, shared names, stale price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
+| `src/comps/quality.py` | Checks across companies: shared names, stale price dates (the share-class merge moves to ingestion). (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/resolve.py` *(planned)* | Resolve a query to an entity by key, ticker, or name, or return a list of choices if ambiguous. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
