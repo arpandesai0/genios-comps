@@ -19,13 +19,14 @@ import { Badge } from "@/components/ui/badge";
 
 const severities: Severity[] = ["error", "limitation", "warning", "info"];
 const pageSize = 20;
-function useResource<T>(path: string) {
+function useResource<T>(path: string | null) {
   const [result, setResult] = useState<{
     path: string;
     data?: T;
     error?: string;
   } | null>(null);
   useEffect(() => {
+    if (path === null) return;
     const controller = new AbortController();
     api<T>(path, { signal: controller.signal }).then(
       (data) => {
@@ -46,7 +47,7 @@ function useResource<T>(path: string) {
   return {
     data: current?.data,
     error: current?.error,
-    loading: current === null,
+    loading: path !== null && current === null,
   };
 }
 function SeverityBadge({ severity }: { severity: Severity }) {
@@ -179,6 +180,7 @@ export default function DataPage() {
   const [companySector, setCompanySector] = useState("");
   const [companySeverity, setCompanySeverity] = useState("");
   const [companyOffset, setCompanyOffset] = useState(0);
+  const [findingsOpen, setFindingsOpen] = useState(false);
   const [findingSeverity, setFindingSeverity] = useState("");
   const [findingCode, setFindingCode] = useState("");
   const [findingEntity, setFindingEntity] = useState("");
@@ -200,7 +202,7 @@ export default function DataPage() {
   if (findingCode) findingParams.set("code", findingCode);
   if (findingEntity) findingParams.set("entity", findingEntity);
   const findings = useResource<FindingsResponse>(
-    `/dataset/findings?${findingParams}`,
+    findingsOpen ? `/dataset/findings?${findingParams}` : null,
   );
   const companyColumns: ColumnDef<CompaniesResponse["items"][number]>[] = [
     {
@@ -258,173 +260,8 @@ export default function DataPage() {
     <div className="space-y-5">
       <header>
         <h1>Data & Integrity</h1>
-        <p className="muted mt-2">Inspect the source and review findings.</p>
+        <p className="muted mt-2">Search companies and open their details.</p>
       </header>
-
-      <section className="space-y-5" aria-labelledby="dataset-health-heading">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="dataset-health-heading" className="section-heading">
-            Dataset Health
-          </h2>
-          {dataset.data && (
-            <Badge variant="outline">
-              Version {dataset.data.dataset_version}
-            </Badge>
-          )}
-        </div>
-        {dataset.loading && (
-          <p className="muted" role="status">
-            Loading dataset health…
-          </p>
-        )}
-        {dataset.error && (
-          <p className="error" role="alert">
-            {dataset.error}
-          </p>
-        )}
-        {dataset.data && (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {(
-                [
-                  ["Entities", dataset.data.counts.entities],
-                  ["Records", dataset.data.counts.records],
-                ] as const
-              ).map(([label, count]) => (
-                <div className="panel" key={label}>
-                  <p className="muted text-sm">{label}</p>
-                  <p className="mt-2 text-3xl font-semibold tabular-nums">
-                    {count}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {severities.map((severity) => (
-                <div
-                  className="panel flex items-center justify-between gap-4"
-                  key={severity}
-                >
-                  <SeverityBadge severity={severity} />
-                  <span className="text-2xl font-semibold tabular-nums">
-                    {dataset.data!.findings_by_severity[severity]}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="panel space-y-4">
-              <div className="flex flex-wrap justify-between gap-2">
-                <h3 className="font-semibold">Findings by Code</h3>
-                <p className="muted text-sm">
-                  Reference Date: {dataset.data.reference_date}
-                </p>
-              </div>
-              <DataTable
-                columns={codeColumns}
-                data={dataset.data.findings_by_code}
-              />
-              <details className="rounded-lg border p-4">
-                <summary className="cursor-pointer font-medium">
-                  Source Files & Hashes
-                </summary>
-                <p className="muted mt-3 break-all text-sm">
-                  {dataset.data.source.data_dir}
-                </p>
-                <dl className="mt-3 space-y-3">
-                  {dataset.data.source.files.map((file) => (
-                    <div key={file.name}>
-                      <dt className="font-medium">{file.name}</dt>
-                      <dd className="muted mt-1 break-all font-mono text-sm">
-                        SHA-256: {file.sha256}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </details>
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className="panel space-y-5" aria-labelledby="findings-heading">
-        <div>
-          <h2 id="findings-heading" className="section-heading">
-            Findings
-          </h2>
-          <p className="muted mt-1">
-            Model-derived findings are signals, not facts. Classifications
-            remain unchanged.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <label className="field" htmlFor="finding-severity">
-            <span>Finding Severity</span>
-            <select
-              id="finding-severity"
-              value={findingSeverity}
-              onChange={(event) => {
-                setFindingSeverity(event.target.value);
-                setFindingOffset(0);
-              }}
-            >
-              <option value="">All Severities</option>
-              {severities.map((severity) => (
-                <option key={severity} value={severity}>
-                  {titleLabel(severity)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field" htmlFor="finding-code">
-            <span>Finding Code</span>
-            <Input
-              id="finding-code"
-              placeholder="e.g. missing_value"
-              value={findingCode}
-              onChange={(event) => {
-                setFindingCode(event.target.value);
-                setFindingOffset(0);
-              }}
-            />
-          </label>
-          <label className="field" htmlFor="finding-company">
-            <span>Finding Company Key</span>
-            <Input
-              id="finding-company"
-              placeholder="e.g. US:NOMA"
-              value={findingEntity}
-              onChange={(event) => {
-                setFindingEntity(event.target.value);
-                setFindingOffset(0);
-              }}
-            />
-          </label>
-        </div>
-        {findings.loading && (
-          <p className="muted" role="status">
-            Loading findings…
-          </p>
-        )}
-        {findings.error && (
-          <p className="error" role="alert">
-            {findings.error}
-          </p>
-        )}
-        {findings.data && (
-          <>
-            <DataTable columns={findingColumns} data={findings.data.items} />
-            <Pager
-              offset={findingOffset}
-              total={findings.data.total}
-              loading={findings.loading}
-              onChange={setFindingOffset}
-            />
-            <p className="muted text-sm">
-              Dataset Version: {findings.data.dataset_version}
-            </p>
-          </>
-        )}
-      </section>
 
       <section className="panel space-y-5" aria-labelledby="companies-heading">
         <div>
@@ -511,6 +348,173 @@ export default function DataPage() {
           </>
         )}
       </section>
+
+      <section className="space-y-5" aria-labelledby="dataset-health-heading">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="dataset-health-heading" className="section-heading">
+            Dataset Health
+          </h2>
+          {dataset.data && (
+            <Badge variant="outline">
+              Version {dataset.data.dataset_version}
+            </Badge>
+          )}
+        </div>
+        {dataset.loading && (
+          <p className="muted" role="status">
+            Loading dataset health…
+          </p>
+        )}
+        {dataset.error && (
+          <p className="error" role="alert">
+            {dataset.error}
+          </p>
+        )}
+        {dataset.data && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {(
+                [
+                  ["Entities", dataset.data.counts.entities],
+                  ["Records", dataset.data.counts.records],
+                ] as const
+              ).map(([label, count]) => (
+                <div className="panel" key={label}>
+                  <p className="muted text-sm">{label}</p>
+                  <p className="mt-2 text-3xl font-semibold tabular-nums">
+                    {count}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <details className="rounded-lg border p-4">
+              <summary className="cursor-pointer font-medium">
+                Source Files & Hashes
+              </summary>
+              <p className="muted mt-3 text-sm">
+                Reference Date: {dataset.data.reference_date || "—"}
+              </p>
+              <p className="muted mt-3 break-all text-sm">
+                {dataset.data.source.data_dir}
+              </p>
+              <dl className="mt-3 space-y-3">
+                {dataset.data.source.files.map((file) => (
+                  <div key={file.name}>
+                    <dt className="font-medium">{file.name}</dt>
+                    <dd className="muted mt-1 break-all font-mono text-sm">
+                      SHA-256: {file.sha256}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          </>
+        )}
+      </section>
+
+      <details
+        className="rounded-lg border px-4 py-3"
+        onToggle={(event) => setFindingsOpen(event.currentTarget.open)}
+      >
+        <summary className="cursor-pointer font-medium">Dataset Findings</summary>
+        <div className="mt-4 space-y-5">
+          {dataset.data && (
+            <section className="space-y-3" aria-labelledby="findings-by-code-heading">
+              <h3 id="findings-by-code-heading" className="font-semibold">Findings by Code</h3>
+              <ul className="flex flex-wrap gap-x-4 gap-y-2">
+                {severities.map((severity) => (
+                  <li key={severity} className="flex items-center gap-2 text-sm">
+                    <SeverityBadge severity={severity} />
+                    <span className="tabular-nums">
+                      {dataset.data!.findings_by_severity[severity]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <DataTable
+                columns={codeColumns}
+                data={dataset.data.findings_by_code}
+              />
+            </section>
+          )}
+          <section className="space-y-5" aria-labelledby="findings-heading">
+            <div>
+              <h3 id="findings-heading" className="font-semibold">Findings</h3>
+              <p className="muted mt-1">
+                Model-derived findings flag possible issues for review.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="field" htmlFor="finding-severity">
+                <span>Finding Severity</span>
+                <select
+                  id="finding-severity"
+                  value={findingSeverity}
+                  onChange={(event) => {
+                    setFindingSeverity(event.target.value);
+                    setFindingOffset(0);
+                  }}
+                >
+                  <option value="">All Severities</option>
+                  {severities.map((severity) => (
+                    <option key={severity} value={severity}>
+                      {titleLabel(severity)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field" htmlFor="finding-code">
+                <span>Finding Code</span>
+                <Input
+                  id="finding-code"
+                  placeholder="e.g. missing_value"
+                  value={findingCode}
+                  onChange={(event) => {
+                    setFindingCode(event.target.value);
+                    setFindingOffset(0);
+                  }}
+                />
+              </label>
+              <label className="field" htmlFor="finding-company">
+                <span>Finding Company Key</span>
+                <Input
+                  id="finding-company"
+                  placeholder="e.g. US:NOMA"
+                  value={findingEntity}
+                  onChange={(event) => {
+                    setFindingEntity(event.target.value);
+                    setFindingOffset(0);
+                  }}
+                />
+              </label>
+            </div>
+            {findings.loading && (
+              <p className="muted" role="status">
+                Loading findings…
+              </p>
+            )}
+            {findings.error && (
+              <p className="error" role="alert">
+                {findings.error}
+              </p>
+            )}
+            {findings.data && (
+              <>
+                <DataTable columns={findingColumns} data={findings.data.items} />
+                <Pager
+                  offset={findingOffset}
+                  total={findings.data.total}
+                  loading={findings.loading}
+                  onChange={setFindingOffset}
+                />
+                <p className="muted text-sm">
+                  Dataset Version: {findings.data.dataset_version}
+                </p>
+              </>
+            )}
+          </section>
+        </div>
+      </details>
       <CompanyDetail
         companyKey={selectedCompany}
         onClose={() => setSelectedCompany(null)}
