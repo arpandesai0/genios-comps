@@ -62,3 +62,35 @@ def test_committed_dev_result_matches_a_fresh_run():
     """Any change to what is served must come with an updated eval result (AGENTS.md): run `make eval`."""
     snapshot, spec = load()
     assert json.loads(RESULT.read_text()) == evaluate(snapshot, spec, "dev")
+
+
+def test_experiment_log_appends_numbered_entries(tmp_path):
+    from datetime import UTC, datetime
+
+    from experiments import read, record, table
+
+    snapshot, spec = load()
+    result = evaluate(snapshot, spec, "dev")
+    log = tmp_path / "experiments.jsonl"
+    inputs = {"method": result["method"], "split": "dev"}
+    when = datetime(2026, 11, 22, 12, 0, tzinfo=UTC)
+    first = record(result, description="baseline", eval_name="retrieval", inputs=inputs, log=log, now=when)
+    second = record(result, description="rerun", eval_name="retrieval", inputs=inputs, log=log)
+    assert [e["experiment"] for e in read(log)] == [1, 2] == [first["experiment"], second["experiment"]]
+    assert first["date"] == "2026-11-22T12:00:00+00:00"
+    assert first["results"]["overall"] == result["overall"]
+    assert set(first["git"]) == {"commit", "branch", "dirty", "dirty_paths"}
+    assert "baseline" in table(read(log))
+    with pytest.raises(ValueError):
+        record(result, description="  ", eval_name="retrieval", inputs=inputs, log=log)
+    assert len(read(log)) == 2
+
+
+def test_committed_experiment_log_is_well_formed():
+    """The log is append-only: numbered 1..n in order, each entry complete."""
+    from experiments import LOG, read
+
+    entries = read(LOG)
+    assert [e["experiment"] for e in entries] == list(range(1, len(entries) + 1))
+    for e in entries:
+        assert e["description"] and e["git"]["commit"] and e["results"]["overall"]

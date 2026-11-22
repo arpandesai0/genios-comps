@@ -22,6 +22,9 @@ country words pull unrelated companies up).
 Usage (repo root):
 
     .venv/bin/python eval/retrieval_eval.py --split dev [--out eval/results/retrieval_tfidf_v1_dev.json]
+        [--log "what this run tests"]
+
+``--log`` appends the run to the experiment log (``experiments.py``, ``experiments.jsonl``).
 
 The held-out split is scored only when the owner calls a configuration final.
 """
@@ -36,7 +39,10 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from experiments import file_hash, record
+
 from comps.config import IngestConfig, Settings
+from comps.retrieval.select import NEAR_DUPLICATE_COSINE
 from comps.service import Snapshot, build_snapshot, find_peers
 
 FIXTURE = Path(__file__).parent / "fixtures" / "retrieval"
@@ -161,6 +167,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--split", choices=("dev", "held_out"), default="dev")
     parser.add_argument("--out", type=Path, help="write the full result as JSON here")
+    parser.add_argument("--log", metavar="DESCRIPTION", help="append this run to eval/experiments.jsonl")
     args = parser.parse_args(argv)
     snapshot, spec = load()
     result = evaluate(snapshot, spec, args.split)
@@ -169,6 +176,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(json.dumps(summary, indent=2))
     if args.out:
         args.out.write_text(json.dumps(result, indent=2) + "\n")
+    if args.log is not None:
+        entry = record(
+            result,
+            description=args.log,
+            eval_name="retrieval",
+            inputs={
+                "method": result["method"],
+                "split": args.split,
+                "fixture": str(FIXTURE.relative_to(FIXTURE.parents[2])),
+                "dataset_version": result["dataset_version"],
+                "labels_sha": file_hash(FIXTURE / "labels.json"),
+                "cutoffs": list(CUTOFFS),
+                "relevant_threshold": result["relevant_threshold"],
+                "near_duplicate_cosine": NEAR_DUPLICATE_COSINE,
+            },
+            result_file=args.out,
+        )
+        dirty = (
+            " (uncommitted changes: " + ", ".join(entry["git"]["dirty_paths"]) + ")" if entry["git"]["dirty"] else ""
+        )
+        print(f"logged experiment {entry['experiment']}{dirty}", file=sys.stderr)
     return 0
 
 

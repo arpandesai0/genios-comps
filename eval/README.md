@@ -9,6 +9,27 @@ make eval                                                        # dev split -> 
 PYTHONPATH=src .venv/bin/python eval/retrieval_eval.py --split held_out   # only once a configuration is final
 ```
 
+### Experiment log (`experiments.jsonl`)
+
+Every eval run worth keeping is appended to `experiments.jsonl`, one JSON line per run. Lines are never edited or removed. A wrong run is corrected by a later run whose description says so.
+
+```bash
+make experiment DESC="what this run tests"   # dev split: writes the result file and appends to the log
+.venv/bin/python eval/experiments.py         # the log as a table
+```
+
+Each entry records:
+
+- `experiment`: assigned automatically, one more than the last entry
+- `date`: UTC
+- `description`
+- `git`: commit, branch, and whether `src/`, `eval/`, `pyproject.toml` or `requirements.lock` had uncommitted changes (`dirty`, `dirty_paths`)
+- `inputs`: method name and version, split, fixture, `dataset_version`, the labels file hash, cutoffs, the relevance threshold, the near-duplicate cosine, and the Python, numpy and scikit-learn versions
+- `results`: overall metrics, per-tag metrics, duplicate listings returned, and the geography lift
+- `result_file`: the full per-target result, if one was written
+
+Commit the code first and then run the experiment, so `git.commit` names code that reproduces the result. Commit the new log line with the change it measures.
+
 ### Fixture (`fixtures/retrieval/`)
 
 - `build_fixture.py` writes `companies.json`, `fx_rates.json` and `labels.json`. Every company is invented. A test fails if the committed files drift from the builder.

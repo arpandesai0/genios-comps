@@ -221,6 +221,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
 | `eval/fixtures/retrieval/` | Synthetic retrieval universe, its builder (`build_fixture.py`) and graded relevance labels (0–3 rubric), split into dev and held-out targets. |
 | `eval/retrieval_eval.py`, `eval/README.md` | The retrieval eval (nDCG@k, precision@k, recall@k, per-tag, geography lift) and how to run and read it. |
+| `eval/experiments.py`, `eval/experiments.jsonl` | Append-only experiment log: every logged eval run with its number, date, description, git commit, inputs and headline metrics (`make experiment DESC=...`). |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
 | `Dockerfile`, `docker-compose.yml`, `scripts/start.sh` | `make start DIR=...` validates the data folder and runs the API (port 8000) and web (port 3000) containers. Data is mounted read-only. |
 
@@ -234,6 +235,8 @@ make format                                          # apply ruff fixes and form
 pre-commit install                                   # optional: ruff and nbstripout on each commit
 uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
+make eval                                            # retrieval eval, dev split -> eval/results/
+make experiment DESC="what it tests"                 # same, appended to eval/experiments.jsonl
 make start DIR=~/Downloads/genios-takehome/data      # API + web via docker compose; make stop to stop
 make eval                                            # retrieval eval (dev split) -> eval/results/
 ```
