@@ -1,13 +1,13 @@
 # HTTP API contract (v0 draft)
 
-This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps` and `/api/comps.csv` are not yet: they return 404, and the UI keeps using mocks for them. There are **no write endpoints**: the input files are the whole dataset (owner decision 2026-11-22), so the former `/api/ingest/*` endpoints and the `origin` and `manual_additions` fields are removed from the contract (the code and UI drop them in a follow-up PR). If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are implemented for these endpoints.
+This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/peers`, `/api/comps` and `/api/comps.csv` are agreed (stage 4) but not yet: they return 404, and the UI keeps using mocks for comps. There are **no write endpoints**: the input files are the whole dataset (owner decision 2026-11-22), so the former `/api/ingest/*` endpoints and the `origin` and `manual_additions` fields are removed from the contract (the code and UI drop them in a follow-up PR). If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are implemented for these endpoints.
 
 ## Conventions
 
 - Base path: `/api`. JSON in and out, except the CSV export.
 - **Company key**: `COUNTRY:TICKER`, e.g. `US:NOMA`. It identifies a listing: each country is assumed to have one exchange, so the same ticker in two countries is two different companies. Record `id`s are internal provenance only. URL-encode the key in paths (`US%3ANOMA`).
 - **Issuers and share classes**: listings of one issuer (share classes, e.g. `US:ABC.A` and `US:ABC.B`) are merged into **one company**, with one row in every list and table. The company is shown under the key of its most valuable class (price × shares; ties go to the alphabetically first key), and `share_class_keys` lists every class. The merge and market-cap rules are recorded in AGENTS.md §4 (2026-11-22) and explained in the README (*Share classes*).
-  - **Resolving class keys.** Every parameter that takes a key accepts any class key and resolves it to the issuer: `GET /api/companies/{key}` (case-insensitive), and `/api/comps` `target` and `exclude` and `/api/dataset/findings?entity=` (exact case, like any key). Responses always carry the issuer's shown key. Excluding any class key excludes the whole issuer; several class keys of one issuer in `exclude` count as one exclusion; a class key of the target in `exclude` is ignored.
+  - **Resolving class keys.** Every parameter that takes a key accepts any class key and resolves it to the issuer: `GET /api/companies/{key}` (case-insensitive), and `/api/peers` and `/api/comps` `target` and `exclude` and `/api/dataset/findings?entity=` (exact case, like any key). Responses always carry the issuer's shown key. Excluding any class key excludes the whole issuer; several class keys of one issuer in `exclude` count as one exclusion; a class key of the target in `exclude` is ignored.
   - **`Finding.entity_keys`** names the shown key of each issuer the finding is about. A finding about one specific class (e.g. its price is missing) also names that class's key and its record in `record_ids`.
 - Money values are in **millions of the dataset currency**, given as `currency` in every response that carries money. The dataset currency is **USD** whenever `fx_rates.json` provides a USD rate (always true when its `base` is USD). If the base is another currency and no valid USD rate is given, it is the base currency, and a `currency_not_usd` finding (severity `warning`, dataset-level: empty `entity_keys`, listed only by `/api/dataset` and `/api/dataset/findings`) says so. Ingestion decides the currency; no other stage converts anything. The conversion rule is defined in README Assumption 12 and, once implemented, in `docs/ingestion.md`.
 - Metric names are currency-neutral everywhere, including `Finding.affects`: `market_cap_m`, `enterprise_value_m`, `ev_revenue`, `ev_ebitda`, `pe`.
@@ -128,12 +128,56 @@ Returns `{ "dataset_version", "total": number, "items": (EntitySummary & { "matc
 ### `GET /api/companies/{key}`
 Exact lookup of one company by its key `COUNTRY:TICKER` (e.g. `GB:IROV`), ignoring case. Ignoring case applies to this endpoint only; other parameters that take a key match its case exactly (they still resolve class keys, see Conventions). The response always carries the canonical key, as in `GB:IROV`. A share-class key resolves to its issuer, so `GET /api/companies/US:ABC.B` returns the issuer with `key: "US:ABC.A"` when that is the shown key. Returns `EntityDetail`, or 404 if no company has that key. A bare ticker or a name is not a key: use `GET /api/companies?q=` to find one.
 
+### `GET /api/peers`
+**Similarity search**: the `k` companies most similar to a target, with the reason each was chosen. This is retrieval only, with no metrics; `/api/comps` builds on the same selection.
+
+Query parameters: `target` (company key, required; any share-class key resolves), `k` (number of peers requested, default 10, 1–50), `exclude` (comma-separated keys the analyst removed; class keys resolve to their issuer).
+
+**How peers are chosen** (AGENTS.md §4, 2026-11-22):
+
+- Candidates are ranked by **description similarity** (`method` names the ranker; the first is TF-IDF cosine). Size, geography and classification are shown as evidence and are never ranking inputs. Valuation multiples are never used. There is no similarity floor.
+- The ranking is walked from the top until `k` peers are chosen. A candidate is **skipped**, with a reason, when it is a near-duplicate of the target, a near-duplicate of a peer already chosen (the higher-ranked one stays), or in `exclude`. Two companies are **near-duplicates** when their descriptions are identical after normalizing case and whitespace, or their description TF-IDF cosine is ≥ 0.95.
+- A company without a usable description cannot be ranked: as a candidate it is skipped with `no_description`; as the target, no peers are returned and `note` says why.
+- If the ranking runs out first, fewer peers are returned (`returned_k < requested_k`) and `note` says why. The list is never padded.
+- Ties in similarity are ordered by key.
+
+```ts
+type SkipReason = "near_duplicate_of_target" | "near_duplicate_of_peer" | "user_excluded" | "no_description";
+
+interface Evidence {                         // why this peer was chosen
+  similarity: number;                        // description similarity under `method`, 0–1; NOT a probability
+  shared_terms: string[];                    // up to 5 description terms that contributed most to the match, strongest first
+  classification: { sector: boolean; industry: boolean; sub_industry: boolean };   // same label as the target (evidence only)
+  country_match: boolean;                    // evidence only
+  revenue_ratio: number | null;              // peer revenue / target revenue; null if either is unavailable or the target's is ≤ 0
+}
+
+interface Skipped {
+  entity: EntitySummary;
+  reason: SkipReason;
+  detail: string;                            // human-readable, e.g. "Near-duplicate of US:ABC (description cosine 0.97)."
+  similarity: number | null;                 // to the target; null for no_description
+  duplicate_of: string | null;               // the shown key it duplicates (target or chosen peer); null otherwise
+}
+
+interface PeersResponse {
+  dataset_version: string;
+  method: { name: string; version: string }; // e.g. { name: "tfidf-description", version: "1" }
+  target: EntitySummary;
+  requested_k: number;
+  returned_k: number;
+  peers: { rank: number; entity: EntitySummary; evidence: Evidence }[];   // rank 1 = most similar
+  skipped: Skipped[];                        // every skip met while walking the ranking, in ranking order, then every no_description company
+  note: string | null;                       // set when returned_k < requested_k (including 0): why
+}
+```
+
+Errors: 404 for an unknown `target`, 422 for an invalid `k` or an unknown key in `exclude`.
+
 ### `GET /api/comps`
-Builds the comps table.
+Builds the comps table: the peers chosen exactly as `/api/peers` chooses them, with every company's metrics and peer-only summary statistics. `target` must be a company key (any share-class key resolves). Free text goes through `GET /api/companies?q=` first: one match can go straight to comps; several let the analyst choose.
 
-Query parameters: `target` (company key, required), `k` (number of peers requested, default 10, 1–50), `exclude` (comma-separated keys the analyst removed).
-
-**Provisional.** Stage 4's contract PR finalises this section for the 2026-11-22 peer-selection rule (AGENTS.md §4): it will add `requested_k` and `returned_k`, a reason for each skipped candidate (target near-duplicate, near-duplicate of a chosen peer, analyst exclusion), and where the near-duplicate peer and score are reported.
+Query parameters: same as `/api/peers`.
 
 To remove a peer, the UI calls the endpoint again with that key added to `exclude`. The server recomputes the summary statistics; the UI never computes them.
 
@@ -142,32 +186,23 @@ interface CompsResponse {
   dataset_version: string;
   currency: string;                          // dataset currency of market cap and EV
   method: { name: string; version: string };
-  k: number;
+  requested_k: number;
+  returned_k: number;
   target: { entity: EntitySummary; metrics: Metrics; findings: Finding[] };
   peers: {
     rank: number;
     entity: EntitySummary;
     metrics: Metrics;
     findings: Finding[];
-    evidence: {                              // why this peer was chosen (provisional shape)
-      similarity: number;                    // description similarity score, 0–1; NOT a probability
-      shared_terms: string[];                // description terms that drove the match
-      classification: { sector: boolean; industry: boolean; sub_industry: boolean };
-      country_match: boolean;
-      revenue_ratio: number | null;          // peer revenue / target revenue (same currency); null if unavailable
-      limitations: string[];                 // finding codes affecting this peer's metrics
-    };
+    evidence: Evidence & { limitations: string[] };   // limitations: finding codes affecting this peer's metrics
   }[];
-  excluded: {
-    entity: EntitySummary;
-    reason: "near_duplicate" | "user_excluded";   // provisional; finalised in stage 4's contract PR
-    detail: string;
-  }[];
-  summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only
+  skipped: Skipped[];
+  note: string | null;
+  summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only; all null when there are no peers
 }
 ```
 
-Errors: 404 for an unknown target, 422 for an invalid `k` or `exclude`.
+Errors: as `/api/peers`.
 
 ### `GET /api/comps.csv`
 Same parameters as `/api/comps`. Returns `text/csv` with the target row, the peer rows (key, name, rank, similarity, market cap, EV, EV/Revenue, EV/EBITDA, P/E using display values) and the summary rows.

@@ -176,6 +176,13 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | **Peer selection walks the full ranking until it has k peers.** It skips the target, the target's near-duplicates, analyst exclusions, and any candidate that is a near-duplicate of a peer already chosen (the higher-ranked one is kept). Each skip carries a reason. If the ranking runs out, it returns fewer peers with `requested_k`, `returned_k` and the reasons; it never pads. |
 | 2026-11-22 | Sequencing: the API contract for share classes lands first (this PR), then the ingestion/finance implementation with the README's DSU section and `docs/ingestion.md` update, then stage 4 (retrieval). |
 | 2026-11-22 | **No runtime additions.** The input files (`companies.json`, `fx_rates.json`) are the whole dataset. The manual-addition feature (`/api/ingest/*`, the "Add company" form, `origin`, `manual_additions`) is dropped, so the snapshot is built once at start-up and never swapped. Contract first (this PR); code and UI removal follow. |
+| 2026-11-22 | **Retrieval approach: TF-IDF cosine on descriptions is served first**, then measured. BM25 is not pursued separately (lexical like TF-IDF; little to gain on short, uniform descriptions). Local sentence embeddings are the next candidate, adopted only if the eval shows TF-IDF missing paraphrased peers. Retrievers stay swappable behind the `Retriever` interface. |
+| 2026-11-22 | TF-IDF baseline: fitted at snapshot build on every issuer with a description; lower-case, English stop words, unigrams, sublinear TF, L2-normalized; cosine similarity; ties ordered by key. Any change to these settings comes with an eval result. |
+| 2026-11-22 | **Country phrases stay in descriptions** ("based in the United States"). The eval includes cross-country peer pairs to check whether geography leaks into the ranking; nothing is stripped on the strength of the pre-test file's phrasing. |
+| 2026-11-22 | **No usable description.** Target: no peers, with a `note` (no data rather than wrong data). Candidate: never ranked; listed in `skipped` as `no_description`. |
+| 2026-11-22 | **`/api/comps` takes a company key only** (share-class keys resolve). Free text goes through `GET /api/companies?q=`: one match goes straight to comps, several let the analyst choose. `/api/peers` is the similarity endpoint (retrieval only); comps reuse its selection. |
+| 2026-11-22 | **Retrieval eval uses ranking metrics**, not METEOR (which scores generated text): graded 0–3 relevance labels on synthetic fixtures, nDCG@k as the main metric, plus precision@k and recall@k, with separate dev and held-out targets. |
+| 2026-11-22 | Stage 4: the owner allowed the implementation PR to be stacked on the unmerged contract PR. Owner wants to be asked at each stage before it is built. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -199,7 +206,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/issuers.py` | Share-class merge: a disjoint-set union groups listings with identical issuer-level data into one issuer, re-rooted at the shown key; `Dataset.parents` maps every listing key to it. |
 | `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
-| `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
+| `src/comps/retrieval/` *(planned)* | `Retriever` interface, the served TF-IDF implementation, near-duplicate check and the k-filling peer selection. |
 | `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints, including resolution (`search`: key, ticker, exact name or alias, partial name). Comps assembly comes later. |
 | `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps return 404. |
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
