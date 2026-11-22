@@ -235,7 +235,6 @@ make format                                          # apply ruff fixes and form
 pre-commit install                                   # optional: ruff and nbstripout on each commit
 uv pip install -e '.[notebook]'                      # dev notebooks (jupyterlab, pandas)
 DATA_DIR=~/Downloads/genios-takehome/data .venv/bin/jupyter lab scripts/dev/ingestion.ipynb
-make eval                                            # retrieval eval, dev split -> eval/results/
 make experiment DESC="what it tests"                 # same, appended to eval/experiments.jsonl
 make start DIR=~/Downloads/genios-takehome/data      # API + web via docker compose; make stop to stop
 make eval                                            # retrieval eval (dev split) -> eval/results/
