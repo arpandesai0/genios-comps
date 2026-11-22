@@ -153,7 +153,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-21 | Float noise is cleaned at 9 dp (half away from zero) before the 1-dp display rounding and before the EV ≤ 0 check, so arithmetic ties such as 2.05 × 3 display as 6.2. `missing_inputs` is ordered numerator causes then denominator causes; within a field, the field then its conversion fields. |
 | 2026-11-21 | A non-finite result (float overflow from extreme inputs) becomes **missing**, with a warning finding `non_finite_result` listing every value it blanked. It is excluded from stats and never crashes the response. |
 | 2026-11-21 | **General rule: serve no data rather than incorrect data.** This includes partial explanations. So `missing_inputs` names an unusable field *and* its failed conversion (e.g. `["total_debt", "reporting_currency"]`), and finding messages must say which value is actually used. |
-| 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). |
+| 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). *(Ingest dropped 2026-11-22.)* |
 | 2026-11-21 | `make start DIR=<folder>` runs **docker compose** (API + web). `DIR` is required and must contain `companies.json` and `fx_rates.json`; there is no default path. `make stop` stops it. |
 | 2026-11-21 | Until comps exist, the UI in API mode hides the Compare page, and `/` redirects to `/data`. Mock mode still shows everything. *(The "Add company" form is removed, 2026-11-22.)* |
 | 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. ~~A share-class sibling's mirror-image finding is not repeated.~~ (Moot since 2026-11-22: share classes are one issuer.) |
@@ -200,7 +200,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
 | `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints, including resolution (`search`: key, ticker, exact name or alias, partial name). Comps assembly comes later. |
-| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps and ingest return 404. |
+| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps return 404. |
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
 | `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
 | `docs/finance.md` | Formulas, ok/NM/missing statuses, rounding and display, summary statistics, with worked examples. |

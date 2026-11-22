@@ -13,7 +13,7 @@ This is the contract between the Python backend and the web UI. **Status:** the 
 - Metric names are currency-neutral everywhere, including `Finding.affects`: `market_cap_m`, `enterprise_value_m`, `ev_revenue`, `ev_ebitda`, `pe`.
 - Multiples (EV/Revenue, EV/EBITDA, P/E) and the revenue ratio are plain ratios. They are the same in any currency.
 - The backend rounds every value for display (one decimal place, as the glossary requires). The UI shows `display` as given and **never re-rounds**. `raw` is the value before display rounding (only float noise below 9 decimal places is cleaned), for calculation traces only.
-- Errors look like `{"error": {"code": "not_found" | "invalid_request" | "rejected", "message": "...", "details": {}}}` and use HTTP status codes 404, 422 or 409.
+- Errors look like `{"error": {"code": "not_found" | "invalid_request", "message": "...", "details": {}}}` and use HTTP status codes 404 or 422.
 - Every response that depends on data includes `dataset_version`, a short hash of the input files.
 
 ## Shared types
@@ -111,7 +111,6 @@ interface SummaryStat {
   mean: number | null; median: number | null; high: number | null; low: number | null; // rounded 1 dp
   display: { mean: string | null; median: string | null; high: string | null; low: string | null };
 }
-
 ```
 
 ## Endpoints

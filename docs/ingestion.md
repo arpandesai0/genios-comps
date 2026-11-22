@@ -223,7 +223,7 @@ Output, abridged. These are the real fields of `comps.models.Dataset`:
 }
 ```
 
-Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `aliases` and `text_history`. Each observation carries `record_id`, `origin`, `price_date` and `original`, which is the record exactly as supplied.
+Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `aliases` and `text_history`. Each observation carries `record_id`, `price_date` and `original` (and, until the follow-up code PR, `origin`, always `"file"`), which is the record exactly as supplied.
 
 ## Findings catalogue
 
