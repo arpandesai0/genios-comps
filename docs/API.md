@@ -169,7 +169,7 @@ interface PeersResponse {
   requested_k: number;
   returned_k: number;
   peers: { rank: number; entity: EntitySummary; evidence: Evidence }[];   // rank 1 = most similar
-  skipped: Skipped[];                        // in order: skips met while walking the ranking (ranking order); then every `exclude` key not met before the walk ended (by key); then every no_description company except the target (by key)
+  skipped: Skipped[];                        // in order: skips met while walking the ranking (ranking order); then every `exclude` key not met before the walk ended (by key); then every other no_description company (by key). A company appears at most once: an excluded company without a description is listed as `user_excluded`
   note: string | null;                       // non-null exactly when returned_k < requested_k (including a target with no description); display text only
 }
 ```
