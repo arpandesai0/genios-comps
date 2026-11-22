@@ -1,7 +1,7 @@
 import { handleMock } from "@/mocks/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-async function handle(
+export async function GET(
   request: Request,
   context: { params: Promise<{ path: string[] }> },
 ) {
@@ -19,5 +19,3 @@ async function handle(
   }
   return handleMock(request, (await context.params).path.join("/"));
 }
-export const GET = handle;
-export const POST = handle;

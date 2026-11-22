@@ -5,7 +5,6 @@ import { join } from "node:path";
 import recordsJson from "./synthetic-companies.json";
 import fxRates from "./fx-rates.json";
 import type {
-  RawRecord,
   EntityDetail,
   EntitySummary,
   Finding,
@@ -16,8 +15,30 @@ import type {
   SummaryStat,
   CompsResponse,
   DatasetResponse,
-  IngestResult,
 } from "../lib/api-types";
+
+interface RawRecord {
+  id: string;
+  ticker: string;
+  name: string;
+  description: string;
+  sector: string;
+  industry: string;
+  sub_industry: string;
+  country: string;
+  price_currency: string;
+  reporting_currency: string;
+  units: "millions" | "thousands";
+  fiscal_year_end: string;
+  price: number | null;
+  price_date: string;
+  shares_outstanding: number | null;
+  total_debt: number | null;
+  cash: number | null;
+  revenue: number | null;
+  ebitda: number | null;
+  net_income: number | null;
+}
 
 const numericFields = [
   "price",
@@ -64,19 +85,16 @@ const fixtureRecords: RawRecord[] = recordsJson.map((record: unknown) => {
     throw new Error("Synthetic fixtures violate RawRecord");
   return record;
 });
-const stateKey = globalThis as typeof globalThis & {
-  __geniosMockRecords?: { record: RawRecord; key: string; added_at: string }[];
-};
-const additions = (stateKey.__geniosMockRecords ??= []);
-const hash = (value: unknown) =>
-  createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const files = ["synthetic-companies.json", "fx-rates.json"].map((name) => ({
   name,
   sha256: createHash("sha256")
     .update(readFileSync(join(process.cwd(), "mocks", name)))
     .digest("hex"),
 }));
-const version = () => hash([files, additions]).slice(0, 12);
+const datasetVersion = createHash("sha256")
+  .update(JSON.stringify(files))
+  .digest("hex")
+  .slice(0, 12);
 const counts = (): Record<Severity, number> => ({
   error: 0,
   limitation: 0,
@@ -112,7 +130,7 @@ function finding(
     entity_keys: [keyOf(record)],
   };
 }
-function observe(r: RawRecord, origin: Observation["origin"]): Observation {
+function observe(r: RawRecord): Observation {
   const priceFx = rates[r.price_currency] ?? null;
   const reportingFx = rates[r.reporting_currency] ?? null;
   const unit = r.units === "thousands" ? 0.001 : 1;
@@ -120,7 +138,6 @@ function observe(r: RawRecord, origin: Observation["origin"]): Observation {
     v === null || fx === null ? null : v * fx * factor;
   return {
     record_id: r.id,
-    origin,
     price_date: r.price_date || null,
     original: { ...r },
     usd: {
@@ -212,32 +229,23 @@ function metrics(r: RawRecord, o: Observation): Metrics {
     pe: ratio(cap, pMissing, "net_income"),
   };
 }
-function buildEntities(extra?: RawRecord): EntityDetail[] {
-  const all = [
-    ...fixtureRecords.map((record) => ({ record, origin: "file" as const })),
-    ...additions.map(({ record }) => ({ record, origin: "manual" as const })),
-    ...(extra ? [{ record: extra, origin: "manual" as const }] : []),
-  ];
-  const grouped = new Map<string, typeof all>();
-  for (const item of all) {
-    const group = grouped.get(keyOf(item.record)) ?? [];
+function buildEntities(): EntityDetail[] {
+  const grouped = new Map<string, RawRecord[]>();
+  for (const record of fixtureRecords) {
+    const key = keyOf(record);
+    const group = grouped.get(key) ?? [];
     if (
-      !group.some(
-        ({ record }) => JSON.stringify(record) === JSON.stringify(item.record),
-      )
+      !group.some((existing) => JSON.stringify(existing) === JSON.stringify(record))
     )
-      group.push(item);
-    grouped.set(keyOf(item.record), group);
+      group.push(record);
+    grouped.set(key, group);
   }
   return [...grouped.entries()].map(([key, group]) => {
-    group.sort((a, b) =>
-      a.record.price_date.localeCompare(b.record.price_date),
-    );
-    const r = group.at(-1)!.record;
+    group.sort((a, b) => a.price_date.localeCompare(b.price_date));
+    const r = group.at(-1)!;
     // One observation per date, ties resolved by later record; history remains in record provenance.
     const byDate = new Map<string, Observation>();
-    for (const item of group)
-      byDate.set(item.record.price_date, observe(item.record, item.origin));
+    for (const record of group) byDate.set(record.price_date, observe(record));
     const observations = [...byDate.values()];
     const latest = observations.at(-1)!;
     const resultMetrics = metrics(r, latest);
@@ -329,7 +337,7 @@ function buildEntities(extra?: RawRecord): EntityDetail[] {
       );
     if (
       group.some(
-        ({ record }) =>
+        (record) =>
           record.name !== r.name || record.description !== r.description,
       )
     )
@@ -357,8 +365,8 @@ function buildEntities(extra?: RawRecord): EntityDetail[] {
       finding_counts,
       description: r.description,
       fiscal_year_end: r.fiscal_year_end,
-      aliases: [...new Set(group.map(({ record }) => record.name))],
-      record_ids: group.map(({ record }) => record.id),
+      aliases: [...new Set(group.map((record) => record.name))],
+      record_ids: group.map((record) => record.id),
       latest,
       observations,
       metrics: resultMetrics,
@@ -414,7 +422,6 @@ class MockError extends Error {
   constructor(
     public status: number,
     message: string,
-    public details: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -475,7 +482,7 @@ function comps(
     },
   }));
   return {
-    dataset_version: version(),
+    dataset_version: datasetVersion,
     method: { name: "Synthetic TF-IDF fixture", version: "mock-v1" },
     k,
     target: {
@@ -490,72 +497,6 @@ function comps(
       ev_ebitda: stat(peers.map((p) => p.metrics.ev_ebitda)),
       pe: stat(peers.map((p) => p.metrics.pe)),
     },
-  };
-}
-function preview(record: RawRecord, entities: EntityDetail[]): IngestResult {
-  const key = keyOf(record);
-  const invalid: Finding[] = [];
-  if (!record.ticker.trim() || !record.id.trim() || !record.name.trim())
-    invalid.push(
-      finding(
-        record,
-        "invalid_identity",
-        "error",
-        "ID, ticker and name are required.",
-        ["id", "ticker", "name"],
-        [],
-      ),
-    );
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(record.price_date) ||
-    Number.isNaN(Date.parse(record.price_date))
-  )
-    invalid.push(
-      finding(
-        record,
-        "invalid_date",
-        "error",
-        "Price date must be an ISO date.",
-        ["price_date"],
-        [...financialKeys],
-      ),
-    );
-  const entity = buildEntities(record).find((e) => e.key === key)!;
-  invalid.push(...entity.findings.filter((f) => f.severity === "error"));
-  if (invalid.length)
-    return {
-      accepted: false,
-      resolution: { key, action: "rejected" },
-      entity: null,
-      findings: invalid,
-    };
-  const existing = entities.find((e) => e.key === key);
-  let action: IngestResult["resolution"]["action"] = "create";
-  if (existing) {
-    const same = (a: Record<string, unknown>, b: RawRecord) =>
-      Object.keys(b)
-        .filter((k) => k !== "id")
-        .every((k) => a[k] === b[k as keyof RawRecord]);
-    if (existing.observations.some((o) => same(o.original, record)))
-      action = "duplicate";
-    else if (
-      existing.observations.some(
-        (o) =>
-          o.price_date === record.price_date &&
-          numericFields.every((f) => o.original[f] === record[f]) &&
-          ["price_currency", "reporting_currency", "units"].every(
-            (f) => o.original[f] === record[f as keyof RawRecord],
-          ),
-      )
-    )
-      action = "update_text";
-    else action = "add_observation";
-  }
-  return {
-    accepted: true,
-    resolution: { key, action },
-    entity: action === "duplicate" ? existing! : entity,
-    findings: entity.findings,
   };
 }
 function page<T>(
@@ -575,7 +516,7 @@ function page<T>(
   )
     throw new MockError(422, "Invalid pagination parameters.");
   return {
-    dataset_version: version(),
+    dataset_version: datasetVersion,
     total: items.length,
     items: items.slice(offset, offset + limit),
   };
@@ -640,172 +581,129 @@ function csv(response: CompsResponse) {
     )
     .join("\r\n");
 }
-export async function handleMock(
-  request: Request,
-  path: string,
-): Promise<Response> {
+export function handleMock(request: Request, path: string): Response {
   const json = (body: unknown, status = 200) =>
     Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
   try {
-    if (request.method === "GET") {
-      const entities = buildEntities();
-      const params = new URL(request.url).searchParams;
-      if (path === "health")
-        return json({
-          status: "ok",
-          dataset_version: version(),
-          entities: entities.length,
-          records: fixtureRecords.length + additions.length,
-          reference_date: referenceDate,
-        });
-      if (path === "companies") {
-        const q = (params.get("q") ?? "").trim().toLowerCase(),
-          sector = params.get("sector"),
-          severity = params.get("has_findings");
-        if (severity && !severityList.includes(severity as Severity))
-          throw new MockError(422, "Invalid severity.");
-        const items = entities
-          .map((e) => ({
-            ...summaryEntity(e),
-            match: !q
-              ? null
-              : e.key.toLowerCase() === q
-                ? ("key" as const)
-                : e.ticker.toLowerCase() === q
-                  ? ("ticker" as const)
-                  : e.name.toLowerCase() === q
-                    ? ("name_exact" as const)
-                    : e.name.toLowerCase().includes(q) ||
-                        e.key.toLowerCase().includes(q)
-                      ? ("name_partial" as const)
-                      : null,
-          }))
-          .filter(
-            (e) =>
-              (!q || e.match !== null) &&
-              (!sector || e.sector === sector) &&
-              (!severity || e.finding_counts[severity as Severity] > 0),
-          );
-        return json(page(items, params, 20, 200));
-      }
-      if (path.startsWith("companies/")) {
-        const e = entities.find(
-          (e) => e.key === decodeURIComponent(path.slice(10)),
+    const entities = buildEntities();
+    const params = new URL(request.url).searchParams;
+    if (path === "health")
+      return json({
+        status: "ok",
+        dataset_version: datasetVersion,
+        entities: entities.length,
+        records: fixtureRecords.length,
+        reference_date: referenceDate,
+      });
+    if (path === "companies") {
+      const q = (params.get("q") ?? "").trim().toLowerCase(),
+        sector = params.get("sector"),
+        severity = params.get("has_findings");
+      if (severity && !severityList.includes(severity as Severity))
+        throw new MockError(422, "Invalid severity.");
+      const items = entities
+        .map((e) => ({
+          ...summaryEntity(e),
+          match: !q
+            ? null
+            : e.key.toLowerCase() === q
+              ? ("key" as const)
+              : e.ticker.toLowerCase() === q
+                ? ("ticker" as const)
+                : e.name.toLowerCase() === q
+                  ? ("name_exact" as const)
+                  : e.name.toLowerCase().includes(q) ||
+                      e.key.toLowerCase().includes(q)
+                    ? ("name_partial" as const)
+                    : null,
+        }))
+        .filter(
+          (e) =>
+            (!q || e.match !== null) &&
+            (!sector || e.sector === sector) &&
+            (!severity || e.finding_counts[severity as Severity] > 0),
         );
-        if (!e) throw new MockError(404, "Company not found.");
-        return json({ ...e, dataset_version: version() });
-      }
-      if (path === "comps" || path === "comps.csv") {
-        const result = comps(params, entities);
-        return path === "comps"
-          ? json(result)
-          : new Response(csv(result), {
-              headers: {
-                "Content-Type": "text/csv; charset=utf-8",
-                "Content-Disposition": 'attachment; filename="comps.csv"',
-                "Cache-Control": "no-store",
-              },
-            });
-      }
-      const findings = entities.flatMap((e) => e.findings);
-      if (path === "dataset") {
-        const bySeverity = counts();
-        const byCode = new Map<
-          string,
-          DatasetResponse["findings_by_code"][number]
-        >();
-        for (const f of findings) {
-          bySeverity[f.severity]++;
-          const key = `${f.code}:${f.severity}:${f.source}`;
-          const item = byCode.get(key) ?? {
-            code: f.code,
-            severity: f.severity,
-            source: f.source,
-            count: 0,
-          };
-          item.count++;
-          byCode.set(key, item);
-        }
-        const body: DatasetResponse = {
-          dataset_version: version(),
-          reference_date: referenceDate,
-          source: {
-            data_dir: "web/mocks (synthetic)",
-            files,
-          },
-          counts: {
-            records: fixtureRecords.length + additions.length,
-            entities: entities.length,
-            manual_additions: additions.length,
-          },
-          findings_by_severity: bySeverity,
-          findings_by_code: [...byCode.values()],
+      return json(page(items, params, 20, 200));
+    }
+    if (path.startsWith("companies/")) {
+      const e = entities.find(
+        (e) => e.key === decodeURIComponent(path.slice(10)),
+      );
+      if (!e) throw new MockError(404, "Company not found.");
+      return json({ ...e, dataset_version: datasetVersion });
+    }
+    if (path === "comps" || path === "comps.csv") {
+      const result = comps(params, entities);
+      return path === "comps"
+        ? json(result)
+        : new Response(csv(result), {
+            headers: {
+              "Content-Type": "text/csv; charset=utf-8",
+              "Content-Disposition": 'attachment; filename="comps.csv"',
+              "Cache-Control": "no-store",
+            },
+          });
+    }
+    const findings = entities.flatMap((e) => e.findings);
+    if (path === "dataset") {
+      const bySeverity = counts();
+      const byCode = new Map<
+        string,
+        DatasetResponse["findings_by_code"][number]
+      >();
+      for (const f of findings) {
+        bySeverity[f.severity]++;
+        const key = `${f.code}:${f.severity}:${f.source}`;
+        const item = byCode.get(key) ?? {
+          code: f.code,
+          severity: f.severity,
+          source: f.source,
+          count: 0,
         };
-        return json(body);
+        item.count++;
+        byCode.set(key, item);
       }
-      if (path === "dataset/findings")
-        return json(
-          page(
-            findings.filter(
-              (f) =>
-                (!params.get("severity") ||
-                  f.severity === params.get("severity")) &&
-                (!params.get("code") || f.code === params.get("code")) &&
-                (!params.get("entity") ||
-                  f.entity_keys.includes(params.get("entity")!)),
-            ),
-            params,
-            50,
-            500,
+      const body: DatasetResponse = {
+        dataset_version: datasetVersion,
+        reference_date: referenceDate,
+        source: {
+          data_dir: "web/mocks (synthetic)",
+          files,
+        },
+        counts: {
+          records: fixtureRecords.length,
+          entities: entities.length,
+        },
+        findings_by_severity: bySeverity,
+        findings_by_code: [...byCode.values()],
+      };
+      return json(body);
+    }
+    if (path === "dataset/findings")
+      return json(
+        page(
+          findings.filter(
+            (f) =>
+              (!params.get("severity") ||
+                f.severity === params.get("severity")) &&
+              (!params.get("code") || f.code === params.get("code")) &&
+              (!params.get("entity") ||
+                f.entity_keys.includes(params.get("entity")!)),
           ),
-        );
-      if (path === "ingest/records")
-        return json({ dataset_version: version(), items: additions });
-    }
-    if (
-      request.method === "POST" &&
-      (path === "ingest/preview" || path === "ingest/records")
-    ) {
-      let body: unknown;
-      try {
-        body = await request.json();
-      } catch {
-        throw new MockError(422, "Request body must be JSON.");
-      }
-      if (!isRecord(body))
-        throw new MockError(
-          422,
-          "All RawRecord fields are required with the documented types.",
-        );
-      const result = preview(body, buildEntities());
-      if (path === "ingest/preview")
-        return json({ ...result, dataset_version: version() });
-      if (!result.accepted)
-        throw new MockError(409, "Record rejected.", {
-          findings: result.findings,
-        });
-      if (result.resolution.action !== "duplicate")
-        additions.push({
-          record: body,
-          key: result.resolution.key!,
-          added_at: new Date().toISOString(),
-        });
-      return json({ ...result, dataset_version: version() });
-    }
+          params,
+          50,
+          500,
+        ),
+      );
     throw new MockError(404, "Endpoint not found.");
   } catch (error) {
     if (error instanceof MockError)
       return json(
         {
           error: {
-            code:
-              error.status === 404
-                ? "not_found"
-                : error.status === 409
-                  ? "rejected"
-                  : "invalid_request",
+            code: error.status === 404 ? "not_found" : "invalid_request",
             message: error.message,
-            details: error.details,
+            details: {},
           },
         },
         error.status,
