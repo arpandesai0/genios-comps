@@ -1,6 +1,6 @@
 # HTTP API contract (v0 draft)
 
-This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/peers`, `/api/comps` and `/api/comps.csv` are agreed (stage 4) but not yet: they return 404, and the UI keeps using mocks for comps. There are **no write endpoints**: the input files are the whole dataset (owner decision 2026-11-22), so the former `/api/ingest/*` endpoints and the `origin` and `manual_additions` fields are removed from the contract (the code and UI drop them in a follow-up PR). If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are implemented for these endpoints.
+This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/peers`, `/api/comps` and `/api/comps.csv` are implemented too; the UI still uses mocks for comps. There are **no write endpoints**: the input files are the whole dataset (owner decision 2026-11-22), so the former `/api/ingest/*` endpoints and the `origin` and `manual_additions` fields are removed from the contract (the code and UI drop them in a follow-up PR). If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are implemented for these endpoints.
 
 ## Conventions
 
@@ -169,7 +169,7 @@ interface PeersResponse {
   requested_k: number;
   returned_k: number;
   peers: { rank: number; entity: EntitySummary; evidence: Evidence }[];   // rank 1 = most similar
-  skipped: Skipped[];                        // in order: skips met while walking the ranking (ranking order); then every `exclude` key not met before the walk ended (by key); then every no_description company except the target (by key)
+  skipped: Skipped[];                        // in order: skips met while walking the ranking (ranking order); then every `exclude` key not met before the walk ended (by key); then every other no_description company (by key). A company appears at most once: an excluded company without a description is listed as `user_excluded`
   note: string | null;                       // non-null exactly when returned_k < requested_k (including a target with no description); display text only
 }
 ```

@@ -47,8 +47,8 @@ jobs:
           tracked=$(git ls-files)
           # data/ anywhere, the glossary, the brief, local databases and env files
           forbidden=$(printf '%s\n' "$tracked" | grep -E '(^|/)data/|(^|/)GLOSSARY\.md$|(^|/)README\.brief\.md$|\.db$|(^|/)\.env$' || true)
-          # the supplied dataset's file names are allowed only as synthetic fixtures under tests/
-          dataset=$(printf '%s\n' "$tracked" | grep -E '(^|/)(companies|fx_rates)\.json$' | grep -vE '^tests/' || true)
+          # the supplied dataset's file names are allowed only as synthetic fixtures under tests/ and eval/fixtures/
+          dataset=$(printf '%s\n' "$tracked" | grep -E '(^|/)(companies|fx_rates)\.json$' | grep -vE '^(tests|eval/fixtures)/' || true)
           if [ -n "$forbidden$dataset" ]; then
             echo "These files must not be committed:"
             printf '%s\n' "$forbidden" "$dataset" | sed '/^$/d; s/^/  /'
