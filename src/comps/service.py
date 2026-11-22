@@ -1,8 +1,8 @@
 """The served snapshot: an immutable view of the dataset plus each company's computed metrics.
 
-The snapshot is built once at start-up and only read afterwards, so concurrent requests need no
-locking. (Swapping in a new snapshot for manual additions comes later, with the ingest endpoints.)
-Query logic for the read-only endpoints lives here, so the API layer stays an adapter.
+The snapshot is built once at start-up (with the retrieval index) and only read afterwards, so
+concurrent requests need no locking. Query logic for every endpoint lives here, so the API layer
+stays an adapter.
 """
 
 from __future__ import annotations
@@ -14,9 +14,18 @@ from pathlib import Path
 from typing import Literal
 
 from comps.config import Settings
-from comps.finance import compute_metrics
+from comps.finance import clean, compute_metrics, summarize
 from comps.ingest import load_dataset
-from comps.models import SEVERITIES, Dataset, Entity, Finding, Metrics, Severity
+from comps.models import SEVERITIES, Dataset, Entity, Finding, Metrics, Severity, Summary
+from comps.retrieval import (
+    Index,
+    NearDuplicates,
+    Selection,
+    Skip,
+    TfidfRetriever,
+    normalize_description,
+    select_peers,
+)
 
 Match = Literal["key", "ticker", "name_exact", "name_partial"]
 _MATCH_ORDER: dict[Match, int] = {"key": 0, "ticker": 1, "name_exact": 2, "name_partial": 3}
@@ -40,6 +49,9 @@ class Snapshot:
     data_dir: Path
     companies: Mapping[str, CompanyView]  # shown key -> view, ordered by key
     findings: tuple[Finding, ...]  # every finding: dataset, all observations, companies, finance
+    ranker: Index  # description similarity over companies with a usable description
+    duplicates: NearDuplicates  # near-duplicate test (its own TF-IDF index)
+    method: tuple[str, str]  # (name, version) of the ranker
 
     def resolve(self, key: str, ignore_case: bool = False) -> CompanyView | None:
         """The company a listing key belongs to: any share-class key resolves to its issuer.
@@ -70,11 +82,20 @@ def build_snapshot(settings: Settings) -> Snapshot:
         companies[key] = CompanyView(
             entity=entity, metrics=metrics, findings=entity.findings + entity.latest.findings + others + raised
         )
+    documents = {key: e.description for key, e in dataset.entities.items() if e.description and e.description.strip()}
+    retriever = TfidfRetriever()
+    ranker = retriever.fit(documents)
+    # The near-duplicate rule is defined on TF-IDF cosine. While the ranker is TF-IDF with the same
+    # settings, the same index serves both; a different ranker would get its own index here.
+    duplicates = NearDuplicates(index=ranker, normalized={k: normalize_description(d) for k, d in documents.items()})
     return Snapshot(
         dataset=dataset,
         data_dir=settings.data_dir,
         companies=companies,
         findings=tuple(dataset.all_findings()) + tuple(finance_findings),
+        ranker=ranker,
+        duplicates=duplicates,
+        method=(retriever.name, retriever.version),
     )
 
 
@@ -181,3 +202,108 @@ def dataset_overview(snapshot: Snapshot) -> DatasetOverview:
             (code, sev, src, n) for (code, sev, src), n in sorted(by_code.items(), key=lambda kv: (-kv[1], kv[0][0]))
         ],
     )
+
+
+# --- peers and comps -------------------------------------------------------------------------------
+
+
+class UnknownTarget(LookupError):
+    pass
+
+
+class UnknownExclude(ValueError):
+    def __init__(self, keys: list[str]):
+        super().__init__(f"Unknown company key(s) in exclude: {', '.join(keys)}.")
+        self.keys = keys
+
+
+@dataclass(frozen=True)
+class Evidence:
+    similarity: float
+    shared_terms: tuple[str, ...]
+    classification: dict[str, bool]
+    country_match: bool
+    revenue_ratio: float | None
+
+
+@dataclass(frozen=True)
+class PeerView:
+    rank: int
+    company: CompanyView
+    evidence: Evidence
+
+
+@dataclass(frozen=True)
+class SkippedView:
+    company: CompanyView
+    skip: Skip
+
+
+@dataclass(frozen=True)
+class PeersResult:
+    target: CompanyView
+    selection: Selection
+    peers: tuple[PeerView, ...]
+    skipped: tuple[SkippedView, ...]
+
+
+@dataclass(frozen=True)
+class CompsResult:
+    peers: PeersResult
+    summary: Summary
+
+
+_METRIC_NAMES = frozenset(Metrics.__dataclass_fields__)
+
+
+def _evidence(snapshot: Snapshot, target: Entity, peer: Entity, similarity: float) -> Evidence:
+    t_rev, p_rev = target.latest.usd.revenue, peer.latest.usd.revenue
+    ratio = round(clean(p_rev / t_rev), 2) if t_rev is not None and p_rev is not None and t_rev > 0 else None
+    return Evidence(
+        similarity=round(similarity, 4),
+        shared_terms=tuple(snapshot.ranker.shared_terms(target.key, peer.key)),
+        classification={
+            level: getattr(target, level) is not None and getattr(target, level) == getattr(peer, level)
+            for level in ("sector", "industry", "sub_industry")
+        },
+        country_match=target.country == peer.country and target.country not in ("", "*"),
+        revenue_ratio=ratio,
+    )
+
+
+def limitations(company: CompanyView) -> tuple[str, ...]:
+    """Distinct codes of findings that affect one of the company's metrics."""
+    return tuple(sorted({f.code for f in company.findings if _METRIC_NAMES & set(f.affects)}))
+
+
+def find_peers(snapshot: Snapshot, target: str, k: int, exclude: list[str] | tuple[str, ...] = ()) -> PeersResult:
+    """Choose up to ``k`` peers for ``target`` (exact-case key; share-class keys resolve).
+
+    Raises ``UnknownTarget`` or ``UnknownExclude``. Empty ``exclude`` items are ignored; repeats count once.
+    """
+    company = snapshot.resolve(target)
+    if company is None:
+        raise UnknownTarget(target)
+    keys = [x.strip() for x in exclude if x.strip()]
+    unknown = [x for x in dict.fromkeys(keys) if snapshot.resolve(x) is None]
+    if unknown:
+        raise UnknownExclude(unknown)
+    excluded = {snapshot.dataset.parents[x] for x in keys}
+    t = company.entity
+    selection = select_peers(
+        t.key, k, universe=snapshot.companies, ranker=snapshot.ranker, duplicates=snapshot.duplicates, exclude=excluded
+    )
+    peers = tuple(
+        PeerView(
+            p.rank, snapshot.companies[p.key], _evidence(snapshot, t, snapshot.companies[p.key].entity, p.similarity)
+        )
+        for p in selection.peers
+    )
+    skipped = tuple(SkippedView(snapshot.companies[s.key], s) for s in selection.skipped)
+    return PeersResult(target=company, selection=selection, peers=peers, skipped=skipped)
+
+
+def build_comps(snapshot: Snapshot, target: str, k: int, exclude: list[str] | tuple[str, ...] = ()) -> CompsResult:
+    """The comps table: ``find_peers`` plus peer-only summary statistics (the target is never included)."""
+    result = find_peers(snapshot, target, k, exclude)
+    return CompsResult(peers=result, summary=summarize([p.company.metrics for p in result.peers]))

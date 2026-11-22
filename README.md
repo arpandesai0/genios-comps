@@ -25,7 +25,7 @@ make stop                        # stops them
 - API: <http://localhost:8000/api/health>. The endpoints are described in [`docs/API.md`](docs/API.md).
 - **Using a different data file:** point `DIR` at another folder with the same two files. The data is mounted read-only and never copied into an image.
 
-Status: the read-only data endpoints are served. Comps (peer selection) is not built yet, so the Compare page is hidden when the UI talks to the real API. The input files are the whole dataset: there is no way to add or edit companies at runtime.
+Status: the data endpoints, peer selection (`/api/peers`) and comps tables (`/api/comps`, `/api/comps.csv`) are served. The UI's Compare page is not wired to the real API yet, so it is hidden in API mode. The input files are the whole dataset: there is no way to add or edit companies at runtime.
 
 ## Assumptions
 
@@ -50,6 +50,14 @@ Where the brief is silent, the service assumes the following:
     - Only ingestion handles currency. Later stages use whatever currency it reports.
 13. **One company → one exchange → one country.** Each country is assumed to have a single stock exchange, and each listing trades on one exchange, so `country:ticker` identifies a listing. The same ticker in two countries (e.g. `US:ABC` and `CA:ABC`) is treated as two different companies.
 14. **Share classes of one issuer are one company.** Listings in the same country whose issuer-level data is identical are merged; see [Share classes](#share-classes-disjoint-set-union).
+
+## Requesting a comps table
+
+1. Find the company's key by text: `GET /api/companies?q=dorust` (key, ticker or name). Each result has a `key` such as `CA:DOLG`.
+2. Build the table: `GET /api/comps?target=CA:DOLG&k=10`. Add `exclude=US:AAAA,US:BBBB` to remove peers; the summary statistics are recomputed.
+3. Download it: `GET /api/comps.csv?target=CA:DOLG&k=10`.
+
+`GET /api/peers?target=...` returns the same peers with the evidence for each (similarity, shared description terms, classification and country match, revenue ratio) but no metrics. How peers are chosen is in [`docs/retrieval.md`](docs/retrieval.md).
 
 ## Share classes (disjoint-set union)
 

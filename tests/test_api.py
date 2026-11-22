@@ -114,10 +114,9 @@ def test_invalid_parameters_are_422_in_contract_shape(client):
         assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_request"
 
 
-def test_endpoints_not_built_yet_are_404(client):
-    for path in ("/api/comps?target=US:ACME", "/api/comps.csv?target=US:ACME", "/api/ingest/records"):
-        r = client.get(path)
-        assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+def test_ingest_endpoints_do_not_exist(client):
+    r = client.get("/api/ingest/records")
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
 
 
 # --- richer universe: sectors, same ticker in two countries, aliases, a share-class pair ---------------
