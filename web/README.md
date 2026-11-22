@@ -81,6 +81,6 @@ Codex implemented the UI, synthetic mock service, Docker setup and browser check
 
 ## Mock coverage and limits
 
-The fixture contains 15 synthetic records across 14 entities, including two observations and aliases for `US:NOMA`. Searching `NOMA` demonstrates ticker ambiguity (`US:NOMA`, `GB:NOMA`); `US:NOMA.B` demonstrates same-issuer exclusion. Other fixtures cover missing EBITDA (`US:ARCL`), negative net income/NM (`US:MESA`), a model-derived classification warning (`US:ORBT`), stale prices (`DE:LUMA`), thousands-to-millions conversion (`US:ALTO`) and CAD conversion (`CA:NOVA`).
+The fixture contains 15 synthetic records across 13 issuers, including two observations and aliases for `US:NOMA`. Searching `NOMA` demonstrates ticker ambiguity (`US:NOMA`, `GB:NOMA`); Searching `NOMA.B` matches the same US issuer through its duplicate listing, which is counted once in market cap. Other fixtures cover missing EBITDA (`US:ARCL`), negative net income/NM (`US:MESA`), a model-derived classification warning (`US:ORBT`), stale prices (`DE:LUMA`), thousands-to-millions conversion (`US:ALTO`) and CAD conversion (`CA:NOVA`).
 
 The mock HTTP server computes financial metrics and summaries on the server so exclusions can be exercised end to end. Retrieval uses deterministic fixture order and scores, not a TF-IDF index. Mock FX is limited to the synthetic USD, CAD, GBP and EUR rates in its fixture.

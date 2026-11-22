@@ -7,6 +7,8 @@ import fxRates from "./fx-rates.json";
 import type {
   EntityDetail,
   EntitySummary,
+  CompaniesResponse,
+  ShareClass,
   Finding,
   Severity,
   MetricValue,
@@ -102,6 +104,9 @@ const counts = (): Record<Severity, number> => ({
   info: 0,
 });
 const keyOf = (r: RawRecord) => `${r.country.trim() || "*"}:${r.ticker}`;
+// This fixture contains one duplicate listing with the same price, currency and shares.
+const duplicateListings = new Map([["US:NOMA.B", "US:NOMA"]]);
+const issuerKey = (key: string) => duplicateListings.get(key) ?? key;
 const financialKeys = [
   "market_cap_usd_m",
   "enterprise_value_usd_m",
@@ -229,6 +234,26 @@ function metrics(r: RawRecord, o: Observation): Metrics {
     pe: ratio(cap, pMissing, "net_income"),
   };
 }
+function shareClass(record: RawRecord, observation: Observation, counted: boolean): ShareClass {
+  const { price } = observation.usd;
+  const shares = record.shares_outstanding;
+  const missing_inputs: string[] = [];
+  if (price === null) missing_inputs.push("price");
+  if (observation.conversion.price_fx === null) missing_inputs.push("price_currency");
+  if (shares === null) missing_inputs.push("shares_outstanding");
+  return {
+    key: keyOf(record),
+    ticker: record.ticker,
+    name: record.name,
+    record_id: record.id,
+    price_currency: record.price_currency,
+    price,
+    shares_outstanding: shares,
+    market_value_m: price === null || shares === null ? null : price * shares,
+    missing_inputs,
+    counted,
+  };
+}
 function buildEntities(): EntityDetail[] {
   const grouped = new Map<string, RawRecord[]>();
   for (const record of fixtureRecords) {
@@ -240,8 +265,10 @@ function buildEntities(): EntityDetail[] {
       group.push(record);
     grouped.set(key, group);
   }
-  return [...grouped.entries()].map(([key, group]) => {
+  for (const group of grouped.values())
     group.sort((a, b) => a.price_date.localeCompare(b.price_date));
+  const shownListings = [...grouped.entries()].filter(([key]) => issuerKey(key) === key);
+  return shownListings.map(([key, group]) => {
     const r = group.at(-1)!;
     // One observation per date, ties resolved by later record; history remains in record provenance.
     const byDate = new Map<string, Observation>();
@@ -250,6 +277,26 @@ function buildEntities(): EntityDetail[] {
     const latest = observations.at(-1)!;
     const resultMetrics = metrics(r, latest);
     const findings: Finding[] = [];
+    const share_classes = [shareClass(r, latest, true)];
+    const issuerRecords = [...group];
+    for (const [classKey, parent] of duplicateListings) {
+      if (parent !== key) continue;
+      const records = grouped.get(classKey)!;
+      const listing = records.at(-1)!;
+      share_classes.push(shareClass(listing, observe(listing), false));
+      issuerRecords.push(...records);
+      findings.push({
+        ...finding(
+          listing,
+          "duplicate_share_listing",
+          "info",
+          `${classKey} lists the same shares as ${key}. They are counted once in market cap.`,
+          ["price", "price_currency", "shares_outstanding"],
+          ["market_cap_usd_m"],
+        ),
+        entity_keys: [key, classKey],
+      });
+    }
     if (!r.country.trim()) {
       findings.push(
         finding(
@@ -313,17 +360,6 @@ function buildEntities(): EntityDetail[] {
           "derived",
         ),
       );
-    if (key === "US:NOMA" || key === "US:NOMA.B")
-      findings.push(
-        finding(
-          r,
-          "possible_same_issuer",
-          "info",
-          "Synthetic share classes may represent the same issuer.",
-          ["ticker"],
-          ["retrieval"],
-        ),
-      );
     if (group.length > byDate.size)
       findings.push(
         finding(
@@ -365,8 +401,10 @@ function buildEntities(): EntityDetail[] {
       finding_counts,
       description: r.description,
       fiscal_year_end: r.fiscal_year_end,
-      aliases: [...new Set(group.map((record) => record.name))],
-      record_ids: group.map((record) => record.id),
+      aliases: [...new Set(issuerRecords.map((record) => record.name))],
+      record_ids: issuerRecords.map((record) => record.id),
+      share_class_keys: share_classes.map((listing) => listing.key),
+      share_classes,
       latest,
       observations,
       metrics: resultMetrics,
@@ -377,6 +415,7 @@ function buildEntities(): EntityDetail[] {
 function summaryEntity(e: EntityDetail): EntitySummary {
   return {
     key: e.key,
+    share_class_keys: e.share_class_keys,
     ticker: e.ticker,
     country: e.country,
     name: e.name,
@@ -386,6 +425,34 @@ function summaryEntity(e: EntityDetail): EntitySummary {
     latest_price_date: e.latest_price_date,
     finding_counts: e.finding_counts,
   };
+}
+const matchOrder = ["key", "ticker", "name_exact", "name_partial", null] as const;
+function companyMatch(entity: EntityDetail, query: string): CompaniesResponse["items"][number] {
+  const summary = summaryEntity(entity);
+  if (query) {
+    const classes = entity.share_classes.map((listing) => ({
+      listing,
+      names: fixtureRecords
+        .filter((record) => keyOf(record) === listing.key)
+        .map((record) => record.name.toLowerCase()),
+    }));
+    const matches = [
+      classes.find(({ listing }) => listing.key.toLowerCase() === query),
+      classes.find(({ listing }) => listing.ticker.toLowerCase() === query),
+      classes.find(({ names }) => names.includes(query)),
+      classes.find(({ names }) => names.some((name) => name.includes(query))),
+    ];
+    const index = matches.findIndex(Boolean);
+    const key = matches[index]?.listing.key;
+    if (key) {
+      return {
+        ...summary,
+        match: matchOrder[index],
+        matched_key: key === entity.key ? null : key,
+      };
+    }
+  }
+  return { ...summary, match: null, matched_key: null };
 }
 function stat(values: MetricValue[]): SummaryStat {
   const sorted = values
@@ -430,27 +497,26 @@ function comps(
   params: URLSearchParams,
   entities: EntityDetail[],
 ): CompsResponse {
-  const target = entities.find((e) => e.key === params.get("target"));
+  const targetKey = issuerKey(params.get("target") ?? "");
+  const target = entities.find((e) => e.key === targetKey);
   if (!target) throw new MockError(404, "Target company not found.");
   const k = Number(params.get("k") ?? 10);
   if (!Number.isInteger(k) || k < 1 || k > 50)
     throw new MockError(422, "k must be an integer from 1 to 50.");
-  const removed = (params.get("exclude") || "").split(",").filter(Boolean);
+  const removed = (params.get("exclude") || "")
+    .split(",")
+    .filter(Boolean)
+    .map(issuerKey);
   if (removed.some((key) => !entities.some((e) => e.key === key)))
     throw new MockError(422, "An excluded company key was not found.");
   const excluded: CompsResponse["excluded"] = [];
   const candidates = entities.filter((e) => {
     if (e.key === target.key) return false;
-    const sibling =
-      ["US:NOMA", "US:NOMA.B"].includes(target.key) &&
-      ["US:NOMA", "US:NOMA.B"].includes(e.key);
-    if (sibling || removed.includes(e.key)) {
+    if (removed.includes(e.key)) {
       excluded.push({
         entity: summaryEntity(e),
-        reason: sibling ? "possible_same_issuer" : "user_excluded",
-        detail: sibling
-          ? "Possible same issuer: synthetic share-class fixture."
-          : "Removed by the analyst.",
+        reason: "user_excluded",
+        detail: "Removed by the analyst.",
       });
       return false;
     }
@@ -602,33 +668,23 @@ export function handleMock(request: Request, path: string): Response {
       if (severity && !severityList.includes(severity as Severity))
         throw new MockError(422, "Invalid severity.");
       const items = entities
-        .map((e) => ({
-          ...summaryEntity(e),
-          match: !q
-            ? null
-            : e.key.toLowerCase() === q
-              ? ("key" as const)
-              : e.ticker.toLowerCase() === q
-                ? ("ticker" as const)
-                : e.name.toLowerCase() === q
-                  ? ("name_exact" as const)
-                  : e.name.toLowerCase().includes(q) ||
-                      e.key.toLowerCase().includes(q)
-                    ? ("name_partial" as const)
-                    : null,
-        }))
+        .map((entity) => companyMatch(entity, q))
         .filter(
           (e) =>
             (!q || e.match !== null) &&
             (!sector || e.sector === sector) &&
             (!severity || e.finding_counts[severity as Severity] > 0),
+        )
+        .sort(
+          (a, b) =>
+            matchOrder.indexOf(a.match) - matchOrder.indexOf(b.match) ||
+            a.key.localeCompare(b.key),
         );
       return json(page(items, params, 20, 200));
     }
     if (path.startsWith("companies/")) {
-      const e = entities.find(
-        (e) => e.key === decodeURIComponent(path.slice(10)),
-      );
+      const key = decodeURIComponent(path.slice(10)).toUpperCase();
+      const e = entities.find((e) => e.key === issuerKey(key));
       if (!e) throw new MockError(404, "Company not found.");
       return json({ ...e, dataset_version: datasetVersion });
     }
@@ -679,22 +735,25 @@ export function handleMock(request: Request, path: string): Response {
       };
       return json(body);
     }
-    if (path === "dataset/findings")
+    if (path === "dataset/findings") {
+      const key = params.get("entity");
+      const matchingFindings = key
+        ? entities.find((entity) => entity.key === issuerKey(key))?.findings ?? []
+        : findings;
       return json(
         page(
-          findings.filter(
+          matchingFindings.filter(
             (f) =>
               (!params.get("severity") ||
                 f.severity === params.get("severity")) &&
-              (!params.get("code") || f.code === params.get("code")) &&
-              (!params.get("entity") ||
-                f.entity_keys.includes(params.get("entity")!)),
+              (!params.get("code") || f.code === params.get("code")),
           ),
           params,
           50,
           500,
         ),
       );
+    }
     throw new MockError(404, "Endpoint not found.");
   } catch (error) {
     if (error instanceof MockError)

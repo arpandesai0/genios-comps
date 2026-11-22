@@ -30,7 +30,8 @@ export interface Metrics {
 }
 
 export interface EntitySummary {
-  key: string; // "US:NOMA"
+  key: string; // shown listing of the issuer
+  share_class_keys: string[]; // shown key first
   ticker: string;
   country: string;
   name: string;
@@ -61,14 +62,28 @@ export interface Observation {
   };
 }
 
+export interface ShareClass {
+  key: string;
+  ticker: string;
+  name: string | null;
+  record_id: string;
+  price_currency: string | null; // as supplied
+  price: number | null; // USD per share
+  shares_outstanding: number | null; // millions
+  market_value_m: number | null; // USD millions
+  missing_inputs: string[];
+  counted: boolean;
+}
+
 export interface EntityDetail extends EntitySummary {
+  share_classes: ShareClass[];
   description: string | null;
   fiscal_year_end: string | null;
-  aliases: string[]; // every name seen for this key
+  aliases: string[]; // every name seen across the issuer’s classes
   record_ids: string[];
-  latest: Observation; // the only observation used in calculations
-  observations: Observation[]; // full history, oldest first
-  metrics: Metrics; // computed from `latest`
+  latest: Observation; // latest observation of the shown class
+  observations: Observation[]; // history of the shown class, oldest first
+  metrics: Metrics; // market cap from counted share classes, other inputs from latest
   findings: Finding[];
 }
 
@@ -138,6 +153,7 @@ export interface CompaniesResponse {
   total: number;
   items: (EntitySummary & {
     match: "key" | "ticker" | "name_exact" | "name_partial" | null;
+    matched_key: string | null; // matched listing when different from the shown key
   })[];
 }
 export interface FindingsResponse {
