@@ -21,7 +21,7 @@ All examples below use invented companies. The supplied data is never committed.
 | `DATA_DIR` | `/data` | Folder that holds `companies.json` and `fx_rates.json`. Point it at another folder to use a different data file of the same format. |
 | `STALE_AFTER_DAYS` | `90` | A latest price older than this many days before the reference date (the latest valid `price_date` in the data) gets a `stale_price` warning. |
 
-Manual additions (records posted through the API) are passed in as `extra_records`. They go through exactly the same steps, with `origin="manual"`. They live in memory only and are never written to the input files.
+The input files are the whole dataset: there are no runtime additions (owner decision 2026-11-22). *(The code still accepts `extra_records`; it is removed in a follow-up PR.)*
 
 ## Steps
 
@@ -159,7 +159,7 @@ A missing field is a `limitation` when it affects anything other than evidence: 
 
 ### 8. Dataset version
 
-`Dataset.version` is a 12-character hash of the two files' SHA-256 values plus any manual additions. Every API response that depends on the data carries it, so a result can be traced back to its input data. The version does **not** cover the settings: the same files with a different `STALE_AFTER_DAYS` give the same version but can give different `stale_price` findings.
+`Dataset.version` is a 12-character hash of the two files' SHA-256 values. Every API response that depends on the data carries it, so a result can be traced back to its input data. The version does **not** cover the settings: the same files with a different `STALE_AFTER_DAYS` give the same version but can give different `stale_price` findings.
 
 ## Output: what the dataset looks like
 
@@ -223,7 +223,7 @@ Output, abridged. These are the real fields of `comps.models.Dataset`:
 }
 ```
 
-Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `aliases` and `text_history`. Each observation carries `record_id`, `origin`, `price_date` and `original`, which is the record exactly as supplied.
+Each entity also carries `key`, `ticker`, `country`, the resolved text fields, `aliases` and `text_history`. Each observation carries `record_id`, `price_date` and `original` (and, until the follow-up code PR, `origin`, always `"file"`), which is the record exactly as supplied.
 
 ## Findings catalogue
 

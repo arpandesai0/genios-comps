@@ -28,7 +28,7 @@ It is a take-home assignment with a **~6 hour budget**. Treat it as an **MVP**: 
 ### Engineering style: a simple MVP
 
 - One Python service, synchronous, in-memory. No queues, workers, caches, vector databases, or microservices.
-- FastAPI handlers are plain `def`, so they run in FastAPI's threadpool and requests are served concurrently. Every request reads one **immutable snapshot**. Writes build a new snapshot and swap it in atomically. A failed build leaves the previous snapshot in place.
+- FastAPI handlers are plain `def`, so they run in FastAPI's threadpool and requests are served concurrently. Every request reads one **immutable snapshot**, built once at start-up from the input files. There are no runtime writes.
 - Prefer the standard library, plus numpy and scikit-learn for retrieval. Add a dependency only when it removes real complexity.
 - No speculative abstractions. Add an interface only where a part is genuinely meant to be swapped (retrievers are; storage is not, yet).
 
@@ -97,8 +97,8 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 ## 3. Architecture
 
 ```
-DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
-                    └─────────────┬─────────────┘
+               DATA_DIR (companies.json, fx_rates.json)
+                                  │
                         Ingestion pipeline
    raw → validate/normalize (USD, units) → group by country:ticker
        → share classes merged into one issuer (disjoint-set union)
@@ -138,7 +138,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | The user picks `k`. There is **no similarity floor or abstention**. |
 | 2026-11-21 | Retrieval = TF-IDF on descriptions. Size and geography are evidence, not ranking inputs. No hard industry filter. Valuation multiples are never used to select peers. |
 | 2026-11-21 | A derived classification-conflict warning comes from description neighbours. It is marked model-derived, and labels are never rewritten. |
-| 2026-11-21 | Manual company additions are **in-memory only**. They never touch the input files. |
+| 2026-11-21 | ~~Manual company additions are **in-memory only**. They never touch the input files.~~ **Reversed 2026-11-22:** no manual additions. |
 | 2026-11-21 | UI = **Next.js + shadcn/ui** (data tables), served as a separate container in docker compose. |
 | 2026-11-21 | GitHub: public repo `genios-comps`, one PR per step, merged in sequence **by the owner**. A PR is opened once its step is built (and, if it changes what is served, evaluated); the owner decides the next step after reviewing the results. |
 | 2026-11-21 | Agents never merge. Each PR gets a smaller-model sub-agent review; the authoring agent addresses the comments; the owner reviews and merges by hand. |
@@ -153,9 +153,9 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-21 | Float noise is cleaned at 9 dp (half away from zero) before the 1-dp display rounding and before the EV ≤ 0 check, so arithmetic ties such as 2.05 × 3 display as 6.2. `missing_inputs` is ordered numerator causes then denominator causes; within a field, the field then its conversion fields. |
 | 2026-11-21 | A non-finite result (float overflow from extreme inputs) becomes **missing**, with a warning finding `non_finite_result` listing every value it blanked. It is excluded from stats and never crashes the response. |
 | 2026-11-21 | **General rule: serve no data rather than incorrect data.** This includes partial explanations. So `missing_inputs` names an unusable field *and* its failed conversion (e.g. `["total_debt", "reporting_currency"]`), and finding messages must say which value is actually used. |
-| 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). |
+| 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). *(Ingest dropped 2026-11-22.)* |
 | 2026-11-21 | `make start DIR=<folder>` runs **docker compose** (API + web). `DIR` is required and must contain `companies.json` and `fx_rates.json`; there is no default path. `make stop` stops it. |
-| 2026-11-21 | Until comps and ingest exist, the UI in API mode hides the Compare page and the "Add company" form, and `/` redirects to `/data`. Mock mode still shows everything. |
+| 2026-11-21 | Until comps exist, the UI in API mode hides the Compare page, and `/` redirects to `/data`. Mock mode still shows everything. *(The "Add company" form is removed, 2026-11-22.)* |
 | 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. ~~A share-class sibling's mirror-image finding is not repeated.~~ (Moot since 2026-11-22: share classes are one issuer.) |
 | 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
 | 2026-11-21 | **Priorities: data normalization (input) and retrieval (output) matter most.** The pipeline's outputs must match the expected results exactly. Findings are supporting statistics: keep them accurate, but don't spend effort polishing their granularity. |
@@ -175,6 +175,7 @@ DATA_DIR (companies.json, fx_rates.json)      in-memory manual additions
 | 2026-11-22 | **Near-duplicates (retrieval).** Two issuers whose descriptions are identical after normalizing case and whitespace, or whose description TF-IDF cosine is ≥ 0.95, are excluded from each other's peer lists with a finding naming the score. |
 | 2026-11-22 | **Peer selection walks the full ranking until it has k peers.** It skips the target, the target's near-duplicates, analyst exclusions, and any candidate that is a near-duplicate of a peer already chosen (the higher-ranked one is kept). Each skip carries a reason. If the ranking runs out, it returns fewer peers with `requested_k`, `returned_k` and the reasons; it never pads. |
 | 2026-11-22 | Sequencing: the API contract for share classes lands first (this PR), then the ingestion/finance implementation with the README's DSU section and `docs/ingestion.md` update, then stage 4 (retrieval). |
+| 2026-11-22 | **No runtime additions.** The input files (`companies.json`, `fx_rates.json`) are the whole dataset. The manual-addition feature (`/api/ingest/*`, the "Add company" form, `origin`, `manual_additions`) is dropped, so the snapshot is built once at start-up and never swapped. Contract first (this PR); code and UI removal follow. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -198,8 +199,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/quality.py` | Checks across companies: shared names, stale price dates (the share-class merge moves to ingestion). (The derived label-conflict warning is planned; it needs retrieval.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/retrieval/` *(planned)* | `Retriever` interface and the served TF-IDF implementation. |
-| `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints, including resolution (`search`: key, ticker, exact name or alias, partial name). Snapshot swapping and comps assembly come later. |
-| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps and ingest return 404. |
+| `src/comps/service.py` | Builds the immutable snapshot (dataset + metrics) at start-up, and holds the query logic for the read-only endpoints, including resolution (`search`: key, ticker, exact name or alias, partial name). Comps assembly comes later. |
+| `src/comps/api.py` | FastAPI adapter for `docs/API.md`. It serves the read-only endpoints for now; comps return 404. |
 | `docs/pipeline.md` | Living overview of the stages, their status, and the data passed between them. Update it whenever a stage changes. |
 | `docs/ingestion.md` | Ingestion and quality steps, rules, findings catalogue, assumptions, with worked examples. |
 | `docs/finance.md` | Formulas, ok/NM/missing statuses, rounding and display, summary statistics, with worked examples. |

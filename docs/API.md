@@ -1,6 +1,6 @@
 # HTTP API contract (v0 draft)
 
-This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps`, `/api/comps.csv` and `/api/ingest/*` are not yet: they return 404, and the UI keeps using mocks for them. If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules below (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are agreed but not implemented yet; until they land, every key is its own issuer, and `docs/ingestion.md` still describes the current separate-entities behaviour.
+This is the contract between the Python backend and the web UI. **Status:** the read-only endpoints (`/api/health`, `/api/companies`, `/api/companies/{key}`, `/api/dataset`, `/api/dataset/findings`) are implemented. `/api/comps` and `/api/comps.csv` are not yet: they return 404, and the UI keeps using mocks for them. There are **no write endpoints**: the input files are the whole dataset (owner decision 2026-11-22), so the former `/api/ingest/*` endpoints and the `origin` and `manual_additions` fields are removed from the contract (the code and UI drop them in a follow-up PR). If a field needs to change, change this file in its own PR first. The **share-class** fields and lookup rules below (`share_class_keys`, `share_classes`, `matched_key`, class keys resolving to their issuer) are agreed but not implemented yet; until they land, every key is its own issuer, and `docs/ingestion.md` still describes the current separate-entities behaviour.
 
 ## Conventions
 
@@ -13,8 +13,8 @@ This is the contract between the Python backend and the web UI. **Status:** the 
 - Metric names are currency-neutral everywhere, including `Finding.affects`: `market_cap_m`, `enterprise_value_m`, `ev_revenue`, `ev_ebitda`, `pe`.
 - Multiples (EV/Revenue, EV/EBITDA, P/E) and the revenue ratio are plain ratios. They are the same in any currency.
 - The backend rounds every value for display (one decimal place, as the glossary requires). The UI shows `display` as given and **never re-rounds**. `raw` is the value before display rounding (only float noise below 9 decimal places is cleaned), for calculation traces only.
-- Errors look like `{"error": {"code": "not_found" | "invalid_request" | "rejected", "message": "...", "details": {}}}` and use HTTP status codes 404, 422 or 409.
-- Every response that depends on data includes `dataset_version`, a short hash of the input files plus any in-memory additions.
+- Errors look like `{"error": {"code": "not_found" | "invalid_request", "message": "...", "details": {}}}` and use HTTP status codes 404 or 422.
+- Every response that depends on data includes `dataset_version`, a short hash of the input files.
 
 ## Shared types
 
@@ -65,7 +65,6 @@ interface EntitySummary {
 
 interface Observation {
   record_id: string;
-  origin: "file" | "manual";
   price_date: string | null;
   original: Record<string, unknown>;  // the record exactly as supplied
   normalized: {                        // in the dataset currency: price per share, other money values in millions; null when it can't be computed
@@ -111,16 +110,6 @@ interface SummaryStat {
   n_missing: number;
   mean: number | null; median: number | null; high: number | null; low: number | null; // rounded 1 dp
   display: { mean: string | null; median: string | null; high: string | null; low: string | null };
-}
-
-// A record in the original companies.json schema (all fields required; values may be null)
-interface RawRecord {
-  id: string; ticker: string; name: string; description: string;
-  sector: string; industry: string; sub_industry: string; country: string;
-  price_currency: string; reporting_currency: string; units: "millions" | "thousands";
-  fiscal_year_end: string; price: number | null; price_date: string;
-  shares_outstanding: number | null; total_debt: number | null; cash: number | null;
-  revenue: number | null; ebitda: number | null; net_income: number | null;
 }
 ```
 
@@ -194,7 +183,7 @@ Data-health overview.
   fx: { base: string };                      // base currency as given in fx_rates.json
   reference_date: string | null;             // latest valid price_date in the data (stale-price checks measure from it); null if no record has a valid date
   source: { data_dir: string; files: { name: string; sha256: string }[] };
-  counts: { records: number; entities: number; manual_additions: number };   // entities = issuers, share classes merged
+  counts: { records: number; entities: number };   // entities = issuers, share classes merged
   findings_by_severity: Record<Severity, number>;
   findings_by_code: { code: string; severity: Severity; source: "validation" | "derived"; count: number }[];
 }
@@ -203,26 +192,3 @@ Data-health overview.
 ### `GET /api/dataset/findings`
 Query parameters: `severity`, `code`, `entity` (key), `limit` (default 50, max 500), `offset`.
 Returns `{ "dataset_version", "total": number, "items": Finding[] }`.
-
-### `POST /api/ingest/preview`
-Body: `RawRecord`. Runs the full ingestion pipeline against the current dataset **without saving**.
-
-```ts
-interface IngestResult {
-  accepted: boolean;                         // false if a blocking error would reject it
-  resolution: {
-    key: string | null;
-    action: "create" | "add_observation" | "update_text" | "duplicate" | "rejected";
-  };
-  entity: EntityDetail | null;               // the entity as it would look after saving
-  findings: Finding[];                       // findings raised by this record
-}
-```
-
-### `POST /api/ingest/records`
-Body: `RawRecord`. Same pipeline as preview, then saves the record. Returns `IngestResult & { dataset_version: string }`, or 409 with the findings if it was rejected.
-
-Additions are held **in memory only**: they are lost when the service restarts, and they never modify the input files.
-
-### `GET /api/ingest/records`
-Returns `{ "items": { record: RawRecord; key: string; added_at: string }[] }` for the additions made since the service started.
