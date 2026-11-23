@@ -99,7 +99,7 @@ DATA_DIR=/path/to/data .venv/bin/uvicorn comps.api:app --reload   # API only, wi
 make experiment DESC="what it tests"   # retrieval eval: runs the pipeline at a commit, scores it, logs it
 ```
 
-Retrieval settings (environment variables): `EMBEDDING_MODEL`, `NEAR_DUPLICATE_THRESHOLD`, `MODEL_CACHE_DIR`, `MODEL_OFFLINE`; see [`docs/retrieval.md`](docs/retrieval.md). The tests use the light TF-IDF ranker, so they need no model download. The eval and its results are described in [`eval/README.md`](eval/README.md).
+Settings: thresholds and defaults (stale-price days, embedding model, near-duplicate threshold per model) are in the config file [`src/comps/settings.toml`](src/comps/settings.toml). Environment variables override them (`STALE_AFTER_DAYS`, `EMBEDDING_MODEL`, `NEAR_DUPLICATE_THRESHOLD`), `CONFIG_FILE=<path>` points at another file, and `MODEL_CACHE_DIR` / `MODEL_OFFLINE` control the model cache; see [`docs/retrieval.md`](docs/retrieval.md). The tests use the light TF-IDF ranker, so they need no model download. The eval and its results are described in [`eval/README.md`](eval/README.md).
 
 CI runs four workflows on every pull request and push to `main`: `lint`, `typecheck`, `tests` (Python 3.11 and 3.12, with a coverage report) and `repo-hygiene` (notebooks cleared, no supplied data or local state committed).
 

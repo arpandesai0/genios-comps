@@ -196,6 +196,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | Held-out is scored once, for the winner and the TF-IDF reference. Embeddings may also be run on the pre-test data for qualitative checks only (git-ignored `local_*`). Geography leak: measure only, for now. |
 | 2026-11-22 | **One PR for the embedding stage** (contract, retriever, evals, serving, docs). |
 | 2026-11-22 | `make start` takes `SERVICES` (default: all compose services); naming services starts only those, e.g. `SERVICES=api` for local testing and evals without the front end. |
+| 2026-11-23 | **Thresholds come from a config file, not code:** `src/comps/settings.toml` holds the stale-price days, the default embedding model and one near-duplicate threshold per model; environment variables override. A model with no threshold stops start-up (no silent reuse of another model's value). |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -213,7 +214,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `.pre-commit-config.yaml` | Optional local hooks: ruff check, ruff format, and nbstripout for notebook outputs. |
 | `.github/workflows/` | CI, one concern per workflow: `lint`, `typecheck`, `tests` (3.11 and 3.12, with coverage), `repo-hygiene`. |
 | `src/comps/` | The Python service package. |
-| `src/comps/config.py` | Settings from env vars: `DATA_DIR`, staleness threshold, `EMBEDDING_MODEL`, `NEAR_DUPLICATE_THRESHOLD`, `MODEL_CACHE_DIR`, `MODEL_OFFLINE`. |
+| `src/comps/config.py`, `src/comps/settings.toml` | Settings: every default and threshold is in the config file `settings.toml` (stale-price days, embedding model, near-duplicate threshold per model); env vars override (`DATA_DIR`, `STALE_AFTER_DAYS`, `EMBEDDING_MODEL`, `NEAR_DUPLICATE_THRESHOLD`, `MODEL_CACHE_DIR`, `MODEL_OFFLINE`, `CONFIG_FILE`). |
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/issuers.py` | Share-class merge: a disjoint-set union groups listings with identical issuer-level data into one issuer, re-rooted at the shown key; `Dataset.parents` maps every listing key to it. |

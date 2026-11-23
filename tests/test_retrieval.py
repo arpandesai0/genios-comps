@@ -259,8 +259,14 @@ def test_revenue_ratio_never_overflows_and_rounds_half_away(tmp_path):
 def test_embedding_settings_are_read_at_startup():
     from comps.config import DEFAULT_EMBEDDING_MODEL, load_settings
 
-    cfg = load_settings({"EMBEDDING_MODEL": "some/model", "MODEL_CACHE_DIR": "/m", "MODEL_OFFLINE": "1"}).retrieval
-    assert (cfg.model, str(cfg.cache_dir), cfg.offline) == ("some/model", "/m", True)
+    env = {
+        "EMBEDDING_MODEL": "some/model",
+        "NEAR_DUPLICATE_THRESHOLD": "0.9",
+        "MODEL_CACHE_DIR": "/m",
+        "MODEL_OFFLINE": "1",
+    }
+    cfg = load_settings(env).retrieval
+    assert (cfg.model, cfg.near_duplicate, str(cfg.cache_dir), cfg.offline) == ("some/model", 0.9, "/m", True)
     default = load_settings({}).retrieval
     assert (default.model, default.offline, default.near_duplicate) == (DEFAULT_EMBEDDING_MODEL, False, 0.88)
     assert default.cache_dir == Path("~/.cache/comps-models").expanduser()  # persistent, not a temp folder
@@ -275,6 +281,9 @@ def test_embedding_settings_are_read_at_startup():
         {"NEAR_DUPLICATE_THRESHOLD": "high"},
         {"NEAR_DUPLICATE_THRESHOLD": "1.5"},
         {"NEAR_DUPLICATE_THRESHOLD": "0"},
+        {"STALE_AFTER_DAYS": "soon"},
+        {"STALE_AFTER_DAYS": "-1"},
+        {"EMBEDDING_MODEL": "untuned/model"},  # no threshold in the config file for it
     ],
 )
 def test_malformed_retrieval_settings_fail_startup(env):
@@ -282,6 +291,61 @@ def test_malformed_retrieval_settings_fail_startup(env):
 
     with pytest.raises(ValueError):
         load_settings(env)
+
+
+def test_thresholds_come_from_the_config_file(tmp_path):
+    from comps.config import DEFAULT_CONFIG_FILE, IngestConfig, RetrievalConfig, load_settings, read_config
+
+    shipped = read_config(DEFAULT_CONFIG_FILE)
+    default = load_settings({})
+    assert default.ingest.stale_after_days == shipped["ingest"]["stale_after_days"] == IngestConfig().stale_after_days
+    assert default.retrieval.near_duplicate == RetrievalConfig().near_duplicate
+    assert default.retrieval.near_duplicate == shipped["retrieval"]["near_duplicate_threshold"][default.retrieval.model]
+
+    other = tmp_path / "settings.toml"
+    other.write_text(
+        '[ingest]\nstale_after_days = 30\n[retrieval]\nembedding_model = "a/model"\n'
+        '[retrieval.near_duplicate_threshold]\n"a/model" = 0.8\n"b/model" = 0.7\n'
+    )
+    s = load_settings({"CONFIG_FILE": str(other)})
+    assert (s.ingest.stale_after_days, s.retrieval.model, s.retrieval.near_duplicate) == (30, "a/model", 0.8)
+    # switching the model picks that model's own threshold; an environment variable overrides the file
+    assert load_settings({"CONFIG_FILE": str(other), "EMBEDDING_MODEL": "b/model"}).retrieval.near_duplicate == 0.7
+    env = {"CONFIG_FILE": str(other), "NEAR_DUPLICATE_THRESHOLD": "0.95", "STALE_AFTER_DAYS": "7"}
+    s = load_settings(env)
+    assert (s.retrieval.near_duplicate, s.ingest.stale_after_days) == (0.95, 7)
+    other.write_text(
+        '[ingest]\nstale_after_days = 30\n[retrieval]\nembedding_model = "a/model"\n'
+        '[retrieval.near_duplicate_threshold]\n"a/model" = 2\n'
+    )
+    with pytest.raises(ValueError, match="near_duplicate_threshold"):
+        load_settings({"CONFIG_FILE": str(other)})
+
+
+def test_config_file_edge_cases(tmp_path):
+    from comps.config import load_settings
+
+    default = load_settings({})
+    # empty variables fall back to the file; model names match ignoring case, as fastembed does
+    blank = load_settings({"STALE_AFTER_DAYS": "", "EMBEDDING_MODEL": "", "NEAR_DUPLICATE_THRESHOLD": ""})
+    assert blank == default
+    upper = load_settings({"EMBEDDING_MODEL": default.retrieval.model.upper()})
+    assert upper.retrieval.near_duplicate == default.retrieval.near_duplicate
+
+    with pytest.raises(ValueError, match="Cannot read the config file"):
+        load_settings({"CONFIG_FILE": str(tmp_path / "missing.toml")})
+    other = tmp_path / "settings.toml"
+    other.write_text('[retrieval]\nembedding_model = "a/model"\n')
+    with pytest.raises(ValueError, match="has no setting"):
+        load_settings({"CONFIG_FILE": str(other)})
+    other.write_text(
+        '[ingest]\nstale_after_days = 90.5\n[retrieval]\nembedding_model = "a/model"\n'
+        '[retrieval.near_duplicate_threshold]\n"a/model" = 0.8\n'
+    )
+    with pytest.raises(ValueError, match="stale_after_days in"):
+        load_settings({"CONFIG_FILE": str(other)})
+    with pytest.raises(ValueError, match="STALE_AFTER_DAYS"):
+        load_settings({"STALE_AFTER_DAYS": "x"})
 
 
 class _Index:

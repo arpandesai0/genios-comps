@@ -7,14 +7,17 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN pip install -r requirements.lock
 # The embedding model is required and the service runs offline: download it now, at build time, before
-# the source is copied so code changes don't re-download it. Any failure fails the build. At runtime
+# the source is copied so code changes don't re-download it (an edit to settings.toml does). Any failure fails the build. At runtime
 # MODEL_OFFLINE=1 forbids downloads, so a missing model stops start-up instead of falling back.
-# Set it with `EMBEDDING_MODEL=<name> make start ...` (compose passes it as a build arg).
-ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+# The model is the one in src/comps/settings.toml, unless `EMBEDDING_MODEL=<name> make start ...` overrides it
+# (compose passes it as a build arg).
+COPY src/comps/settings.toml ./src/comps/settings.toml
+ARG EMBEDDING_MODEL=
 ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} MODEL_CACHE_DIR=/models
-RUN python -c "import os; from fastembed import TextEmbedding; \
-TextEmbedding(model_name=os.environ['EMBEDDING_MODEL'], cache_dir='/models'); \
-print('embedding model', os.environ['EMBEDDING_MODEL'], 'is ready in /models')"
+RUN python -c "import os, tomllib; from fastembed import TextEmbedding; \
+model = os.environ['EMBEDDING_MODEL'] or tomllib.load(open('src/comps/settings.toml', 'rb'))['retrieval']['embedding_model']; \
+TextEmbedding(model_name=model, cache_dir='/models'); \
+print('embedding model', model, 'is ready in /models')"
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-deps .
