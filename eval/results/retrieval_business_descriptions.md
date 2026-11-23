@@ -2,7 +2,7 @@
 
 Machine-readable results: experiments 9–13 in [`../experiments.json`](../experiments.json); captured output in `../runs/009`–`013`. Method: [docs/eval.md](../../docs/eval.md). **These numbers are not from the hidden dataset.**
 
-**Why:** in the supplied pre-test data, an airline's (names here are invented stand-ins) top peers included a fibre broadband firm and a facilities firm ("Zarquel Fibre", "Zarvine Facilities") ahead of five of its six airlines. Descriptions open with the invented company name, and MiniLM matched the look-alike names, not the business. The existing fixtures had no look-alike names, so a new fixture was written independently by Sonnet to measure this: `lookalike/` (70 companies, 14 businesses, 14 name stems shared across unrelated businesses).
+**Why:** in the supplied pre-test data, the top peers of an airline (names in this doc are invented stand-ins) included a fibre broadband firm and a facilities firm ("Zarquel Fibre", "Zarvine Facilities") ahead of five of its six airlines. Descriptions open with the invented company name, and MiniLM matched the look-alike names, not the business. The existing fixtures had no look-alike names, so a new fixture was written independently by Sonnet to measure this: `lookalike/` (70 companies, 14 businesses, 14 name stems shared across unrelated businesses).
 
 **Served (experiment 13):** ingestion derives a `business_description`, which is the description without the **distinctive** words of the issuer's own names: name words that no other company's description uses ("Zarqon", "Velorin"). Name words other descriptions also use describe the business ("Air", "Offshore", "Drilling") and stay. Ranking uses this text; the near-duplicate test keeps the description as supplied.
 
