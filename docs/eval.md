@@ -35,7 +35,7 @@ Every company and description is invented. Each fixture has a builder script tha
 | `retrieval/` | 57 companies, 13 businesses, 7 sectors, 1 duplicate listing | the same agent that wrote the ranker | first ranking fixture; kept so runs stay comparable with experiment 1 |
 | `independent/` | 90 companies, 18 businesses, 9 sectors, 2 duplicate listings | a different model (Sonnet), never shown the ranker, its scores or the first fixture | **main ranking fixture**, the less biased one |
 | `dedup/` | 160 description pairs, 64 duplicates | Sonnet, same rules | the near-duplicate rule |
-| `lookalike/` | 70 companies, 14 businesses, 14 shared name stems | Sonnet, same rules | look-alike invented names in unrelated businesses (added for experiments 10–11) |
+| `lookalike/` | 70 companies, 14 businesses, 14 shared name stems | Sonnet, same rules | look-alike invented names in unrelated businesses (added for experiments 10–13) |
 
 ### Ranking fixtures
 
@@ -136,5 +136,5 @@ Workflow for a change to what is served:
 See the table at the top of [eval/README.md](../eval/README.md), and the full interpretation in [eval/results/retrieval_embeddings.md](../eval/results/retrieval_embeddings.md).
 - **Embeddings beat TF-IDF everywhere.** On the independent fixture, nDCG@10 went from 0.459 to 0.729 on dev and from 0.428 to 0.684 on held-out.
 - **MiniLM-L6 is served**, with a near-duplicate threshold of 0.88.
-- **Business descriptions** (own names removed before ranking) are served from experiment 11: look-alike names 0.757 → 0.923 dev, other fixtures flat or better ([results](../eval/results/retrieval_business_descriptions.md)).
+- **Business descriptions** (invented name words removed before ranking) are served from experiment 13: independent 0.729 → 0.769 dev (0.684 → 0.761 held-out), look-alike names 0.757 → 0.852 dev ([results](../eval/results/retrieval_business_descriptions.md)).
 - **Earlier result:** the TF-IDF v1 interpretation is kept at [eval/results/retrieval_tfidf_v1_dev.md](../eval/results/retrieval_tfidf_v1_dev.md).
