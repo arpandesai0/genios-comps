@@ -530,6 +530,16 @@ function comps(
     }
     chosen.push(e);
   }
+  // Exclusions not met before k peers were chosen: listed by key, with no similarity (docs/API.md).
+  for (const key of [...new Set(removed)].sort())
+    if (key !== target.key && !skipped.some((s) => s.entity.key === key))
+      skipped.push({
+        entity: summaryEntity(entities.find((e) => e.key === key)!),
+        reason: "user_excluded",
+        detail: "Removed by the analyst.",
+        similarity: null,
+        duplicate_of: null,
+      });
   const peers = chosen.map((e, i) => ({
     rank: i + 1,
     entity: summaryEntity(e),
@@ -624,64 +634,24 @@ function page<T>(
   };
 }
 function csv(response: CompsResponse) {
+  // The layout in docs/API.md: header, target, peers, mean/median/high/low, then one n row.
+  const c = response.currency;
   const rows: unknown[][] = [
-    [
-      "type",
-      "key",
-      "name",
-      "rank",
-      "similarity",
-      "market_cap_m",
-      "enterprise_value_m",
-      "ev_revenue",
-      "ev_ebitda",
-      "pe",
-    ],
+    ["Row", "Rank", "Key", "Name", "Similarity", `Market cap (${c} m)`, `EV (${c} m)`, "EV/Revenue", "EV/EBITDA", "P/E"],
   ];
-  const row = (
-    kind: string,
-    e: EntitySummary,
-    m: Metrics,
-    rank: unknown = "",
-    similarity: unknown = "",
-  ) => [
-    kind,
-    e.key,
-    e.name,
-    rank,
-    similarity,
-    ...financialKeys.map((k) => m[k].display),
-  ];
-  rows.push(row("target", response.target.entity, response.target.metrics));
+  const values = (m: Metrics) => financialKeys.map((k) => m[k].display);
+  rows.push(["target", "", response.target.entity.key, response.target.entity.name, "", ...values(response.target.metrics)]);
   for (const p of response.peers)
-    rows.push(row("peer", p.entity, p.metrics, p.rank, p.evidence.similarity));
+    rows.push(["peer", p.rank, p.entity.key, p.entity.name, p.evidence.similarity.toFixed(4), ...values(p.metrics)]);
   for (const s of ["mean", "median", "high", "low"] as const)
-    rows.push([
-      s,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ...multipleKeys.map((k) => response.summary[k].display[s]),
-    ]);
-  for (const s of ["n", "n_nm", "n_missing"] as const)
-    rows.push([
-      s,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ...multipleKeys.map((k) => response.summary[k][s]),
-    ]);
-  return rows
-    .map((r) =>
-      r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(","),
-    )
-    .join("\r\n");
+    rows.push([s, "", "", "", "", "", "", ...multipleKeys.map((k) => response.summary[k].display[s])]);
+  rows.push(["n", "", "", "", "", "", "", ...multipleKeys.map((k) => response.summary[k].n)]);
+  // RFC 4180: quote only fields that need it.
+  const cell = (v: unknown) => {
+    const t = String(v ?? "");
+    return /[",\r\n]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
+  };
+  return rows.map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 }
 export function handleMock(request: Request, path: string): Response {
   const json = (body: unknown, status = 200) =>
@@ -733,7 +703,7 @@ export function handleMock(request: Request, path: string): Response {
         : new Response(csv(result), {
             headers: {
               "Content-Type": "text/csv; charset=utf-8",
-              "Content-Disposition": 'attachment; filename="comps.csv"',
+              "Content-Disposition": `attachment; filename="comps_${result.target.entity.key.replace(":", "_")}.csv"`,
               "Cache-Control": "no-store",
             },
           });

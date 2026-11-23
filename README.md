@@ -14,7 +14,7 @@ This project is under active development. Setup instructions, design notes and e
 
 ## Setup and running
 
-You need Docker. The service reads its data from a folder you name at start-up. The folder must contain `companies.json` and `fx_rates.json`.
+You need Docker (Engine 25+ with Compose 2.20.2+, for the start-up healthcheck interval). The service reads its data from a folder you name at start-up. The folder must contain `companies.json` and `fx_rates.json`.
 
 ```bash
 make start DIR=/path/to/data                # builds and starts every service (API and web UI)

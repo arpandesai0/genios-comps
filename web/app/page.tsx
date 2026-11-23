@@ -480,7 +480,8 @@ export default function ComparePage() {
                     <Badge>{skipLabels[e.reason]}</Badge>
                     <p className="muted">
                       {e.detail}
-                      {e.similarity !== null && ` Similarity ${e.similarity}.`}
+                      {e.similarity !== null &&
+                        ` Similarity to the target: ${e.similarity}.`}
                     </p>
                   </div>
                   {e.reason === "user_excluded" && (

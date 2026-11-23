@@ -101,6 +101,18 @@ def test_comps_use_contract_metric_names(client):
     assert set(r.json()["target"]["metrics"]) == {"market_cap_m", "enterprise_value_m", "ev_revenue", "ev_ebitda", "pe"}
 
 
+def test_contract_names_in_findings_health_and_peers(client):
+    bolt = client.get("/api/companies/US%3ABOLT").json()
+    affects = {a for f in bolt["findings"] for a in f["affects"]}
+    assert "enterprise_value_m" in affects and not any(a.endswith("_usd_m") for a in affects)
+    findings = client.get("/api/dataset/findings", params={"entity": "US:BOLT"})
+    assert "enterprise_value_m" in findings.text and "_usd_m" not in findings.text
+    health = client.get("/api/health").json()
+    assert health["currency"] == "USD"
+    peers = client.get("/api/peers", params={"target": "US:ACME", "k": 2})
+    assert peers.status_code == 200 and "_usd_m" not in peers.text and "method" not in peers.json()
+
+
 def test_dataset_overview(client):
     body = client.get("/api/dataset").json()
     assert body["counts"] == {"records": 5, "entities": 3}
