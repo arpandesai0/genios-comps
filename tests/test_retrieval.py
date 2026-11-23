@@ -491,3 +491,50 @@ def test_duplicate_listings_are_still_caught_on_the_supplied_text(tmp_path):
     result = find_peers(s, "US:NWA", 2)
     assert [p.company.entity.key for p in result.peers] == ["US:SKY"]
     assert [(k.skip.key, k.skip.reason) for k in result.skipped] == [("US:NWAX", "near_duplicate_of_target")]
+
+
+@pytest.mark.parametrize(
+    ("name", "description", "expected"),
+    [
+        # a different legal suffix in the text than in the record name; the stem with a possessive
+        (
+            "Haventet Pay Inc",
+            "Haventet Pay Corp offers payments. Haventet Pay's app is popular.",
+            "The company offers payments. The company's app is popular.",
+        ),
+        (
+            "Acme Group",
+            "We are the Acme group, part of the ACME GROUP family.",
+            "We are The company, part of The company family.",
+        ),  # a leading "the" goes with the name
+        (
+            "AT&T Inc",
+            "AT&T Inc sells phone plans. AT&T also sells TV.",
+            "The company sells phone plans. The company also sells TV.",
+        ),  # regex characters are literal
+        ("Acme Corp", "Acme Corp.", None),  # only the name: nothing about the business
+    ],
+)
+def test_business_description_edge_cases(name, description, expected):
+    from comps.ingest import business_description
+
+    assert business_description(_entity(name, description)) == expected
+
+
+def test_a_description_that_is_only_the_name_gets_no_peers(tmp_path):
+    universe = [
+        make_record(ticker="ONLY", name="Acme Corp", description="Acme Corp."),
+        make_record(
+            ticker="SKY", name="Skyline Carriers Inc", description="Skyline Carriers Inc flies.", revenue=800.0
+        ),
+        make_record(ticker="JET", name="Jetway Air Ltd", description="Jetway Air Ltd flies too.", revenue=700.0),
+    ]
+    (tmp_path / "companies.json").write_text(json.dumps(universe))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
+    with TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))) as c:
+        body = c.get("/api/peers", params={"target": "US:ONLY", "k": 2}).json()
+        assert body["peers"] == [] and body["note"]
+        other = c.get("/api/peers", params={"target": "US:SKY", "k": 2}).json()
+        assert [p["entity"]["key"] for p in other["peers"]] == ["US:JET"]
+        assert [(s["entity"]["key"], s["reason"]) for s in other["skipped"]] == [("US:ONLY", "no_description")]

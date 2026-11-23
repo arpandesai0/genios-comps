@@ -211,6 +211,37 @@ def build_dataset(
 
 NAME_PLACEHOLDER = "The company"
 _MIN_NAME_LENGTH = 3  # never remove a one- or two-letter "name" from the text
+# Legal and group suffixes a description may use instead of the record's own ("Haventet Pay Corp" for the record
+# name "Haventet Pay Inc"). A name is matched with or without any of them.
+_SUFFIXES = (
+    "Incorporated",
+    "Inc",
+    "Corporation",
+    "Corp",
+    "Company",
+    "Co",
+    "Limited",
+    "Ltd",
+    "PLC",
+    "LLC",
+    "Group",
+    "Holdings",
+    "Holding",
+    "AG",
+    "SE",
+    "SA",
+    "NV",
+    "GmbH",
+)
+_SUFFIX = rf"(?:,?\s+(?:{'|'.join(_SUFFIXES)})\.?)"
+
+
+def _stem(name: str) -> str:
+    """The name without trailing legal/group suffixes ("Irovaiva Air Group" -> "Irovaiva Air")."""
+    stem = name
+    while (shorter := re.sub(rf"{_SUFFIX}$", "", stem, flags=re.IGNORECASE)) != stem:
+        stem = shorter
+    return stem
 
 
 def business_description(e: Entity) -> str | None:
@@ -219,15 +250,20 @@ def business_description(e: Entity) -> str | None:
     Descriptions usually open with the company's name ("Irovaiva Air Group operates a regional flight
     network ..."). Embedding models split invented names into sub-word pieces, so two unrelated companies with
     look-alike names ("Irovaiva", "Irovaor") would score as similar. Every name of the issuer (its name and
-    aliases, across share classes) is replaced, longest first, as a whole phrase in any case. Nothing else in
-    the text changes, and the supplied description is kept as is for display.
+    aliases, across share classes) is replaced as a whole phrase in any case, with any legal suffix
+    ("Inc", "Corp", "Group" ...) and a leading "the". Nothing else in the text changes, and the supplied
+    description is kept as is for display. A description that is only the name has no business text: None.
     """
     if not e.description or not e.description.strip():
         return e.description
-    names = {n.strip() for n in (e.name, *e.aliases) if n and len(n.strip()) >= _MIN_NAME_LENGTH}
+    stems = {_stem(n.strip()) for n in (e.name, *e.aliases) if n}
+    stems = {s for s in stems if len(s) >= _MIN_NAME_LENGTH}
     text = e.description
-    for name in sorted(names, key=lambda n: (-len(n), n)):
-        text = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", NAME_PLACEHOLDER, text, flags=re.IGNORECASE)
+    for stem in sorted(stems, key=lambda n: (-len(n), n)):
+        pattern = rf"(?<!\w)(?:the\s+)?{re.escape(stem)}{_SUFFIX}*(?!\w)"
+        text = re.sub(pattern, NAME_PLACEHOLDER, text, flags=re.IGNORECASE)
+    if not re.sub(rf"{NAME_PLACEHOLDER}|[\W_]", "", text, flags=re.IGNORECASE):
+        return None  # only the name (and punctuation): nothing about the business to compare
     return text
 
 

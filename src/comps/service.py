@@ -52,7 +52,7 @@ class Snapshot:
     companies: Mapping[str, CompanyView]  # shown key -> view, ordered by key
     findings: tuple[Finding, ...]  # every finding: dataset, all observations, companies, finance
     ranker: Index  # description similarity over companies with a usable description
-    duplicates: NearDuplicates  # near-duplicate test on the same index
+    duplicates: NearDuplicates  # near-duplicate test on its own index of the descriptions as supplied
     method: tuple[str, str]  # (name, model or version) of the ranker; for logs, never served
 
     def resolve(self, key: str, ignore_case: bool = False) -> CompanyView | None:
