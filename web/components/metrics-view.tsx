@@ -1,7 +1,7 @@
 import type { Metrics, MetricValue } from "@/lib/api-types";
 export const metricLabels: Record<keyof Metrics, string> = {
-  market_cap_usd_m: "Market Cap",
-  enterprise_value_usd_m: "Enterprise Value",
+  market_cap_m: "Market Cap",
+  enterprise_value_m: "Enterprise Value",
   ev_revenue: "EV / Revenue",
   ev_ebitda: "EV / EBITDA",
   pe: "P / E",

@@ -14,7 +14,7 @@ This project is under active development. Setup instructions, design notes and e
 
 ## Setup and running
 
-You need Docker. The service reads its data from a folder you name at start-up. The folder must contain `companies.json` and `fx_rates.json`.
+You need Docker (Engine 25+ with Compose 2.20.2+, for the start-up healthcheck interval). The service reads its data from a folder you name at start-up. The folder must contain `companies.json` and `fx_rates.json`.
 
 ```bash
 make start DIR=/path/to/data                # builds and starts every service (API and web UI)
@@ -30,7 +30,11 @@ The first build downloads the embedding model (`sentence-transformers/all-MiniLM
 - API: <http://localhost:8000/api/health>. The endpoints are described in [`docs/API.md`](docs/API.md).
 - **Using a different data file:** point `DIR` at another folder with the same two files. The data is mounted read-only and never copied into an image.
 
-Status: the data endpoints, peer selection (`/api/peers`) and comps tables (`/api/comps`, `/api/comps.csv`) are served. The UI's Compare page is not wired to the real API yet, so it is hidden in API mode. The input files are the whole dataset: there is no way to add or edit companies at runtime.
+Once everything is healthy, `make start` prints the URLs between two `****` lines and then follows the logs; Ctrl+C stops the services.
+
+- **Compare** (`/`): search a company, pick `k`, and get the comps table: peers ranked by description similarity with their metrics, the evidence for each peer, peer-only summary statistics, the companies skipped and why, CSV export. Removing a peer re-requests the table, and the statistics are recomputed by the server.
+
+Status: the data endpoints, peer selection (`/api/peers`) and comps tables (`/api/comps`, `/api/comps.csv`) are served, and the UI uses all of them. The input files are the whole dataset: there is no way to add or edit companies at runtime.
 
 ## Assumptions
 

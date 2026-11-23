@@ -3,12 +3,6 @@ const config: NextConfig = {
   output: "standalone",
   devIndicators: false,
   outputFileTracingIncludes: { "/api/**/*": ["./mocks/*.json"] },
-  // The real API doesn't serve comps yet, so the Compare page is hidden and / opens /data.
-  async redirects() {
-    return process.env.NEXT_PUBLIC_USE_MOCKS === "0"
-      ? [{ source: "/", destination: "/data", permanent: false }]
-      : [];
-  },
   async rewrites() {
     return {
       beforeFiles:

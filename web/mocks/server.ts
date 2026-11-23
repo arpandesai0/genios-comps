@@ -16,6 +16,7 @@ import type {
   Observation,
   SummaryStat,
   CompsResponse,
+  PeersResponse,
   DatasetResponse,
 } from "../lib/api-types";
 
@@ -108,8 +109,8 @@ const keyOf = (r: RawRecord) => `${r.country.trim() || "*"}:${r.ticker}`;
 const duplicateListings = new Map([["US:NOMA.B", "US:NOMA"]]);
 const issuerKey = (key: string) => duplicateListings.get(key) ?? key;
 const financialKeys = [
-  "market_cap_usd_m",
-  "enterprise_value_usd_m",
+  "market_cap_m",
+  "enterprise_value_m",
   "ev_revenue",
   "ev_ebitda",
   "pe",
@@ -145,7 +146,7 @@ function observe(r: RawRecord): Observation {
     record_id: r.id,
     price_date: r.price_date || null,
     original: { ...r },
-    usd: {
+    normalized: {
       price: convert(r.price, priceFx),
       total_debt: convert(r.total_debt, reportingFx, unit),
       cash: convert(r.cash, reportingFx, unit),
@@ -202,13 +203,13 @@ function metrics(r: RawRecord, o: Observation): Metrics {
     ...missing("price", "shares_outstanding"),
     ...(o.conversion.price_fx === null ? ["price_fx"] : []),
   ];
-  const cap = pMissing.length ? null : o.usd.price! * r.shares_outstanding!;
+  const cap = pMissing.length ? null : o.normalized.price! * r.shares_outstanding!;
   const evMissing = [
     ...pMissing,
     ...missing("total_debt", "cash"),
     ...(o.conversion.reporting_fx === null ? ["reporting_fx"] : []),
   ];
-  const ev = evMissing.length ? null : cap! + o.usd.total_debt! - o.usd.cash!;
+  const ev = evMissing.length ? null : cap! + o.normalized.total_debt! - o.normalized.cash!;
   const ratio = (
     num: number | null,
     fields: string[],
@@ -220,22 +221,22 @@ function metrics(r: RawRecord, o: Observation): Metrics {
       ...(o.conversion.reporting_fx === null ? ["reporting_fx"] : []),
     ];
     return metric(
-      absent.length ? null : o.usd[denom]! <= 0 ? 0 : num! / o.usd[denom]!,
+      absent.length ? null : o.normalized[denom]! <= 0 ? 0 : num! / o.normalized[denom]!,
       [...new Set(absent)],
       true,
-      o.usd[denom] !== null && o.usd[denom]! <= 0,
+      o.normalized[denom] !== null && o.normalized[denom]! <= 0,
     );
   };
   return {
-    market_cap_usd_m: metric(cap, pMissing),
-    enterprise_value_usd_m: metric(ev, evMissing),
+    market_cap_m: metric(cap, pMissing),
+    enterprise_value_m: metric(ev, evMissing),
     ev_revenue: ratio(ev, evMissing, "revenue"),
     ev_ebitda: ratio(ev, evMissing, "ebitda"),
     pe: ratio(cap, pMissing, "net_income"),
   };
 }
 function shareClass(record: RawRecord, observation: Observation, counted: boolean): ShareClass {
-  const { price } = observation.usd;
+  const { price } = observation.normalized;
   const shares = record.shares_outstanding;
   const missing_inputs: string[] = [];
   if (price === null) missing_inputs.push("price");
@@ -292,7 +293,7 @@ function buildEntities(): EntityDetail[] {
           "info",
           `${classKey} lists the same shares as ${key}. They are counted once in market cap.`,
           ["price", "price_currency", "shares_outstanding"],
-          ["market_cap_usd_m"],
+          ["market_cap_m"],
         ),
         entity_keys: [key, classKey],
       });
@@ -407,6 +408,7 @@ function buildEntities(): EntityDetail[] {
       share_classes,
       latest,
       observations,
+      currency: "USD",
       metrics: resultMetrics,
       findings,
     };
@@ -509,29 +511,42 @@ function comps(
     .map(issuerKey);
   if (removed.some((key) => !entities.some((e) => e.key === key)))
     throw new MockError(422, "An excluded company key was not found.");
-  const excluded: CompsResponse["excluded"] = [];
-  const candidates = entities.filter((e) => {
-    if (e.key === target.key) return false;
+  // Deterministic fixture similarity (not a model): earlier fixture rows score higher.
+  const similarity = (e: EntityDetail) =>
+    Number(Math.max(0, 0.94 - entities.indexOf(e) * 0.043).toFixed(4));
+  const skipped: CompsResponse["skipped"] = [];
+  const chosen: EntityDetail[] = [];
+  for (const e of entities) {
+    if (e.key === target.key || chosen.length >= k) continue;
     if (removed.includes(e.key)) {
-      excluded.push({
+      skipped.push({
         entity: summaryEntity(e),
         reason: "user_excluded",
         detail: "Removed by the analyst.",
+        similarity: similarity(e),
+        duplicate_of: null,
       });
-      return false;
+      continue;
     }
-    return true;
-  });
-  const peers = candidates.slice(0, k).map((e, i) => ({
+    chosen.push(e);
+  }
+  // Exclusions not met before k peers were chosen: listed by key, with no similarity (docs/API.md).
+  for (const key of [...new Set(removed)].sort())
+    if (key !== target.key && !skipped.some((s) => s.entity.key === key))
+      skipped.push({
+        entity: summaryEntity(entities.find((e) => e.key === key)!),
+        reason: "user_excluded",
+        detail: "Removed by the analyst.",
+        similarity: null,
+        duplicate_of: null,
+      });
+  const peers = chosen.map((e, i) => ({
     rank: i + 1,
     entity: summaryEntity(e),
     metrics: e.metrics,
     findings: e.findings,
     evidence: {
-      similarity: Number(
-        Math.max(0, 0.94 - entities.indexOf(e) * 0.043).toFixed(3),
-      ),
-      shared_terms: ["cloud", "software", "enterprise"],
+      similarity: similarity(e),
       classification: {
         sector: e.sector === target.sector,
         industry: e.industry === target.industry,
@@ -539,30 +554,61 @@ function comps(
       },
       country_match: e.country === target.country,
       revenue_ratio:
-        e.latest.usd.revenue !== null && target.latest.usd.revenue
-          ? e.latest.usd.revenue / target.latest.usd.revenue
+        e.latest.normalized.revenue !== null && target.latest.normalized.revenue
+          ? Number(
+              (
+                e.latest.normalized.revenue / target.latest.normalized.revenue
+              ).toFixed(2),
+            )
           : null,
-      limitations: e.findings
-        .filter((f) => f.affects.length)
-        .map((f) => f.code),
+      limitations: [
+        ...new Set(
+          e.findings.filter((f) => f.affects.length).map((f) => f.code),
+        ),
+      ].sort(),
     },
   }));
   return {
     dataset_version: datasetVersion,
-    method: { name: "Synthetic TF-IDF fixture", version: "mock-v1" },
-    k,
+    currency: "USD",
+    requested_k: k,
+    returned_k: peers.length,
     target: {
       entity: summaryEntity(target),
       metrics: target.metrics,
       findings: target.findings,
     },
     peers,
-    excluded,
+    skipped,
+    note:
+      peers.length < k
+        ? `Only ${peers.length} of the ${k} requested peers could be chosen: the universe ran out of candidates.`
+        : null,
     summary: {
       ev_revenue: stat(peers.map((p) => p.metrics.ev_revenue)),
       ev_ebitda: stat(peers.map((p) => p.metrics.ev_ebitda)),
       pe: stat(peers.map((p) => p.metrics.pe)),
     },
+  };
+}
+function peersOf(result: CompsResponse): PeersResponse {
+  return {
+    dataset_version: result.dataset_version,
+    target: result.target.entity,
+    requested_k: result.requested_k,
+    returned_k: result.returned_k,
+    peers: result.peers.map(({ rank, entity, evidence }) => ({
+      rank,
+      entity,
+      evidence: {
+        similarity: evidence.similarity,
+        classification: evidence.classification,
+        country_match: evidence.country_match,
+        revenue_ratio: evidence.revenue_ratio,
+      },
+    })),
+    skipped: result.skipped,
+    note: result.note,
   };
 }
 function page<T>(
@@ -588,64 +634,24 @@ function page<T>(
   };
 }
 function csv(response: CompsResponse) {
+  // The layout in docs/API.md: header, target, peers, mean/median/high/low, then one n row.
+  const c = response.currency;
   const rows: unknown[][] = [
-    [
-      "type",
-      "key",
-      "name",
-      "rank",
-      "similarity",
-      "market_cap_usd_m",
-      "enterprise_value_usd_m",
-      "ev_revenue",
-      "ev_ebitda",
-      "pe",
-    ],
+    ["Row", "Rank", "Key", "Name", "Similarity", `Market cap (${c} m)`, `EV (${c} m)`, "EV/Revenue", "EV/EBITDA", "P/E"],
   ];
-  const row = (
-    kind: string,
-    e: EntitySummary,
-    m: Metrics,
-    rank: unknown = "",
-    similarity: unknown = "",
-  ) => [
-    kind,
-    e.key,
-    e.name,
-    rank,
-    similarity,
-    ...financialKeys.map((k) => m[k].display),
-  ];
-  rows.push(row("target", response.target.entity, response.target.metrics));
+  const values = (m: Metrics) => financialKeys.map((k) => m[k].display);
+  rows.push(["target", "", response.target.entity.key, response.target.entity.name, "", ...values(response.target.metrics)]);
   for (const p of response.peers)
-    rows.push(row("peer", p.entity, p.metrics, p.rank, p.evidence.similarity));
+    rows.push(["peer", p.rank, p.entity.key, p.entity.name, p.evidence.similarity.toFixed(4), ...values(p.metrics)]);
   for (const s of ["mean", "median", "high", "low"] as const)
-    rows.push([
-      s,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ...multipleKeys.map((k) => response.summary[k].display[s]),
-    ]);
-  for (const s of ["n", "n_nm", "n_missing"] as const)
-    rows.push([
-      s,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      ...multipleKeys.map((k) => response.summary[k][s]),
-    ]);
-  return rows
-    .map((r) =>
-      r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(","),
-    )
-    .join("\r\n");
+    rows.push([s, "", "", "", "", "", "", ...multipleKeys.map((k) => response.summary[k].display[s])]);
+  rows.push(["n", "", "", "", "", "", "", ...multipleKeys.map((k) => response.summary[k].n)]);
+  // RFC 4180: quote only fields that need it.
+  const cell = (v: unknown) => {
+    const t = String(v ?? "");
+    return /[",\r\n]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
+  };
+  return rows.map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 }
 export function handleMock(request: Request, path: string): Response {
   const json = (body: unknown, status = 200) =>
@@ -657,6 +663,7 @@ export function handleMock(request: Request, path: string): Response {
       return json({
         status: "ok",
         dataset_version: datasetVersion,
+        currency: "USD",
         entities: entities.length,
         records: fixtureRecords.length,
         reference_date: referenceDate,
@@ -688,6 +695,7 @@ export function handleMock(request: Request, path: string): Response {
       if (!e) throw new MockError(404, "Company not found.");
       return json({ ...e, dataset_version: datasetVersion });
     }
+    if (path === "peers") return json(peersOf(comps(params, entities)));
     if (path === "comps" || path === "comps.csv") {
       const result = comps(params, entities);
       return path === "comps"
@@ -695,7 +703,7 @@ export function handleMock(request: Request, path: string): Response {
         : new Response(csv(result), {
             headers: {
               "Content-Type": "text/csv; charset=utf-8",
-              "Content-Disposition": 'attachment; filename="comps.csv"',
+              "Content-Disposition": `attachment; filename="comps_${result.target.entity.key.replace(":", "_")}.csv"`,
               "Cache-Control": "no-store",
             },
           });
@@ -721,6 +729,8 @@ export function handleMock(request: Request, path: string): Response {
       }
       const body: DatasetResponse = {
         dataset_version: datasetVersion,
+        currency: "USD",
+        fx: { base: "USD" },
         reference_date: referenceDate,
         source: {
           data_dir: "web/mocks (synthetic)",

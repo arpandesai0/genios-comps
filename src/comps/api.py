@@ -42,7 +42,13 @@ from comps.service import (
     list_findings,
 )
 
-CURRENCY = "USD"  # ingestion normalizes every value to USD
+CURRENCY = "USD"  # ingestion normalizes every value to USD (it requires an fx_rates.json with base USD)
+# Contract names (docs/API.md) are currency-neutral; internal names still carry "usd". This adapter maps them.
+_METRIC_NAMES = {"market_cap_usd_m": "market_cap_m", "enterprise_value_usd_m": "enterprise_value_m"}
+
+
+def _metric_name(name: str) -> str:
+    return _METRIC_NAMES.get(name, name)
 
 
 def _iso(d: date | None) -> str | None:
@@ -55,7 +61,7 @@ def finding_json(f: Finding) -> dict[str, Any]:
         "severity": f.severity,
         "message": f.message,
         "fields": list(f.fields),
-        "affects": list(f.affects),
+        "affects": [_metric_name(a) for a in f.affects],
         "source": f.source,
         "record_ids": list(f.record_ids),
         "entity_keys": list(f.entity_keys),
@@ -67,16 +73,15 @@ def metric_json(m: MetricValue) -> dict[str, Any]:
 
 
 def metrics_json(m: Metrics) -> dict[str, Any]:
-    return {name: metric_json(getattr(m, name)) for name in m.__dataclass_fields__}
+    return {_metric_name(name): metric_json(getattr(m, name)) for name in m.__dataclass_fields__}
 
 
 def observation_json(o: Observation) -> dict[str, Any]:
     return {
         "record_id": o.record_id,
-        "origin": o.origin,
         "price_date": _iso(o.price_date),
         "original": dict(o.original),
-        "usd": asdict(o.usd),
+        "normalized": asdict(o.usd),
         "conversion": asdict(o.conversion),
     }
 
@@ -118,6 +123,7 @@ def detail_json(c: CompanyView) -> dict[str, Any]:
     e = c.entity
     return {
         **summary_json(c),
+        "currency": CURRENCY,
         "description": e.description,
         "fiscal_year_end": e.fiscal_year_end,
         "aliases": list(e.aliases),
@@ -287,6 +293,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         return {
             "status": "ok",
             "dataset_version": s.dataset.version,
+            "currency": CURRENCY,
             "entities": len(s.companies),
             "records": s.dataset.record_count,
             "reference_date": _iso(s.dataset.reference_date),
@@ -366,12 +373,14 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         o = dataset_overview(s)
         return {
             "dataset_version": s.dataset.version,
+            "currency": CURRENCY,
+            "fx": {"base": CURRENCY},  # ingestion accepts only base USD
             "reference_date": _iso(s.dataset.reference_date),
             "source": {
                 "data_dir": str(s.data_dir),
                 "files": [{"name": f.name, "sha256": f.sha256} for f in s.dataset.files],
             },
-            "counts": {"records": o.records, "entities": o.entities, "manual_additions": o.manual_additions},
+            "counts": {"records": o.records, "entities": o.entities},
             "findings_by_severity": o.by_severity,
             "findings_by_code": [
                 {"code": code, "severity": sev, "source": src, "count": n} for code, sev, src, n in o.by_code

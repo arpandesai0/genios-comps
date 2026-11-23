@@ -615,6 +615,20 @@ label {
   align-items: center;
   gap: 3px;
 }
+.note {
+  margin: 0 24px 12px;
+  background: #fff8e6;
+  border: 1px solid #ecd49a;
+  color: #7a5a12;
+  padding: 10px 14px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+.dark .note {
+  background: #3d321a;
+  border-color: #6b5626;
+  color: #f2d78e;
+}
 .table-footnote {
   border-top: 1px solid var(--border);
   padding: 12px 24px;

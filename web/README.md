@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. Mocks are enabled by default; `NEXT_PUBLIC_USE_MOCKS=1` makes the choice explicit. Compare is `/`; dataset health, findings and companies are `/data`.
+Open <http://localhost:3000>. Mocks are enabled by default (the mock server follows the same contract as the API); `NEXT_PUBLIC_USE_MOCKS=1` makes the choice explicit. Compare is `/`; dataset health, findings and companies are `/data`.
 
 All browser requests use `/api`. In mock mode, a Next.js route serves synthetic JSON fixtures from `mocks/`. No supplied assignment data is included.
 

@@ -33,6 +33,47 @@ done
 
 echo "Data folder: $dir"
 echo "Services: ${*:-all ($(echo $known))}"
-if [ $# -eq 0 ] || echo " $* " | grep -q " web "; then echo "UI:  http://localhost:3000"; fi
-echo "API: http://localhost:8000/api/health"
-DIR="$dir" exec docker compose up --build "$@"
+export DIR="$dir"
+services="$*"  # compose service names never contain spaces
+follower=""
+
+# Ctrl+C (at any point, including the build) stops the services, as an attached `docker compose up` would.
+# The exit code is stop's, so a failed stop is not hidden.
+stop_services() {
+  trap - INT TERM
+  echo
+  rc=0
+  docker compose stop $services || rc=$?
+  [ -z "$follower" ] || kill "$follower" 2>/dev/null || true
+  exit "$rc"
+}
+trap stop_services INT TERM
+
+# Start in the background and wait until every service is running (the API healthy, i.e. data ingested and
+# the model loaded), so the URLs below are printed only once they answer.
+if ! docker compose up --build --detach --wait $services; then
+  docker compose logs --tail 50 $services >&2
+  fail "Start-up failed: see the logs above. Stop what started with: make stop"
+fi
+
+# Start-up logs first (ingestion, model load), then the banner, then only new log lines.
+docker compose logs $services
+line="****************************************************************"
+echo
+echo "$line"
+echo "  Comps service is up"
+echo "  Data:  $dir"
+if [ -z "$services" ] || echo " $services " | grep -q " web "; then echo "  UI:    http://localhost:3000"; fi
+echo "  API:   http://localhost:8000/api/health"
+echo "  Docs:  http://localhost:8000/docs"
+echo "  Ctrl+C stops the services (or run: make stop)"
+echo "$line"
+echo
+
+docker compose logs --follow --since 0s $services &
+follower=$!
+rc=0
+wait "$follower" || rc=$?
+# Reached only if the logs ended without Ctrl+C: a service exited, or `make stop` ran elsewhere.
+echo "The services are no longer running (exit $rc). Check 'docker compose ps -a', then run make start again." >&2
+exit 1
