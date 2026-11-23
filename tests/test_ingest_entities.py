@@ -116,15 +116,6 @@ def test_ingestion_is_deterministic_and_order_independent_without_conflicts(fx):
     assert list(first.entities) == sorted(first.entities)
 
 
-def test_manual_records_change_the_version_and_are_marked(fx):
-    base = [make_record(ticker="AAA")]
-    ds = build_dataset(base, fx)
-    added = build_dataset(base, fx, extra_records=[make_record(ticker="NEW", revenue=7.0)])
-    assert added.version != ds.version
-    assert added.entities["US:NEW"].latest.origin == "manual"
-    assert added.metadata["manual_records"] == 1
-
-
 def test_text_updated_message_says_which_value_is_used_after_a_fallback(fx):
     # The latest description is blank, so the older one is used; the message must not claim "latest".
     ds = build_dataset(

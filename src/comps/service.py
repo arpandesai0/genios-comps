@@ -206,7 +206,6 @@ def list_findings(
 class DatasetOverview:
     records: int
     entities: int
-    manual_additions: int
     by_severity: dict[Severity, int]
     by_code: list[tuple[str, Severity, str, int]]  # (code, severity, source, count), most frequent first
 
@@ -217,7 +216,6 @@ def dataset_overview(snapshot: Snapshot) -> DatasetOverview:
     return DatasetOverview(
         records=snapshot.dataset.record_count,
         entities=len(snapshot.companies),
-        manual_additions=int(snapshot.dataset.metadata.get("manual_records", 0)),
         by_severity={s: by_severity.get(s, 0) for s in SEVERITIES},
         by_code=[
             (code, sev, src, n) for (code, sev, src), n in sorted(by_code.items(), key=lambda kv: (-kv[1], kv[0][0]))

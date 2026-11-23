@@ -105,7 +105,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
        → issuers with observation history + findings
                                   ↓
           Immutable Snapshot (versioned by input-file hash)
-     entities · findings · embedding index (EMBEDDING_MODEL) · derived label-conflict warnings
+     entities · findings · embedding index (EMBEDDING_MODEL)
                                   ↓
      Resolve (service.search): key / ticker / name → every match; the analyst chooses
                                   ↓
@@ -160,7 +160,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
 | 2026-11-21 | **Priorities: data normalization (input) and retrieval (output) matter most.** The pipeline's outputs must match the expected results exactly. Findings are supporting statistics: keep them accurate, but don't spend effort polishing their granularity. |
 | 2026-11-21 | An empty latest text value keeps raising both `text_from_older_record` and `text_updated` (current behaviour). Lower-case currency codes in `fx_rates.json` are upper-cased without a finding. |
-| 2026-11-21 | **Currency.** `fx_rates.json` may have any `base`; each rate is read as base units per one unit of the currency. Values are converted to USD whenever the file gives a USD rate (glossary), otherwise to the base currency, with a dataset-level `currency_not_usd` finding and money labelled with the currency. A currency without a rate is a data issue (`unknown_currency`, values blank). Listed in README Assumptions. |
+| 2026-11-21 | ~~**Currency.** `fx_rates.json` may have any `base`; each rate is read as base units per one unit of the currency. Values are converted to USD whenever the file gives a USD rate (glossary), otherwise to the base currency, with a dataset-level `currency_not_usd` finding and money labelled with the currency. A currency without a rate is a data issue (`unknown_currency`, values blank). Listed in README Assumptions.~~ **Reversed 2026-11-23:** `fx_rates.json` must have base USD (the glossary's definition); any other base is a blocking error. |
 | 2026-11-21 | **Only ingestion handles currency.** It picks the dataset currency and normalizes every value into it; finance, retrieval, the API and the UI are currency-agnostic and only display the `currency` label. API names drop `usd` (`market_cap_m`, `enterprise_value_m`, `normalized`). |
 | 2026-11-21 | Remove the `REFERENCE_DATE` setting and the `future_price_date` finding. Staleness is always measured from the dataset's latest valid `price_date`. |
 | 2026-11-21 | **Resolve is done as it is.** Resolution stays in `service.search` behind `GET /api/companies`: every match is returned, the analyst always chooses, and `/api/comps?target=` takes a key only. No separate `resolve.py`, no automatic resolution. |
@@ -200,6 +200,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-23 | **Finish the UI** against the real API: Compare is always shown (no redirect to `/data`), uses `/api/comps`, shows `skipped` with reasons and `note`, and drops `method` / `shared_terms`. The API adapter serves the contract's currency-neutral names (`market_cap_m`, `enterprise_value_m`, `normalized`) and `currency`. The geography leak is left as is (out of time). |
 | 2026-11-23 | `make start` prints the URLs in a `****` banner only once the services are healthy, then follows the logs; the API healthcheck polls every second while starting, then once a minute. |
 | 2026-11-23 | **Rank on business descriptions:** ingestion derives `business_description` (the description without the distinctive words of the issuer's own names and aliases, i.e. name words no other company's description uses); ranking uses it, while the near-duplicate test uses the description as supplied (same model, two embeddings). The analyst sees the supplied description. Labels stay evidence, not ranking inputs. A look-alike-names fixture (Sonnet) measures it: experiment 13 (experiments 11–12, removing whole names, hurt descriptive names). |
+| 2026-11-23 | **Cleanup:** the manual-addition remnants (`origin`, `extra_records`, `manual_additions`) are removed from the code, and the non-USD base plan is dropped (USD base required). The derived label-conflict warning is not built. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -221,7 +222,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/issuers.py` | Share-class merge: a disjoint-set union groups listings with identical issuer-level data into one issuer, re-rooted at the shown key; `Dataset.parents` maps every listing key to it. |
-| `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
+| `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (A derived label-conflict warning is not built: decision 2026-11-23.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/retrieval/` | `Retriever` / `Index` interface (`base.py`), the served embedding ranker (`embedding.py`), the earlier TF-IDF ranker used by the tests (`tfidf.py`), and the near-duplicate test and k-filling peer selection (`select.py`). |
 | `docs/retrieval.md` | How peers are chosen: index, walk and skip reasons, evidence, example, known gaps. |

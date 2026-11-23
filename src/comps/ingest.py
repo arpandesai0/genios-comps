@@ -25,7 +25,6 @@ from comps.models import (
     Entity,
     Finding,
     Observation,
-    Origin,
     SourceFile,
     TextVersion,
     UsdValues,
@@ -105,12 +104,8 @@ class DatasetError(Exception):
 def load_dataset(
     data_dir: Path | str,
     config: IngestConfig | None = None,
-    extra_records: Sequence[Mapping[str, Any]] = (),
 ) -> Dataset:
-    """Read ``companies.json`` and ``fx_rates.json`` from ``data_dir`` and ingest them.
-
-    ``extra_records`` are manual additions; they are ingested with ``origin="manual"``.
-    """
+    """Read ``companies.json`` and ``fx_rates.json`` from ``data_dir`` and ingest them (the whole dataset)."""
     data_dir = Path(data_dir)
     raw_companies = _read_json(data_dir / COMPANIES_FILE)
     raw_fx = _read_json(data_dir / FX_FILE)
@@ -118,7 +113,7 @@ def load_dataset(
         SourceFile(name=name, sha256=hashlib.sha256(raw).hexdigest())
         for name, raw in ((COMPANIES_FILE, raw_companies[0]), (FX_FILE, raw_fx[0]))
     )
-    return build_dataset(raw_companies[1], raw_fx[1], config=config, files=files, extra_records=extra_records)
+    return build_dataset(raw_companies[1], raw_fx[1], config=config, files=files)
 
 
 def _read_json(path: Path) -> tuple[bytes, Any]:
@@ -138,7 +133,6 @@ def build_dataset(
     *,
     config: IngestConfig | None = None,
     files: tuple[SourceFile, ...] = (),
-    extra_records: Sequence[Mapping[str, Any]] = (),
 ) -> Dataset:
     """Pure ingestion of already-parsed JSON. Deterministic for a given input."""
     config = config or IngestConfig()
@@ -147,11 +141,10 @@ def build_dataset(
     if not isinstance(companies, list):
         raise DatasetError(f"{COMPANIES_FILE} must contain a JSON list of records")
 
-    inputs: list[tuple[Any, Origin]] = [(r, "file") for r in companies]
-    inputs += [(r, "manual") for r in extra_records]
+    inputs: list[Any] = list(companies)
 
     normalized: list[_Normalized] = []
-    for index, (raw, origin) in enumerate(inputs):
+    for index, raw in enumerate(inputs):
         if not isinstance(raw, Mapping):
             dataset_findings.append(
                 Finding(
@@ -162,7 +155,7 @@ def build_dataset(
                 )
             )
             continue
-        record = normalize_record(raw, index=index, origin=origin, rates=rates)
+        record = normalize_record(raw, index=index, rates=rates)
         if record.ticker is None:
             # Assumption: the universe is public companies, so a record without a ticker is treated
             # as not listed. There is no offline way to verify it, so it is excluded.
@@ -198,14 +191,13 @@ def build_dataset(
     }
 
     return Dataset(
-        version=_version(files, companies, fx, extra_records),
+        version=_version(files, companies, fx),
         reference_date=reference_date,
         fx_rates=rates,
         files=files,
         record_count=len(inputs),
         entities=entities,
         findings=tuple(dataset_findings),
-        metadata={"manual_records": len(extra_records)},
         parents=parents,
     )
 
@@ -275,15 +267,13 @@ def business_description(e: Entity, frequency: Mapping[str, int]) -> str | None:
     return text
 
 
-def _version(files, companies, fx, extra_records) -> str:
+def _version(files, companies, fx) -> str:
     h = hashlib.sha256()
     if files:
         for f in files:
             h.update(f.sha256.encode())
     else:
         h.update(json.dumps([companies, fx], sort_keys=True, default=str).encode())
-    if extra_records:
-        h.update(json.dumps(list(extra_records), sort_keys=True, default=str).encode())
     return h.hexdigest()[:12]
 
 
@@ -336,7 +326,6 @@ def normalize_record(
     raw: Mapping[str, Any],
     *,
     index: int,
-    origin: Origin,
     rates: Mapping[str, float],
 ) -> _Normalized:
     """Validate one record and normalize its values to USD. Never raises for bad values."""
@@ -399,7 +388,6 @@ def normalize_record(
 
     observation = Observation(
         record_id=record_id,
-        origin=origin,
         source_index=index,
         price_date=price_date,
         original=dict(raw),
