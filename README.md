@@ -66,7 +66,7 @@ Where the brief is silent, the service assumes the following:
 - **Implementation:** Claude Code wrote most of the Python service (ingestion, share-class merge, finance, retrieval, API), the tests, the eval harness and the docs. Codex built the first version of the Next.js UI against mocks.
 - **Independent test data:** the second ranking fixture, the look-alike-names fixture and the labelled near-duplicate pairs were written by a different model (Sonnet) that never saw the ranker or its scores. This keeps the eval from grading itself.
 - **Review:** every PR got a review from a smaller model (Sonnet). The authoring agent answered each comment and fixed or declined it with a reason, and the owner reviewed and merged by hand.
-- **Spot checks:** Sonnet sub-agents judged peer lists for 36 random companies in the supplied data by reading the descriptions.
+- **Spot checks:** Sonnet sub-agents judged peer lists for 36 random companies in the supplied data by reading the descriptions ([method and results](eval/results/spotcheck_pretest_k5.md)).
 
 **How the output was checked**
 - **Tests on synthetic data only:** unit tests per rule, and an end-to-end acceptance fixture with one planted defect per company whose hand-derived `expected.json` must match exactly. `make check` (lint, types, tests) runs locally and in CI on every PR.

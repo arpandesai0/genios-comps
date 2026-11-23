@@ -132,7 +132,7 @@ Found in the supplied pre-test file (485 records, 477 companies after merging) o
    - Served configuration (experiment 13): nDCG@10 is 0.769 dev / 0.761 held-out on the independent fixture, and 0.852 / 0.848 on look-alike names.
    - No company appears twice in a peer list.
    - Dedup precision is 1.0 at the served threshold.
-4. **Spot-checked on the supplied data.** 36 random companies at k = 5 were judged by reading the descriptions: 180 of 180 peers were the same business.
+4. **Spot-checked on the supplied data** (qualitative). 36 random companies at k = 5 had their peers graded by model judges reading the descriptions: 180 of 180 were graded the same business. The method and limits are in [eval/results/spotcheck_pretest_k5.md](eval/results/spotcheck_pretest_k5.md).
 5. **The contract holds.** API tests assert the documented field names. Playwright tests cover the UI flows on mocks.
-6. **It runs as the brief requires.** `make start DIR=<folder>` starts offline (verified with networking disabled). Start-up fails loudly on a missing model, bad settings or unreadable files.
+6. **It runs as the brief requires.** `make start DIR=<folder>` starts offline. This was checked by hand: the API image started with `docker run --network none -m 1g` and loaded the model baked into it (recorded in PR #30's review replies and PR #31's checks). Start-up fails loudly on a missing model, bad settings or unreadable files.
 7. **One command runs every check:** `make check` (lint, types, 260+ tests). CI runs it on every PR.
