@@ -27,7 +27,7 @@ A rough breakdown of the time spent, reconstructed from the PR history. The work
 | Embedding stage: three models compared as a black box, independent fixtures, near-duplicate threshold, offline Docker image | #30 | 1.5 h |
 | Config file for thresholds; finishing the UI against the real API; start-up banner | #31, #32 | 0.5 h |
 | Look-alike company names: business descriptions, new fixture, experiments 9–13, spot check on the supplied data | #33 | 0.75 h |
-| Cleanup, design doc, README sections, this log | #34, this PR | 0.5 h |
+| Cleanup, design doc, README sections, this log, review fixes | #34–#37 | 0.5 h |
 | **Day 2 total** | | **≈ 5.5 h** |
 
 **Total: about 10 hours over two days.** This is more than the suggested 6 hours. The extra went into evaluation: the independent fixtures, the model comparison, and the look-alike-names fix found by running the service on the supplied data.

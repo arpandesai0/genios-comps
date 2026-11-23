@@ -4,7 +4,7 @@ Run `python build_fixture.py` to (re)write companies.json, fx_rates.json and
 labels.json next to this file. Everything is held as Python literals below.
 
 All companies are invented. Real data has invented company names such as
-"Irovaiva Air Group" / "Irovaor Fibre Inc" and every description starts with
+"Zarqon Air Group" / "Zarquel Fibre Inc" and every description starts with
 the company's own name. Here, 14 invented name STEMS (Velor, Quint, Ostra, ...)
 are each shared by 5 companies in 5 DIFFERENT businesses and sectors, while the
 5 true peers of every business all carry names from different stems. So a
