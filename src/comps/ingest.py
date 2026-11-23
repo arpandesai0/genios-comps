@@ -185,6 +185,9 @@ def build_dataset(
     listings = resolve_entities(normalized)
     # Share classes of one issuer become one company (disjoint-set union; see issuers.py).
     entities, parents = issuers.merge_share_classes(listings)
+    # After the merge, so every class's name is removed from the issuer's description.
+    frequency = description_frequency(entities)
+    entities = {key: replace(e, business_description=business_description(e, frequency)) for key, e in entities.items()}
 
     # Freshness is measured from the latest valid price_date, so results don't depend on when the service runs.
     reference_date = max((e.latest.price_date for e in entities.values() if e.latest.price_date), default=None)
@@ -205,6 +208,71 @@ def build_dataset(
         metadata={"manual_records": len(extra_records)},
         parents=parents,
     )
+
+
+_WORD = re.compile(r"[^\W_]+(?:[&.-][^\W_]+)*")
+_NAME_WORD = re.compile(rf"({_WORD.pattern})(?:['\u2019]s\b)?")
+_SUFFIXES = frozenset(
+    w.casefold()
+    for w in (
+        "Inc",
+        "Incorporated",
+        "Corp",
+        "Corporation",
+        "Co",
+        "Company",
+        "Ltd",
+        "Limited",
+        "PLC",
+        "LLC",
+        "Group",
+        "Holdings",
+        "Holding",
+        "AG",
+        "SE",
+        "SA",
+        "NV",
+        "GmbH",
+    )
+)
+
+
+def _words(text: str) -> set[str]:
+    return {w.casefold() for w in _WORD.findall(text)}
+
+
+def description_frequency(entities: Mapping[str, Entity]) -> dict[str, int]:
+    """For every word, the number of companies whose description contains it (case-insensitive)."""
+    df: dict[str, int] = {}
+    for e in entities.values():
+        for w in _words(e.description or ""):
+            df[w] = df.get(w, 0) + 1
+    return df
+
+
+def business_description(e: Entity, frequency: Mapping[str, int]) -> str | None:
+    """``e.description`` without the distinctive words of the issuer's own names, for similarity only.
+
+    Descriptions usually open with the company's invented name ("Irovaiva Air Group operates ..."). Embedding
+    models split invented words into sub-word pieces, so unrelated companies with look-alike names ("Irovaiva",
+    "Irovaor") score as similar. A word of the issuer's name or aliases is removed when no other company's
+    description contains it (``frequency`` <= 1): that is the invented part. Words other descriptions also use
+    ("Air", "Offshore", "Drilling") describe the business and stay. Nothing else changes; the supplied
+    description is kept for display. A description left with nothing but legal suffixes has no business
+    text: None.
+    """
+    if not e.description or not e.description.strip():
+        return e.description
+    own = set().union(*(_words(n) for n in (e.name, *e.aliases) if n))
+    distinctive = {w for w in own if frequency.get(w, 0) <= 1 and w not in _SUFFIXES}
+    if not distinctive:
+        return e.description
+    # A removed word takes its possessive with it ("Irovaiva's fleet" -> "fleet").
+    text = _NAME_WORD.sub(lambda m: "" if m.group(1).casefold() in distinctive else m.group(0), e.description)
+    text = re.sub(r"\s+([,.;:)])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
+    if not (_words(text) - _SUFFIXES):
+        return None  # only the name (and suffixes or punctuation): nothing about the business to compare
+    return text
 
 
 def _version(files, companies, fx, extra_records) -> str:

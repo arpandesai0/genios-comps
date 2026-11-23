@@ -27,7 +27,8 @@ The input files are the whole dataset: there are no runtime additions (owner dec
 
 ```
 read files ─► parse FX ─► validate + normalize each record ─► drop unlisted ─► group by COUNTRY:TICKER
-          ─► build each listing's history ─► merge share classes (DSU) ─► cross-company checks ─► Dataset (versioned)
+          ─► build each listing's history ─► merge share classes (DSU) ─► business descriptions
+          ─► cross-company checks ─► Dataset (versioned)
 ```
 
 ### 1. Read the files
@@ -155,6 +156,16 @@ A key `COUNTRY:TICKER` identifies a **listing**. Each country is assumed to have
 | `share_class_incomplete` | limitation | a non-shown class has no usable price or share count, so market cap is missing |
 
 Example: `US:DUAL.A` (price 20, 100 m shares) and `US:DUAL.B` (price 10, 50 m shares) with identical issuer data become one company shown as `US:DUAL.A`, with market cap 2,000 + 500 = 2,500. If `US:DUAL.B` had price 20 and 100 m shares too, it would be counted once (market cap 2,000).
+
+### 6b. Business descriptions (owner decision 2026-11-23)
+
+Descriptions usually open with the company's own invented name ("Irovaiva Air Group operates a regional flight network …"). An embedding model splits such names into sub-word pieces, so unrelated companies with look-alike names ("Irovaiva", "Irovaor", "Irixet") score as similar. In the supplied pre-test data this put a fibre broadband firm and a facilities firm above five of the six airlines for Irovaiva Air Group.
+
+So, after the share-class merge, each issuer gets a derived **`business_description`**: its description without the **distinctive** words of its own names (current name and every alias, across share classes). A name word is distinctive when no other company's description contains it (case-insensitive), e.g. "Irovaiva". A removed word takes its possessive with it. Name words that other descriptions also use describe the business ("Air", "Offshore", "Drilling") and stay, as do legal suffixes. Removing whole names instead (experiments 11–12) also removed those business words and cost ranking quality. A description left with nothing but the name has no business text, and the company is treated as having no description for ranking.
+
+- **Retrieval ranks on `business_description`.** The near-duplicate test keeps using the description as supplied, because two listings of one company usually share their name, and that is real evidence that they are the same company.
+- **The analyst always sees the description as supplied** (`EntityDetail.description`). The derived text is not served.
+- **No finding.** It applies to every company the same way and changes no supplied value.
 
 ### 7. Checks across companies (`quality.py`)
 

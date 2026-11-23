@@ -52,7 +52,7 @@ class Snapshot:
     companies: Mapping[str, CompanyView]  # shown key -> view, ordered by key
     findings: tuple[Finding, ...]  # every finding: dataset, all observations, companies, finance
     ranker: Index  # description similarity over companies with a usable description
-    duplicates: NearDuplicates  # near-duplicate test on the same index
+    duplicates: NearDuplicates  # near-duplicate test on its own index of the descriptions as supplied
     method: tuple[str, str]  # (name, model or version) of the ranker; for logs, never served
 
     def resolve(self, key: str, ignore_case: bool = False) -> CompanyView | None:
@@ -68,6 +68,11 @@ class Snapshot:
         else:
             shown = parents.get(key)
         return self.companies.get(shown) if shown else None
+
+
+def _texts(texts: Mapping[str, str | None]) -> dict[str, str]:
+    """Only the usable (non-blank) texts."""
+    return {k: t for k, t in texts.items() if t and t.strip()}
 
 
 def build_snapshot(settings: Settings, retriever: Retriever | None = None) -> Snapshot:
@@ -89,14 +94,19 @@ def build_snapshot(settings: Settings, retriever: Retriever | None = None) -> Sn
         companies[key] = CompanyView(
             entity=entity, metrics=metrics, findings=entity.findings + entity.latest.findings + others + raised
         )
-    documents = {key: e.description for key, e in dataset.entities.items() if e.description and e.description.strip()}
+    # Ranking compares business descriptions (own names removed in ingestion, see ingest.business_description), so
+    # look-alike invented names don't make unrelated companies similar. The near-duplicate test uses the
+    # descriptions as supplied: two listings of one company usually share their name, and that is real evidence
+    # that they are the same company. One model embeds both (owner decision 2026-11-23).
+    business = _texts({k: e.business_description for k, e in dataset.entities.items()})
+    supplied = _texts({k: e.description for k, e in dataset.entities.items()})
     cfg = settings.retrieval
     if retriever is None:
         retriever = EmbeddingRetriever(cfg.model, cache_dir=cfg.cache_dir, offline=cfg.offline)
-    ranker = retriever.fit(documents)
+    ranker = retriever.fit(business)
     duplicates = NearDuplicates(
-        index=ranker,
-        normalized={k: normalize_description(d) for k, d in documents.items()},
+        index=retriever.fit(supplied),
+        normalized={k: normalize_description(d) for k, d in supplied.items()},
         threshold=cfg.near_duplicate,
     )
     return Snapshot(

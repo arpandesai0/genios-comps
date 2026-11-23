@@ -9,14 +9,15 @@ A company in a **similar line of business**, judged from its description. Size, 
 ## Steps
 
 ```
-start-up:  issuers' descriptions ─► embedding model (EMBEDDING_MODEL) ─► one normalized vector per company
+start-up:  business descriptions (own names removed) ─► embedding model (EMBEDDING_MODEL) ─► ranking vectors
+           descriptions as supplied                 ─► same model                       ─► near-duplicate vectors
 request:   target key ─► resolve (share-class keys too) ─► rank every other company by cosine ─► walk until k peers
            ─► evidence per peer ─► (comps only) metrics + peer-only summary statistics
 ```
 
 ### 1. Index (`embedding.py`)
 
-At start-up every issuer with a non-empty description is embedded with a **local sentence-embedding model** (ONNX Runtime via `fastembed`; no network at runtime). Vectors are L2-normalized, so the dot product of two vectors is their cosine similarity, clamped to 0–1.
+At start-up every issuer with a non-empty description is embedded twice by the same model: its **business description** (the description with its own names removed in ingestion, [ingestion.md §6b](ingestion.md)) for ranking, and its description as supplied for the near-duplicate test (§2). Embedding uses a **local sentence-embedding model** (ONNX Runtime via `fastembed`; no network at runtime). Vectors are L2-normalized, so the dot product of two vectors is their cosine similarity, clamped to 0–1.
 
 Defaults live in the config file [`src/comps/settings.toml`](../src/comps/settings.toml); an environment variable overrides one, and `CONFIG_FILE=<path>` replaces the whole file.
 

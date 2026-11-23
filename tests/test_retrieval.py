@@ -399,3 +399,129 @@ def test_missing_model_fails_startup_with_no_fallback(tmp_path):
     )
     with pytest.raises(ModelUnavailable, match="MODEL_OFFLINE is set"):
         build_snapshot(settings)
+
+
+# --- business descriptions: own names removed before ranking (owner decision 2026-11-23) ------------
+
+
+def _entity(name, description, aliases=()):
+    from comps.models import Entity
+
+    return Entity(
+        key="US:X",
+        ticker="X",
+        country="US",
+        name=name,
+        description=description,
+        sector=None,
+        industry=None,
+        sub_industry=None,
+        fiscal_year_end=None,
+        aliases=tuple(aliases),
+        observations=(),
+    )
+
+
+def test_business_description_removes_only_distinctive_name_words():
+    from comps.ingest import business_description
+
+    e = _entity(
+        "Northwind Air Group",
+        "NORTHWIND AIR GROUP flies regional routes. Northwind's fleet is young; Skyways Air is a rival.",
+        aliases=("Northwind Airways",),
+    )
+    # "northwind" and "airways" appear in no other description; "air" and "group" do, so they stay
+    frequency = {"northwind": 1, "airways": 1, "air": 5, "group": 9}
+    assert (
+        business_description(e, frequency) == "AIR GROUP flies regional routes. fleet is young; Skyways Air is a rival."
+    )
+    assert business_description(_entity("Acme", "   "), {}) == "   "
+    assert business_description(_entity("Acme", None), {}) is None
+    assert business_description(_entity(None, "No name at all."), {}) == "No name at all."
+
+
+@pytest.mark.parametrize(
+    ("name", "description", "expected"),
+    [
+        ("Haventet Pay Inc", "Haventet Pay Corp offers payments.", "Pay Corp offers payments."),  # suffix differs
+        ("AT&T Inc", "AT&T Inc sells phone plans.", "Inc sells phone plans."),  # regex characters are literal
+        ("Acme Corp", "Acme Corp.", None),  # only the name: nothing about the business
+    ],
+)
+def test_business_description_edge_cases(name, description, expected):
+    from comps.ingest import business_description
+
+    frequency = {"haventet": 1, "at&t": 1, "acme": 1, "pay": 3, "inc": 9, "corp": 9}
+    assert business_description(_entity(name, description), frequency) == expected
+
+
+def test_look_alike_names_do_not_make_companies_peers(tmp_path):
+    def rec(ticker, name, business, **kw):
+        return make_record(ticker=ticker, name=name, description=f"{name} {business}", **kw)
+
+    universe = [
+        rec("NWA", "Northwind Air Group", "operates scheduled regional passenger flights and charter services."),
+        rec("NWF", "Northwind Fibre Group", "builds fibre broadband networks for homes and offices.", revenue=900.0),
+        rec(
+            "SKY",
+            "Skyline Carriers Inc",
+            "operates scheduled regional passenger flights and cargo services.",
+            revenue=800.0,
+        ),
+    ]
+    (tmp_path / "companies.json").write_text(json.dumps(universe))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()), TfidfRetriever())
+    assert s.dataset.entities["US:NWA"].description.startswith("Northwind Air Group")  # shown as supplied
+    from comps.service import find_peers
+
+    peers = [p.company.entity.key for p in find_peers(s, "US:NWA", 2).peers]
+    assert peers == ["US:SKY", "US:NWF"]  # the airline first, though the fibre company shares "Northwind ... Group"
+    assert s.ranker.similarity("US:NWA", "US:NWF") < s.ranker.similarity("US:NWA", "US:SKY")
+
+
+def test_duplicate_listings_are_still_caught_on_the_supplied_text(tmp_path):
+    text = "operates regional passenger flights, charter services and a loyalty programme."
+    universe = [
+        make_record(ticker="NWA", name="Northwind Air Group", description=f"Northwind Air Group {text}"),
+        # The same company listed again (case and spacing differ); other numbers, so the share-class merge leaves it.
+        make_record(
+            ticker="NWAX",
+            name="Northwind Air Group",
+            description=f"NORTHWIND AIR  GROUP {text.upper()}",
+            revenue=1234.0,
+        ),
+        make_record(
+            ticker="SKY", name="Skyline Carriers Inc", description=f"Skyline Carriers Inc {text}", revenue=800.0
+        ),
+    ]
+    (tmp_path / "companies.json").write_text(json.dumps(universe))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()), TfidfRetriever())
+    # SKY has the same business text as the target, yet it is not a duplicate: the supplied names differ.
+    assert s.duplicates.check("US:NWA", "US:SKY") is None
+    assert s.duplicates.check("US:NWA", "US:NWAX") is not None
+    from comps.service import find_peers
+
+    result = find_peers(s, "US:NWA", 2)
+    assert [p.company.entity.key for p in result.peers] == ["US:SKY"]
+    assert [(k.skip.key, k.skip.reason) for k in result.skipped] == [("US:NWAX", "near_duplicate_of_target")]
+
+
+def test_a_description_that_is_only_the_name_gets_no_peers(tmp_path):
+    universe = [
+        make_record(ticker="ONLY", name="Acme Corp", description="Acme Corp."),
+        make_record(
+            ticker="SKY", name="Skyline Carriers Inc", description="Skyline Carriers Inc flies.", revenue=800.0
+        ),
+        make_record(ticker="JET", name="Jetway Air Ltd", description="Jetway Air Ltd flies too.", revenue=700.0),
+    ]
+    (tmp_path / "companies.json").write_text(json.dumps(universe))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
+    with TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))) as c:
+        body = c.get("/api/peers", params={"target": "US:ONLY", "k": 2}).json()
+        assert body["peers"] == [] and body["note"]
+        other = c.get("/api/peers", params={"target": "US:SKY", "k": 2}).json()
+        assert [p["entity"]["key"] for p in other["peers"]] == ["US:JET"]
+        assert [(s["entity"]["key"], s["reason"]) for s in other["skipped"]] == [("US:ONLY", "no_description")]
