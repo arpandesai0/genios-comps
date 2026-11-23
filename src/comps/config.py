@@ -1,22 +1,32 @@
-"""Settings, read from environment variables."""
+"""Settings: defaults from the config file `settings.toml` (or CONFIG_FILE), overridden by environment variables."""
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+import tomllib
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+DEFAULT_CONFIG_FILE = Path(__file__).with_name("settings.toml")
+
+
+def read_config(path: Path = DEFAULT_CONFIG_FILE) -> dict[str, Any]:
+    """The config file as a dict; a missing or malformed file raises, so start-up fails loudly."""
+    with path.open("rb") as f:
+        return tomllib.load(f)
+
+
+_DEFAULTS = read_config()
+# Served when EMBEDDING_MODEL is not set; its near-duplicate threshold comes from the same file.
+DEFAULT_EMBEDDING_MODEL: str = _DEFAULTS["retrieval"]["embedding_model"]
 
 
 @dataclass(frozen=True)
 class IngestConfig:
-    # A price older than this many days before the latest valid price_date in the dataset gets a "stale_price" warning.
-    # (a warning only; stale companies are still served)
-    stale_after_days: int = 90
-
-
-# Served when EMBEDDING_MODEL / NEAR_DUPLICATE_THRESHOLD are not set. Chosen by the retrieval eval (docs/eval.md).
-DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-DEFAULT_NEAR_DUPLICATE = 0.88
+    # A price older than this many days before the latest valid price_date in the dataset gets a "stale_price"
+    # warning (a warning only; stale companies are still served).
+    stale_after_days: int = _DEFAULTS["ingest"]["stale_after_days"]
 
 
 @dataclass(frozen=True)
@@ -26,16 +36,18 @@ class RetrievalConfig:
     # folder the OS may clear, so a persistent per-user folder is the default here; /models in the image).
     cache_dir: Path | None = None
     offline: bool = False  # MODEL_OFFLINE=1: never download; fail if the model isn't in the cache
-    # NEAR_DUPLICATE_THRESHOLD: similarity at or above which two companies are near-duplicates. 0.88 is the
-    # lowest cut that flags no labelled non-duplicate on the pre-test data or the synthetic pairs (docs/eval.md).
-    near_duplicate: float = DEFAULT_NEAR_DUPLICATE
+    # Similarity at or above which two companies are near-duplicates: the model's value in the config file,
+    # or NEAR_DUPLICATE_THRESHOLD.
+    near_duplicate: float = field(
+        default_factory=lambda: _DEFAULTS["retrieval"]["near_duplicate_threshold"][DEFAULT_EMBEDDING_MODEL]
+    )
 
 
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path
     ingest: IngestConfig
-    retrieval: RetrievalConfig = RetrievalConfig()
+    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
 
 DEFAULT_MODEL_CACHE = Path("~/.cache/comps-models")
@@ -49,28 +61,59 @@ def _flag(name: str, value: str) -> bool:
     return v in _TRUE
 
 
-def _threshold(value: str) -> float:
+def _threshold(value: object, source: str) -> float:
     try:
-        t = float(value)
-    except ValueError:
-        raise ValueError(f"NEAR_DUPLICATE_THRESHOLD must be a number in (0, 1]; got {value!r}") from None
+        t = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError(f"{source} must be a number in (0, 1]; got {value!r}") from None
     if not 0 < t <= 1:
-        raise ValueError(f"NEAR_DUPLICATE_THRESHOLD must be in (0, 1]; got {t}")
+        raise ValueError(f"{source} must be in (0, 1]; got {t}")
     return t
 
 
+def _days(value: object, source: str) -> int:
+    try:
+        d = int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        raise ValueError(f"{source} must be a whole number of days; got {value!r}") from None
+    if d < 0:
+        raise ValueError(f"{source} must not be negative; got {d}")
+    return d
+
+
+def _near_duplicate(env: dict[str, str], config: dict[str, Any], model: str, config_file: Path) -> float:
+    if env.get("NEAR_DUPLICATE_THRESHOLD"):
+        return _threshold(env["NEAR_DUPLICATE_THRESHOLD"], "NEAR_DUPLICATE_THRESHOLD")
+    per_model = config.get("retrieval", {}).get("near_duplicate_threshold", {})
+    if model not in per_model:
+        raise ValueError(
+            f"No near-duplicate threshold for the embedding model {model!r}: each model needs its own tuned "
+            f"value. Add it under [retrieval.near_duplicate_threshold] in {config_file}, or set "
+            "NEAR_DUPLICATE_THRESHOLD."
+        )
+    return _threshold(per_model[model], f"near_duplicate_threshold for {model!r} in {config_file}")
+
+
 def load_settings(env: dict[str, str] | None = None) -> Settings:
-    """Read settings; a malformed retrieval setting raises ValueError, so start-up fails loudly."""
+    """Read settings; a missing or malformed setting raises ValueError, so start-up fails loudly."""
     env = dict(os.environ if env is None else env)
+    config_file = Path(env["CONFIG_FILE"]).expanduser() if env.get("CONFIG_FILE") else DEFAULT_CONFIG_FILE
+    config = read_config(config_file)
+    try:
+        default_model = config["retrieval"]["embedding_model"]
+        default_days = config["ingest"]["stale_after_days"]
+    except KeyError as e:
+        raise ValueError(f"{config_file} has no setting {e}") from None
+    model = env.get("EMBEDDING_MODEL") or default_model
     return Settings(
         data_dir=Path(env.get("DATA_DIR", "/data")).expanduser(),
         ingest=IngestConfig(
-            stale_after_days=int(env.get("STALE_AFTER_DAYS", "90")),
+            stale_after_days=_days(env.get("STALE_AFTER_DAYS") or default_days, "stale_after_days"),
         ),
         retrieval=RetrievalConfig(
-            model=env.get("EMBEDDING_MODEL") or DEFAULT_EMBEDDING_MODEL,
+            model=model,
             cache_dir=Path(env.get("MODEL_CACHE_DIR") or DEFAULT_MODEL_CACHE).expanduser(),
             offline=_flag("MODEL_OFFLINE", env.get("MODEL_OFFLINE", "")),
-            near_duplicate=_threshold(env.get("NEAR_DUPLICATE_THRESHOLD") or str(DEFAULT_NEAR_DUPLICATE)),
+            near_duplicate=_near_duplicate(env, config, model, config_file),
         ),
     )

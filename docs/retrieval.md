@@ -18,14 +18,16 @@ request:   target key ─► resolve (share-class keys too) ─► rank every ot
 
 At start-up every issuer with a non-empty description is embedded with a **local sentence-embedding model** (ONNX Runtime via `fastembed`; no network at runtime). Vectors are L2-normalized, so the dot product of two vectors is their cosine similarity, clamped to 0–1.
 
+Defaults live in the config file [`src/comps/settings.toml`](../src/comps/settings.toml); an environment variable overrides one, and `CONFIG_FILE=<path>` replaces the whole file.
+
 | Setting | Default | Meaning |
 |---|---|---|
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional vectors, ~90 MB) | the one model loaded per process; chosen by the eval ([eval.md](eval.md)) |
-| `NEAR_DUPLICATE_THRESHOLD` | `0.88` | similarity at or above which two companies are near-duplicates (§2); must be in (0, 1]. **Tuned for MiniLM:** another model needs its own threshold |
+| `NEAR_DUPLICATE_THRESHOLD` | the model's value in the config file (`0.88` for MiniLM) | similarity at or above which two companies are near-duplicates (§2); must be in (0, 1]. The config file holds **one tuned value per model** (`[retrieval.near_duplicate_threshold]`); a model with no value there stops start-up unless this variable is set |
 | `MODEL_CACHE_DIR` | `~/.cache/comps-models`; `/models` in the image | where the model is downloaded to and loaded from |
 | `MODEL_OFFLINE` | off; `1` in the image | never download: fail if the model is not in the cache (`1`/`true`/`yes`/`on`, any case) |
 
-A malformed setting (e.g. `MODEL_OFFLINE=maybe`, a threshold outside (0, 1]) stops start-up with an error.
+A missing or malformed setting (e.g. `MODEL_OFFLINE=maybe`, a threshold outside (0, 1], a model with no threshold) stops start-up with an error.
 
 **The model is required.** The Docker image downloads it at build time (a failed download fails the build) and runs with `MODEL_OFFLINE=1`. If the model can't be loaded, start-up fails with `ModelUnavailable`; there is no fallback ranker. `make model` downloads the configured model for local runs.
 

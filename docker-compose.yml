@@ -5,7 +5,7 @@ services:
       context: .
       args:
         # The embedding model baked into the image (downloaded at build; the container runs offline).
-        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}  # empty = the model in src/comps/settings.toml
     environment:
       DATA_DIR: /data
     volumes:

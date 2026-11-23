@@ -100,7 +100,7 @@ Cutoffs are @5 and @10, and values are means over the split's targets, rounded t
 ```bash
 make experiment DESC="what this run tests"                          # HEAD, served defaults, dev splits
 make experiment DESC="..." COMMIT=84c6474                            # another commit
-make experiment DESC="..." MODEL=BAAI/bge-small-en-v1.5               # another embedding model (one per run)
+make experiment DESC="..." MODEL=BAAI/bge-small-en-v1.5 THRESHOLD=0.9 # another model (one per run); THRESHOLD if settings.toml has none for it
 make experiment DESC="..." HELD_OUT=1                                # also score held-out (final configurations only)
 .venv/bin/python eval/experiments.py                                 # the log as a table
 ```

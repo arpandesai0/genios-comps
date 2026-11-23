@@ -1,0 +1,18 @@
+# Default settings of the comps service. No threshold or default is hardcoded in Python: every one is here.
+# An environment variable overrides a value (names in brackets). CONFIG_FILE=<path> replaces this whole file.
+
+[ingest]
+# A latest price older than this many days before the dataset's latest valid price_date gets a
+# "stale_price" warning (the company is still served). [STALE_AFTER_DAYS]
+stale_after_days = 90
+
+[retrieval]
+# The one embedding model loaded per process, chosen by the retrieval eval (docs/eval.md). [EMBEDDING_MODEL]
+embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+
+# Near-duplicate threshold, per embedding model: two companies whose description similarity is at or above it
+# are never each other's peers. Each model scores differently, so each needs its own tuned value; a model
+# missing from this table stops start-up unless NEAR_DUPLICATE_THRESHOLD is set. [NEAR_DUPLICATE_THRESHOLD]
+[retrieval.near_duplicate_threshold]
+# Lowest cut that flags no labelled non-duplicate on the pre-test data or the synthetic pairs (docs/eval.md).
+"sentence-transformers/all-MiniLM-L6-v2" = 0.88
