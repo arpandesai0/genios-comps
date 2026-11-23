@@ -24,31 +24,35 @@ function value(v: unknown): string {
 export function CalculationTrace({
   observation,
   metrics,
+  currency,
 }: {
   observation: Observation;
   metrics?: Metrics;
+  currency: string;
 }) {
   const rows = Object.entries(observation.original).map(
     ([field, original]) => ({
       field,
       original: value(original),
-      usd:
-        field in observation.usd
-          ? value(observation.usd[field as keyof Observation["usd"]])
+      normalized:
+        field in observation.normalized
+          ? value(
+              observation.normalized[field as keyof Observation["normalized"]],
+            )
           : "—",
     }),
   );
   const columns: ColumnDef<(typeof rows)[number]>[] = [
     { accessorKey: "field", header: "Original Field" },
     { accessorKey: "original", header: "Original Value" },
-    { accessorKey: "usd", header: "USD Value" },
+    { accessorKey: "normalized", header: `${currency} Value` },
   ];
   return (
     <section className="trace">
       <h3>Calculation Trace</h3>
       <p className="muted">
-        USD financials are in millions; price is USD per share. Shares
-        outstanding are in millions.
+        {currency} financials are in millions; price is {currency} per share.
+        Shares outstanding are in millions.
       </p>
       <dl className="factor-grid">
         {Object.entries(observation.conversion).map(([key, v]) => (
@@ -137,6 +141,9 @@ export function CompanyDetail({
                 .join(" / ")}
             </p>
             <MetricsView metrics={current.metrics} />
+            <p className="muted">
+              Market cap and enterprise value in {current.currency} millions.
+            </p>
             {current.share_classes.length > 1 && (
               <section aria-labelledby="share-classes-heading">
                 <h3 id="share-classes-heading">Share Classes</h3>
@@ -170,6 +177,7 @@ export function CompanyDetail({
             <CalculationTrace
               observation={current.latest}
               metrics={current.metrics}
+              currency={current.currency}
             />
             <section>
               <h3>Findings</h3>
@@ -185,7 +193,7 @@ export function CompanyDetail({
                   <summary>
                     {o.price_date || "Undated"} · {o.record_id}
                   </summary>
-                  <CalculationTrace observation={o} />
+                  <CalculationTrace observation={o} currency={current.currency} />
                 </details>
               ))}
             </section>

@@ -60,10 +60,13 @@ def test_company_list_filters_and_paging(client):
 
 
 def test_company_detail_shows_history_usd_values_and_metrics(client):
-    body = client.get("/api/companies/US%3AACME").json()
+    r = client.get("/api/companies/US%3AACME")
+    assert "_usd_m" not in r.text  # contract metric names are currency-neutral, in metrics and findings alike
+    body = r.json()
     assert [o["record_id"] for o in body["observations"]] == ["a1", "a2"]
     assert body["latest"]["record_id"] == "a2"
-    assert body["latest"]["usd"]["price"] == 20.0
+    assert body["latest"]["normalized"]["price"] == 20.0
+    assert body["currency"] == "USD" and "origin" not in body["latest"] and "usd" not in body["latest"]
     assert body["latest"]["conversion"] == {"price_fx": 1.0, "reporting_fx": 1.0, "unit_factor": 1.0}
     assert body["latest"]["original"]["id"] == "a2"
     assert body["metrics"]["ev_ebitda"] == {
@@ -77,7 +80,7 @@ def test_company_detail_shows_history_usd_values_and_metrics(client):
 
 def test_company_detail_includes_ingestion_and_finance_findings(client):
     bolt = client.get("/api/companies/US%3ABOLT").json()
-    assert bolt["metrics"]["enterprise_value_usd_m"]["missing_inputs"] == ["total_debt"]
+    assert bolt["metrics"]["enterprise_value_m"]["missing_inputs"] == ["total_debt"]
     assert "invalid_value" in [f["code"] for f in bolt["findings"]]
     loss = client.get("/api/companies/US%3ALOSS").json()
     assert loss["metrics"]["pe"]["display"] == "NM"
@@ -92,9 +95,16 @@ def test_unknown_company_is_404_in_contract_shape(client):
     assert r.json()["error"]["code"] == "not_found"
 
 
+def test_comps_use_contract_metric_names(client):
+    r = client.get("/api/comps?target=US%3AACME&k=2")
+    assert r.status_code == 200 and "_usd_m" not in r.text
+    assert set(r.json()["target"]["metrics"]) == {"market_cap_m", "enterprise_value_m", "ev_revenue", "ev_ebitda", "pe"}
+
+
 def test_dataset_overview(client):
     body = client.get("/api/dataset").json()
-    assert body["counts"] == {"records": 5, "entities": 3, "manual_additions": 0}
+    assert body["counts"] == {"records": 5, "entities": 3}
+    assert (body["currency"], body["fx"]) == ("USD", {"base": "USD"})
     assert [f["name"] for f in body["source"]["files"]] == ["companies.json", "fx_rates.json"]
     codes = {row["code"] for row in body["findings_by_code"]}
     assert {"unlisted_excluded", "invalid_value", "nonpositive_ev"} <= codes
@@ -272,7 +282,7 @@ def test_share_class_key_resolves_to_the_issuer(rich):
     assert [(c["key"], c["counted"]) for c in body["share_classes"]] == [("US:BLT.A", True), ("US:BLT.B", False)]
     assert body["share_classes"][1]["market_value_m"] == 2000.0
     # The same shares listed twice are counted once.
-    assert body["metrics"]["market_cap_usd_m"]["display"] == "2,000.0"
+    assert body["metrics"]["market_cap_m"]["display"] == "2,000.0"
     assert sorted(body["aliases"]) == ["Bolt Class A", "Bolt Class B"]
 
 

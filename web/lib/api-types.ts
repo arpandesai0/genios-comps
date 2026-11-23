@@ -1,7 +1,7 @@
 export type Severity = "error" | "limitation" | "warning" | "info";
 
 export interface Finding {
-  code: string; // e.g. "missing_value", "possible_same_issuer", "stale_price"
+  code: string; // e.g. "missing_value", "share_classes_merged", "stale_price"
   severity: Severity;
   message: string; // human-readable
   fields: string[]; // affected record fields
@@ -22,8 +22,8 @@ export interface MetricValue {
 }
 
 export interface Metrics {
-  market_cap_usd_m: MetricValue;
-  enterprise_value_usd_m: MetricValue;
+  market_cap_m: MetricValue; // millions of the dataset currency
+  enterprise_value_m: MetricValue; // millions of the dataset currency
   ev_revenue: MetricValue;
   ev_ebitda: MetricValue;
   pe: MetricValue;
@@ -46,8 +46,8 @@ export interface Observation {
   record_id: string;
   price_date: string | null;
   original: Record<string, unknown>; // the record exactly as supplied
-  usd: {
-    // normalized; null when it can't be computed
+  normalized: {
+    // in the dataset currency: price per share, other money in millions; null when it can't be computed
     price: number | null;
     total_debt: number | null;
     cash: number | null;
@@ -68,14 +68,15 @@ export interface ShareClass {
   name: string | null;
   record_id: string;
   price_currency: string | null; // as supplied
-  price: number | null; // USD per share
+  price: number | null; // per share, dataset currency
   shares_outstanding: number | null; // millions
-  market_value_m: number | null; // USD millions
+  market_value_m: number | null; // millions of the dataset currency
   missing_inputs: string[];
   counted: boolean;
 }
 
 export interface EntityDetail extends EntitySummary {
+  currency: string; // dataset currency of `metrics` and every `normalized` block
   share_classes: ShareClass[];
   description: string | null;
   fiscal_year_end: string | null;
@@ -103,41 +104,61 @@ export interface SummaryStat {
   };
 }
 
+export type SkipReason =
+  | "near_duplicate_of_target"
+  | "near_duplicate_of_peer"
+  | "user_excluded"
+  | "no_description";
+
+export interface Evidence {
+  // why this peer was chosen
+  similarity: number; // description similarity, 0–1 (4 dp); NOT a probability
+  classification: { sector: boolean; industry: boolean; sub_industry: boolean }; // evidence only
+  country_match: boolean; // evidence only
+  revenue_ratio: number | null; // peer revenue / target revenue (2 dp)
+}
+
+export interface Skipped {
+  entity: EntitySummary;
+  reason: SkipReason;
+  detail: string; // human-readable
+  similarity: number | null; // to the target (4 dp)
+  duplicate_of: string | null; // shown key it duplicates
+}
+
+export interface PeersResponse {
+  dataset_version: string;
+  target: EntitySummary;
+  requested_k: number;
+  returned_k: number;
+  peers: { rank: number; entity: EntitySummary; evidence: Evidence }[];
+  skipped: Skipped[];
+  note: string | null; // non-null exactly when returned_k < requested_k
+}
+
 export interface CompsResponse {
   dataset_version: string;
-  method: { name: string; version: string };
-  k: number;
+  currency: string; // dataset currency of market cap and EV
+  requested_k: number;
+  returned_k: number;
   target: { entity: EntitySummary; metrics: Metrics; findings: Finding[] };
   peers: {
     rank: number;
     entity: EntitySummary;
     metrics: Metrics;
     findings: Finding[];
-    evidence: {
-      // why this peer was chosen (provisional shape)
-      similarity: number; // description similarity score, 0–1; NOT a probability
-      shared_terms: string[]; // description terms that drove the match
-      classification: {
-        sector: boolean;
-        industry: boolean;
-        sub_industry: boolean;
-      };
-      country_match: boolean;
-      revenue_ratio: number | null; // peer revenue / target revenue (USD); null if unavailable
-      limitations: string[]; // finding codes affecting this peer's metrics
-    };
+    evidence: Evidence & { limitations: string[] }; // finding codes affecting this peer's metrics
   }[];
-  excluded: {
-    entity: EntitySummary;
-    reason: "possible_same_issuer" | "user_excluded";
-    detail: string;
-  }[];
+  skipped: Skipped[];
+  note: string | null;
   summary: { ev_revenue: SummaryStat; ev_ebitda: SummaryStat; pe: SummaryStat }; // peers only
 }
 
 export interface DatasetResponse {
   dataset_version: string;
-  reference_date: string;
+  currency: string; // dataset currency
+  fx: { base: string }; // base currency as given in fx_rates.json
+  reference_date: string | null;
   source: { data_dir: string; files: { name: string; sha256: string }[] };
   counts: { records: number; entities: number };
   findings_by_severity: Record<Severity, number>;

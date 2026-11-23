@@ -18,9 +18,12 @@ services:
       # Healthy only once the data is ingested and the API answers. If ingestion fails, the
       # container exits and the web UI is not started.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
-      interval: 2s
+      # Poll every second while starting (up to 2 min), then once a minute so the logs stay readable.
+      start_period: 120s
+      start_interval: 1s
+      interval: 60s
       timeout: 3s
-      retries: 30
+      retries: 3
 
   web:
     build:

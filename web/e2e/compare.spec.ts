@@ -31,7 +31,7 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
   ).toBeVisible();
   await expect(
     dialog.getByRole("heading", { name: "Shared Terms" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page
     .getByRole("button", { name: "Calculation Trace", exact: true })
@@ -71,6 +71,7 @@ test("Compare keeps identities distinct, exposes evidence and trace, and refetch
     "href",
     /exclude=GB%3ANOMA/,
   );
+  await expect(page.getByText("Removed by Analyst")).toBeVisible();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Remove Noma Analytics", exact: true }),

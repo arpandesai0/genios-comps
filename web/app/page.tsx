@@ -15,6 +15,7 @@ import type {
   CompaniesResponse,
   CompsResponse,
   Metrics,
+  SkipReason,
 } from "@/lib/api-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,12 @@ import { CompanyDetail } from "@/components/company-detail";
 import { Findings } from "@/components/findings";
 const DEFAULT_K = 10;
 type Peer = CompsResponse["peers"][number];
+const skipLabels: Record<SkipReason, string> = {
+  near_duplicate_of_target: "Near-Duplicate of Target",
+  near_duplicate_of_peer: "Near-Duplicate of a Peer",
+  user_excluded: "Removed by Analyst",
+  no_description: "No Description",
+};
 export default function ComparePage() {
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<CompaniesResponse | null>(null);
@@ -133,7 +140,12 @@ export default function ComparePage() {
       id: key,
       accessorFn: (p: Peer) => p.metrics[key].value ?? undefined,
       sortUndefined: "last" as const,
-      header: key === "enterprise_value_usd_m" ? "EV" : metricLabels[key],
+      header:
+        key === "enterprise_value_m"
+          ? `EV (${result?.currency ?? ""} m)`
+          : key === "market_cap_m"
+            ? `Market Cap (${result?.currency ?? ""} m)`
+            : metricLabels[key],
       cell: ({ row }: { row: { original: Peer } }) => (
         <Metric metric={row.original.metrics[key]} />
       ),
@@ -391,10 +403,15 @@ export default function ComparePage() {
             <div className="section-heading panel-heading">
               <div>
                 <h2>
-                  Peer Comparison <Badge>{result.peers.length}</Badge>
+                  Peer Comparison{" "}
+                  <Badge>
+                    {result.returned_k === result.requested_k
+                      ? result.returned_k
+                      : `${result.returned_k} of ${result.requested_k}`}
+                  </Badge>
                 </h2>
                 <p className="muted">
-                  Ranked by description similarity · USD millions
+                  Ranked by description similarity · {result.currency} millions
                 </p>
               </div>
               <Button variant="outline" size="sm" asChild>
@@ -411,6 +428,11 @@ export default function ComparePage() {
                 </a>
               </Button>
             </div>
+            {result.note && (
+              <p role="note" className="note">
+                {result.note}
+              </p>
+            )}
             <DataTable columns={columns} data={result.peers} />
             <div className="table-footnote">
               Similarity is a score, not a probability. The target is excluded
@@ -440,14 +462,26 @@ export default function ComparePage() {
               ))}
             </div>
           </section>
-          {(result.excluded.length > 0 || excluded.length > 0) && (
+          {(result.skipped.length > 0 || excluded.length > 0) && (
             <section className="panel exclusions">
-              <h2>Excluded Companies</h2>
-              {result.excluded.map((e) => (
+              <div className="section-heading">
+                <div>
+                  <h2>Skipped Companies</h2>
+                  <p className="muted">
+                    Companies passed over while choosing peers, and why. They
+                    are not counted in the peer statistics.
+                  </p>
+                </div>
+              </div>
+              {result.skipped.map((e) => (
                 <div className="exclusion-row" key={e.entity.key}>
                   <div>
-                    <strong>{e.entity.name}</strong> <code>{e.entity.key}</code>
-                    <p className="muted">{e.detail}</p>
+                    <strong>{e.entity.name}</strong> <code>{e.entity.key}</code>{" "}
+                    <Badge>{skipLabels[e.reason]}</Badge>
+                    <p className="muted">
+                      {e.detail}
+                      {e.similarity !== null && ` Similarity ${e.similarity}.`}
+                    </p>
                   </div>
                   {e.reason === "user_excluded" && (
                     <Button
@@ -468,7 +502,7 @@ export default function ComparePage() {
               ))}
               {excluded
                 .filter(
-                  (key) => !result.excluded.some((e) => e.entity.key === key),
+                  (key) => !result.skipped.some((e) => e.entity.key === key),
                 )
                 .map((key) => (
                   <div className="exclusion-row" key={key}>
@@ -488,7 +522,6 @@ export default function ComparePage() {
             </section>
           )}
           <p className="provenance">
-            Method: {result.method.name} · {result.method.version}
             <span>Dataset {result.dataset_version}</span>
           </p>
         </div>
@@ -511,15 +544,10 @@ export default function ComparePage() {
               <section className="evidence-score">
                 <p className="eyebrow">Description Similarity Score</p>
                 <strong>{evidence.evidence.similarity}</strong>
-                <p className="muted">A similarity score, not a probability.</p>
-              </section>
-              <section>
-                <h3>Shared Terms</h3>
-                <div className="badge-row">
-                  {evidence.evidence.shared_terms.map((term) => (
-                    <Badge key={term}>{term}</Badge>
-                  ))}
-                </div>
+                <p className="muted">
+                  A similarity score, not a probability. Peers are ranked by
+                  how closely their business descriptions match the target.
+                </p>
               </section>
               <section>
                 <h3>Classification and Geography</h3>

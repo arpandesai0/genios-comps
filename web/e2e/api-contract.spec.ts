@@ -23,8 +23,11 @@ test("mock resolves share class targets and computes peer-only summary after rem
   expect(initial.peers).toHaveLength(3);
   expect(initial.target.entity.key).toBe("US:NOMA");
   expect(initial.target.entity.share_class_keys).toEqual(["US:NOMA", "US:NOMA.B"]);
-  expect(initial.target.metrics.market_cap_usd_m.display).toBe("4,000.0");
-  expect(initial.excluded).toEqual([]);
+  expect(initial.target.metrics.market_cap_m.display).toBe("4,000.0");
+  expect(initial.skipped).toEqual([]);
+  expect(initial).toMatchObject({ currency: "USD", requested_k: 3, returned_k: 3, note: null });
+  expect(initial).not.toHaveProperty("method");
+  expect(initial.peers[0].evidence).not.toHaveProperty("shared_terms");
   const removed = initial.peers[0].entity.key;
   const query = new URLSearchParams({
     target: "US:NOMA",
@@ -68,9 +71,23 @@ test("mock class keys return the issuer and identify the matched listing", async
   expect(detail.record_ids).toContain("synthetic-014");
 
   const comps = await (await request.get("/api/comps?target=GB%3ANOMA&exclude=US%3ANOMA.B")).json();
-  expect(comps.excluded).toMatchObject([
+  expect(comps.skipped).toMatchObject([
     { reason: "user_excluded", entity: { key: "US:NOMA" } },
   ]);
+});
+
+test("mock peers endpoint returns the comps selection without metrics", async ({
+  request,
+}) => {
+  const query = "target=US%3ANOMA&k=50";
+  const peers = await (await request.get(`/api/peers?${query}`)).json();
+  const comps = await (await request.get(`/api/comps?${query}`)).json();
+  expect(peers.peers.map((p: { entity: { key: string } }) => p.entity.key)).toEqual(
+    comps.peers.map((p: { entity: { key: string } }) => p.entity.key),
+  );
+  expect(peers.peers[0]).not.toHaveProperty("metrics");
+  expect(peers.returned_k).toBeLessThan(50);
+  expect(peers.note).toBeTruthy();
 });
 
 test("dataset hashes match fixture files", async ({

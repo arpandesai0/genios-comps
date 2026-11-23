@@ -33,6 +33,27 @@ done
 
 echo "Data folder: $dir"
 echo "Services: ${*:-all ($(echo $known))}"
-if [ $# -eq 0 ] || echo " $* " | grep -q " web "; then echo "UI:  http://localhost:3000"; fi
-echo "API: http://localhost:8000/api/health"
-DIR="$dir" exec docker compose up --build "$@"
+export DIR="$dir"
+# Start in the background and wait until every service is running (the API healthy, i.e. data ingested and
+# the model loaded), so the URLs below are printed only once they answer. Then follow the logs.
+if ! docker compose up --build --detach --wait "$@"; then
+  docker compose logs --tail 50 "$@" >&2
+  fail "Start-up failed: see the logs above. Stop what started with: make stop"
+fi
+
+line="****************************************************************"
+echo
+echo "$line"
+echo "  Comps service is up"
+echo "  Data:  $dir"
+if [ $# -eq 0 ] || echo " $* " | grep -q " web "; then echo "  UI:    http://localhost:3000"; fi
+echo "  API:   http://localhost:8000/api/health"
+echo "  Docs:  http://localhost:8000/docs"
+echo "  Ctrl+C stops the services (or run: make stop)"
+echo "$line"
+echo
+
+# Ctrl+C stops the services, as an attached `docker compose up` would.
+trap 'echo; docker compose stop "$@"; exit 0' INT TERM
+docker compose logs --follow --since 0s "$@" &
+wait $!

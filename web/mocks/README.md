@@ -4,7 +4,7 @@
 
 The mock server implements the documented HTTP endpoints so search, pagination, filtering, exclusions, and CSV can be exercised end to end. Financial values and summary statistics are computed by this server-side test double; the UI consumes their display values without rounding or calculating summaries.
 
-These mocks are not the Python ingestion or retrieval implementation and do not evaluate peer quality. Ranking and similarity are deterministic fixture signals, identified by the response method `Synthetic TF-IDF fixture`. The FX rates and 90-day freshness check are fixture values, not new production policy.
+These mocks are not the Python ingestion or retrieval implementation and do not evaluate peer quality. Ranking and similarity are deterministic fixture signals (earlier fixture rows score higher), not a model. The FX rates and 90-day freshness check are fixture values, not new production policy.
 
 Fixture cases:
 

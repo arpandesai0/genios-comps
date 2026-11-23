@@ -155,7 +155,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-21 | **General rule: serve no data rather than incorrect data.** This includes partial explanations. So `missing_inputs` names an unusable field *and* its failed conversion (e.g. `["total_debt", "reporting_currency"]`), and finding messages must say which value is actually used. |
 | 2026-11-21 | First backend slice is **read-only**: health, dataset, findings, company search/list/detail. Comps and ingest are not served yet (404). *(Ingest dropped 2026-11-22.)* |
 | 2026-11-21 | `make start DIR=<folder>` runs **docker compose** (API + web). `DIR` is required and must contain `companies.json` and `fx_rates.json`; there is no default path. `make stop` stops it. |
-| 2026-11-21 | Until comps exist, the UI in API mode hides the Compare page, and `/` redirects to `/data`. Mock mode still shows everything. *(The "Add company" form is removed, 2026-11-22.)* |
+| 2026-11-21 | ~~Until comps exist, the UI in API mode hides the Compare page, and `/` redirects to `/data`.~~ (Superseded 2026-11-23: Compare is served.) *(The "Add company" form is removed, 2026-11-22.)* |
 | 2026-11-21 | A company's findings (page, counts and `/api/dataset/findings?entity=KEY`) are its own: company-level, latest observation and finance. ~~A share-class sibling's mirror-image finding is not repeated.~~ (Moot since 2026-11-22: share classes are one issuer.) |
 | 2026-11-21 | Keep Docker and compose conventional (e.g. ports `3000:3000`). No networking or security hardening, which is not the point of the assessment. |
 | 2026-11-21 | **Priorities: data normalization (input) and retrieval (output) matter most.** The pipeline's outputs must match the expected results exactly. Findings are supporting statistics: keep them accurate, but don't spend effort polishing their granularity. |
@@ -197,6 +197,8 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | **One PR for the embedding stage** (contract, retriever, evals, serving, docs). |
 | 2026-11-22 | `make start` takes `SERVICES` (default: all compose services); naming services starts only those, e.g. `SERVICES=api` for local testing and evals without the front end. |
 | 2026-11-23 | **Thresholds come from a config file, not code:** `src/comps/settings.toml` holds the stale-price days, the default embedding model and one near-duplicate threshold per model; environment variables override. A model with no threshold stops start-up (no silent reuse of another model's value). |
+| 2026-11-23 | **Finish the UI** against the real API: Compare is always shown (no redirect to `/data`), uses `/api/comps`, shows `skipped` with reasons and `note`, and drops `method` / `shared_terms`. The API adapter serves the contract's currency-neutral names (`market_cap_m`, `enterprise_value_m`, `normalized`) and `currency`. The geography leak is left as is (out of time). |
+| 2026-11-23 | `make start` prints the URLs in a `****` banner only once the services are healthy, then follows the logs; the API healthcheck polls every second while starting, then once a minute. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -230,7 +232,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `docs/eval.md` | Retrieval evaluation: fixture, labels rubric, splits, metrics, the experiment log and its workflow, results. |
 | `docs/API.md` | HTTP contract shared by the backend and the UI. Change it in its own PR, before the code that depends on it. |
 | `scripts/dev/` | Developer notebooks and scripts for exploring modules against a local `DATA_DIR`. Commit notebooks with outputs cleared, because outputs would contain the supplied data. |
-| `web/` | Next.js + shadcn/ui front end, currently running on synthetic mocks. It talks to the API over HTTP only. |
+| `web/` | Next.js + shadcn/ui front end: Compare (`/`) and Data (`/data`). It talks to the API over HTTP only; `npm run dev` without `NEXT_PUBLIC_USE_MOCKS=0` uses synthetic mocks that follow the same contract. |
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
 | `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
 | `eval/fixtures/` | `retrieval/` (first universe), `independent/` (written by a different model) and `dedup/` (labelled pairs): builders, inputs and golden labels. |
