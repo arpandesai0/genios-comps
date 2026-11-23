@@ -10,7 +10,7 @@ An analyst names the company they want to research. The service picks that compa
 
 The service reads its data from a folder it is given at start-up. It runs fully offline and starts with a single command.
 
-This project is under active development. Setup instructions, design notes and evaluation results will be added as each part lands.
+Design and decisions: [DESIGN.md](DESIGN.md). Retrieval evaluation: [eval/README.md](eval/README.md). Time spent: [TIMELOG.md](TIMELOG.md).
 
 ## Setup and running
 
