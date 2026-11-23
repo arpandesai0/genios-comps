@@ -1,6 +1,6 @@
 # Retrieval eval: `tfidf-description` v1, dev split
 
-Machine-readable result: [`retrieval_tfidf_v1_dev.json`](retrieval_tfidf_v1_dev.json). Reproduce with `make eval`. The fixture and rubric are described in [`eval/README.md`](../README.md).
+Machine-readable result: [`retrieval_tfidf_v1_dev.json`](retrieval_tfidf_v1_dev.json). It was produced by the first in-process eval runner, since replaced (see [docs/eval.md](../../docs/eval.md)); experiment 2 reproduced it exactly with the black-box runner. The fixture and rubric are described in [`eval/README.md`](../README.md).
 
 **What was measured:** the served peer selection (`find_peers`, k = 10), from files through the snapshot, on 29 dev targets in a synthetic 57-company universe. **This is not a measurement on the hidden data**, and the universe was written by the same agent that wrote the ranker, so absolute numbers are optimistic. The comparisons between tags are the useful part. Held-out (28 targets) has not been scored.
 

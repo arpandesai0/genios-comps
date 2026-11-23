@@ -3,12 +3,13 @@
 import csv
 import io
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from comps.api import create_app
-from comps.config import IngestConfig, Settings
+from comps.config import IngestConfig, Settings, load_settings
 from comps.retrieval import NearDuplicates, TfidfRetriever, normalize_description, select_peers
 from comps.service import build_snapshot
 from conftest import FX, make_record
@@ -27,26 +28,15 @@ DOCS = {
 
 def index_and_dups(docs=DOCS):
     index = TfidfRetriever().fit(docs)
-    return index, NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()})
+    return index, NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()}, threshold=0.95)
 
 
-def test_similar_businesses_rank_first_and_terms_explain_why():
+def test_similar_businesses_rank_first():
     index, _ = index_and_dups()
     scores = index.similarities("US:BANKA")
     assert "US:BANKA" not in scores
     assert max(scores, key=scores.get) == "US:TWIN"
     assert scores["US:BANKB"] > scores["US:STEEL"] and scores["US:BANKB"] > scores["US:SOFT"]
-    terms = index.shared_terms("US:BANKA", "US:BANKB")
-    assert 0 < len(terms) <= 5 and set(terms) <= {
-        "bank",
-        "deposit",
-        "accounts",
-        "mortgages",
-        "small",
-        "business",
-        "loans",
-    }
-    assert index.shared_terms("US:STEEL", "US:SOFT") == []
 
 
 def test_stop_word_only_descriptions_are_not_indexed():
@@ -109,7 +99,7 @@ def test_target_without_description_gets_no_peers_and_a_note():
 def test_ties_are_ordered_by_key():
     docs = {"US:T": "alpha beta", "US:B": "alpha gamma", "US:A": "alpha delta"}
     index = TfidfRetriever().fit(docs)
-    dups = NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()})
+    dups = NearDuplicates(index, {k: normalize_description(v) for k, v in docs.items()}, threshold=0.95)
     sel = select_peers("US:T", 2, universe=docs, ranker=index, duplicates=dups)
     assert [p.key for p in sel.peers] == ["US:A", "US:B"]
 
@@ -133,19 +123,19 @@ def api(tmp_path):
     (tmp_path / "companies.json").write_text(json.dumps(UNIVERSE))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
     settings = Settings(data_dir=tmp_path, ingest=IngestConfig())
-    with TestClient(create_app(lambda: build_snapshot(settings))) as c:
+    with TestClient(create_app(lambda: build_snapshot(settings, TfidfRetriever()))) as c:
         yield c
 
 
 def test_peers_endpoint(api):
     body = api.get("/api/peers", params={"target": "US:BNKA", "k": 2}).json()
-    assert body["method"] == {"name": "tfidf-description", "version": "1"}
+    assert "method" not in body
     assert body["target"]["key"] == "US:BNKA"
     assert (body["requested_k"], body["returned_k"], body["note"]) == (2, 2, None)
     first = body["peers"][0]
     assert first["rank"] == 1 and first["entity"]["key"] == "US:BNKB"
     ev = first["evidence"]
-    assert 0 < ev["similarity"] < 1 and ev["shared_terms"]
+    assert 0 < ev["similarity"] < 1 and "shared_terms" not in ev
     assert ev["classification"] == {"sector": True, "industry": True, "sub_industry": True}
     assert ev["country_match"] is True and ev["revenue_ratio"] == 0.5
     assert "metrics" not in first
@@ -259,8 +249,89 @@ def test_revenue_ratio_never_overflows_and_rounds_half_away(tmp_path):
     ]
     (tmp_path / "companies.json").write_text(json.dumps(recs))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
-    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()))
+    s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()), TfidfRetriever())
     ratios = {p.company.entity.key: p.evidence.revenue_ratio for p in find_peers(s, "US:TINY", 3).peers}
     assert ratios["US:HUGE"] is None  # 1e600 is not representable: blank, not a crash
     halves = {p.company.entity.key: p.evidence.revenue_ratio for p in find_peers(s, "US:ONE", 3).peers}
     assert halves["US:HALF"] == 0.13  # 0.125 rounds half away from zero
+
+
+def test_embedding_settings_are_read_at_startup():
+    from comps.config import DEFAULT_EMBEDDING_MODEL, load_settings
+
+    cfg = load_settings({"EMBEDDING_MODEL": "some/model", "MODEL_CACHE_DIR": "/m", "MODEL_OFFLINE": "1"}).retrieval
+    assert (cfg.model, str(cfg.cache_dir), cfg.offline) == ("some/model", "/m", True)
+    default = load_settings({}).retrieval
+    assert (default.model, default.offline, default.near_duplicate) == (DEFAULT_EMBEDDING_MODEL, False, 0.88)
+    assert default.cache_dir == Path("~/.cache/comps-models").expanduser()  # persistent, not a temp folder
+    assert load_settings({"MODEL_OFFLINE": "TRUE", "NEAR_DUPLICATE_THRESHOLD": ""}).retrieval.offline is True
+    assert load_settings({"NEAR_DUPLICATE_THRESHOLD": "1"}).retrieval.near_duplicate == 1.0
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"MODEL_OFFLINE": "maybe"},
+        {"NEAR_DUPLICATE_THRESHOLD": "high"},
+        {"NEAR_DUPLICATE_THRESHOLD": "1.5"},
+        {"NEAR_DUPLICATE_THRESHOLD": "0"},
+    ],
+)
+def test_malformed_retrieval_settings_fail_startup(env):
+    from comps.config import load_settings
+
+    with pytest.raises(ValueError):
+        load_settings(env)
+
+
+class _Index:
+    keys = ("A", "B", "C")
+
+    def similarity(self, a, b):
+        return {frozenset("AB"): 0.88, frozenset("AC"): 0.8799}[frozenset(a + b)]
+
+
+def test_near_duplicate_threshold_is_inclusive():
+    dups = NearDuplicates(_Index(), {"A": "a", "B": "b", "C": "c"}, threshold=0.88)
+    assert dups.check("A", "B") == 0.88 and dups.check("A", "C") is None
+
+
+class _FakeEncoder:
+    def __init__(self):
+        self.seen = []
+
+    def embed(self, texts):
+        self.seen.extend(texts)
+        table = {"bank": [3.0, 4.0], "lender": [4.0, 3.0], "anti": [-3.0, -4.0]}
+        return [table[t.split(": ")[-1]] for t in texts]
+
+
+def test_embedding_index_normalizes_rows_and_clamps_to_unit_range():
+    from comps.retrieval.embedding import EmbeddingRetriever
+
+    index = EmbeddingRetriever("m", encoder=_FakeEncoder()).fit({"A": "bank", "B": "lender", "C": "anti", "D": "  "})
+    assert index.keys == ("A", "B", "C")  # blank description not indexed
+    sims = index.similarities("A")
+    assert sims["B"] == pytest.approx(24 / 25) and sims["C"] == 0.0  # negative cosine clamps to 0
+    assert index.similarity("A", "A") == pytest.approx(1.0)
+    assert EmbeddingRetriever("m", encoder=_FakeEncoder()).fit({"A": " "}).keys == ()
+
+
+def test_embedding_prompt_applies_whatever_the_model_name_case():
+    from comps.retrieval.embedding import EmbeddingRetriever
+
+    enc = _FakeEncoder()
+    EmbeddingRetriever("Google/EmbeddingGemma-300M", encoder=enc).fit({"A": "bank"})
+    assert enc.seen == ["task: sentence similarity | query: bank"]
+
+
+def test_missing_model_fails_startup_with_no_fallback(tmp_path):
+    from comps.retrieval.embedding import ModelUnavailable
+
+    (tmp_path / "companies.json").write_text(json.dumps(UNIVERSE))
+    (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
+    settings = load_settings(
+        {"DATA_DIR": str(tmp_path), "MODEL_CACHE_DIR": str(tmp_path / "empty"), "MODEL_OFFLINE": "1"}
+    )
+    with pytest.raises(ModelUnavailable, match="MODEL_OFFLINE is set"):
+        build_snapshot(settings)

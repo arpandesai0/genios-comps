@@ -134,7 +134,6 @@ def evidence_json(r: PeersResult, i: int) -> dict[str, Any]:
     ev = r.peers[i].evidence
     return {
         "similarity": ev.similarity,
-        "shared_terms": list(ev.shared_terms),
         "classification": dict(ev.classification),
         "country_match": ev.country_match,
         "revenue_ratio": ev.revenue_ratio,
@@ -162,7 +161,6 @@ def _selection_json(r: PeersResult) -> dict[str, Any]:
 def peers_json(s: Snapshot, r: PeersResult) -> dict[str, Any]:
     return {
         "dataset_version": s.dataset.version,
-        "method": {"name": s.method[0], "version": s.method[1]},
         "target": summary_json(r.target),
         **_selection_json(r),
         "peers": [
@@ -181,7 +179,6 @@ def comps_json(s: Snapshot, c: CompsResult) -> dict[str, Any]:
     return {
         "dataset_version": s.dataset.version,
         "currency": CURRENCY,
-        "method": {"name": s.method[0], "version": s.method[1]},
         "target": {
             "entity": summary_json(r.target),
             "metrics": metrics_json(r.target.metrics),
@@ -416,7 +413,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
             return s, _error(422, "invalid_request", str(exc), {"unknown_keys": exc.keys})
 
     _SELECTION = (
-        "Candidates are ranked by **description similarity** (TF-IDF cosine); size, geography and "
+        "Candidates are ranked by **description similarity** of the descriptions; size, geography and "
         "classification are evidence only, never ranking inputs, and valuation multiples are never used. "
         "The ranking is walked until `k` peers are chosen, skipping (with a reason) analyst exclusions, "
         "near-duplicates of the target and near-duplicates of a peer already chosen. Companies without a "

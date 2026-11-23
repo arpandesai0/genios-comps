@@ -7,7 +7,7 @@ settings must come with an eval result.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -31,11 +31,6 @@ class TfidfIndex:
 
     def similarity(self, a: str, b: str) -> float:
         return _unit(float(self._matrix[self._row[a]].multiply(self._matrix[self._row[b]]).sum()))
-
-    def shared_terms(self, a: str, b: str, n: int = 5) -> Sequence[str]:
-        product = self._matrix[self._row[a]].multiply(self._matrix[self._row[b]]).tocoo()
-        pairs = sorted(zip(product.data, product.col, strict=True), key=lambda p: (-p[0], self._terms[p[1]]))
-        return [str(self._terms[col]) for weight, col in pairs[:n] if weight > 0]
 
 
 def _unit(x: float) -> float:

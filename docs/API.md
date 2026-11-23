@@ -135,10 +135,10 @@ Query parameters: `target` (company key, required; any share-class key resolves)
 
 **How peers are chosen** (AGENTS.md §4, 2026-11-22):
 
-- Candidates are ranked by **description similarity** (`method` names the ranker; the first is TF-IDF cosine). Size, geography and classification are shown as evidence and are never ranking inputs. Valuation multiples are never used. There is no similarity floor.
+- Candidates are ranked by **description similarity**. Size, geography and classification are shown as evidence and are never ranking inputs. Valuation multiples are never used. There is no similarity floor. Which model computes the similarity is a server setting and is not part of the response (see [retrieval.md](retrieval.md)).
 - The ranking is walked from the top until `k` peers are chosen. A candidate is **skipped**, with a reason, when it is in `exclude` (`user_excluded`), a near-duplicate of the target (`near_duplicate_of_target`), or a near-duplicate of a peer already chosen (`near_duplicate_of_peer`; the higher-ranked one stays). When several apply, that order decides the reason. Skipped candidates never count toward `k`, and only chosen peers are checked for `near_duplicate_of_peer`.
-- Two companies are **near-duplicates** when their descriptions are identical after normalizing case and whitespace, or their description TF-IDF cosine (unrounded) is ≥ 0.95. Neither can be the other's peer.
-- A **usable description** is non-empty after trimming and has at least one term the ranker can use (for TF-IDF: a word that is not an English stop word). A company without one cannot be ranked: as a candidate it is skipped with `no_description`; as the target, no peers are returned and `note` says why.
+- Two companies are **near-duplicates** when their descriptions are identical after normalizing case and whitespace, or their description similarity (unrounded) is at or above the server's near-duplicate threshold (0.88 by default). Neither can be the other's peer.
+- A **usable description** is non-empty after trimming. A company without one cannot be ranked: as a candidate it is skipped with `no_description`; as the target, no peers are returned and `note` says why.
 - If the ranking runs out first, fewer peers are returned and `note` says why. The list is never padded.
 - Ties in similarity are ordered by key. `rank` is the position among the returned peers (1 … `returned_k`).
 - `exclude`: empty items are ignored and repeats count once; a key of the target is ignored; an unknown key is a 422.
@@ -147,8 +147,7 @@ Query parameters: `target` (company key, required; any share-class key resolves)
 type SkipReason = "near_duplicate_of_target" | "near_duplicate_of_peer" | "user_excluded" | "no_description";
 
 interface Evidence {                         // why this peer was chosen
-  similarity: number;                        // description similarity to the target under `method`, 0–1, rounded to 4 dp; NOT a probability
-  shared_terms: string[];                    // up to 5 terms present in both descriptions, ranked by the product of their weights (ties alphabetical); may be empty
+  similarity: number;                        // description similarity to the target, 0–1, rounded to 4 dp; higher is closer; NOT a probability
   classification: { sector: boolean; industry: boolean; sub_industry: boolean };   // label equal to the target's (false if either is missing); evidence only
   country_match: boolean;                    // same country (false if either is the unknown "*"); evidence only
   revenue_ratio: number | null;              // peer revenue / target revenue (latest observation, dataset currency), rounded to 2 dp; may be ≤ 0 when the peer's revenue is; null if either is unavailable or the target's is ≤ 0
@@ -157,14 +156,13 @@ interface Evidence {                         // why this peer was chosen
 interface Skipped {
   entity: EntitySummary;
   reason: SkipReason;
-  detail: string;                            // human-readable, e.g. "Near-duplicate of US:ABC (description cosine 0.97)."
-  similarity: number | null;                 // to the target (4 dp), even for near_duplicate_of_peer, whose candidate-to-peer cosine is in `detail`; null for no_description and for exclusions not met in the walk
+  detail: string;                            // human-readable, e.g. "Near-duplicate of the target US:ABC: the descriptions are (almost) the same."
+  similarity: number | null;                 // to the target (4 dp), even for near_duplicate_of_peer; null for no_description and for exclusions not met in the walk
   duplicate_of: string | null;               // the shown key it duplicates (target or chosen peer); null otherwise
 }
 
 interface PeersResponse {
   dataset_version: string;
-  method: { name: string; version: string }; // e.g. { name: "tfidf-description", version: "1" }
   target: EntitySummary;
   requested_k: number;
   returned_k: number;
@@ -187,7 +185,6 @@ To remove a peer, the UI calls the endpoint again with that key added to `exclud
 interface CompsResponse {
   dataset_version: string;
   currency: string;                          // dataset currency of market cap and EV
-  method: { name: string; version: string };
   requested_k: number;
   returned_k: number;
   target: { entity: EntitySummary; metrics: Metrics; findings: Finding[] };

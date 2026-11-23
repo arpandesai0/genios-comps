@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn==0.32.1",
     "numpy==2.1.3",
     "scikit-learn==1.5.2",
+    "fastembed==0.9.1",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +46,10 @@ ignore = [
     # Comments intentionally use mathematical symbols such as `×` to document formulas.
     "RUF003",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Hand-written fixture descriptions are long prose strings.
+"eval/fixtures/**" = ["E501", "RUF001"]
 
 [tool.mypy]
 python_version = "3.11"

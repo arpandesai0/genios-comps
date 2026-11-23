@@ -18,6 +18,7 @@ import pytest
 
 from comps.config import IngestConfig, Settings
 from comps.models import Finding, MetricValue
+from comps.retrieval import TfidfRetriever
 from comps.service import Snapshot, build_snapshot
 
 FIXTURE = Path(__file__).parent / "fixtures" / "planted_defects"
@@ -27,7 +28,7 @@ EXPECTED = json.loads((FIXTURE / "expected.json").read_text())
 
 @pytest.fixture(scope="module")
 def snapshot() -> Snapshot:
-    return build_snapshot(Settings(data_dir=FIXTURE, ingest=IngestConfig()))
+    return build_snapshot(Settings(data_dir=FIXTURE, ingest=IngestConfig()), TfidfRetriever())
 
 
 def _key(f: Finding) -> tuple:
