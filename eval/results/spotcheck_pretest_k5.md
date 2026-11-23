@@ -18,7 +18,7 @@ A qualitative check, not part of the scored eval: the supplied file is a pre-tes
 | Targets whose top-1 peer is grade 3 | 36 of 36 |
 | Peers whose sector, industry and sub-industry labels match the target's | 180 of 180 |
 
-The reported Irovaiva Air Group case was also checked: all six airlines rank first, followed by aerospace companies.
+The reported airline case (look-alike names; see retrieval_business_descriptions.md) was also checked: all six airlines rank first, followed by aerospace companies.
 
 **Limits**
 - These are model judgements, not human labels.

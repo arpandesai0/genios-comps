@@ -245,9 +245,9 @@ def description_frequency(entities: Mapping[str, Entity]) -> dict[str, int]:
 def business_description(e: Entity, frequency: Mapping[str, int]) -> str | None:
     """``e.description`` without the distinctive words of the issuer's own names, for similarity only.
 
-    Descriptions usually open with the company's invented name ("Irovaiva Air Group operates ..."). Embedding
-    models split invented words into sub-word pieces, so unrelated companies with look-alike names ("Irovaiva",
-    "Irovaor") score as similar. A word of the issuer's name or aliases is removed when no other company's
+    Descriptions usually open with the company's invented name ("Zarqon Air Group operates ..."). Embedding
+    models split invented words into sub-word pieces, so unrelated companies with look-alike names ("Zarqon",
+    "Zarquel") score as similar. A word of the issuer's name or aliases is removed when no other company's
     description contains it (``frequency`` <= 1): that is the invented part. Words other descriptions also use
     ("Air", "Offshore", "Drilling") describe the business and stay. Nothing else changes; the supplied
     description is kept for display. A description left with nothing but legal suffixes has no business
@@ -259,7 +259,7 @@ def business_description(e: Entity, frequency: Mapping[str, int]) -> str | None:
     distinctive = {w for w in own if frequency.get(w, 0) <= 1 and w not in _SUFFIXES}
     if not distinctive:
         return e.description
-    # A removed word takes its possessive with it ("Irovaiva's fleet" -> "fleet").
+    # A removed word takes its possessive with it ("Zarqon's fleet" -> "fleet").
     text = _NAME_WORD.sub(lambda m: "" if m.group(1).casefold() in distinctive else m.group(0), e.description)
     text = re.sub(r"\s+([,.;:)])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
     if not (_words(text) - _SUFFIXES):

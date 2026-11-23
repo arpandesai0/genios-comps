@@ -443,7 +443,7 @@ def test_business_description_removes_only_distinctive_name_words():
 @pytest.mark.parametrize(
     ("name", "description", "expected"),
     [
-        ("Haventet Pay Inc", "Haventet Pay Corp offers payments.", "Pay Corp offers payments."),  # suffix differs
+        ("Quillor Pay Inc", "Quillor Pay Corp offers payments.", "Pay Corp offers payments."),  # suffix differs
         ("AT&T Inc", "AT&T Inc sells phone plans.", "Inc sells phone plans."),  # regex characters are literal
         ("Acme Corp", "Acme Corp.", None),  # only the name: nothing about the business
     ],
@@ -451,7 +451,7 @@ def test_business_description_removes_only_distinctive_name_words():
 def test_business_description_edge_cases(name, description, expected):
     from comps.ingest import business_description
 
-    frequency = {"haventet": 1, "at&t": 1, "acme": 1, "pay": 3, "inc": 9, "corp": 9}
+    frequency = {"quillor": 1, "at&t": 1, "acme": 1, "pay": 3, "inc": 9, "corp": 9}
     assert business_description(_entity(name, description), frequency) == expected
 
 

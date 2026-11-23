@@ -10,7 +10,9 @@ An analyst names the company they want to research. The service picks that compa
 
 The service reads its data from a folder it is given at start-up. It runs fully offline and starts with a single command.
 
-This project is under active development. Setup instructions, design notes and evaluation results will be added as each part lands.
+**Quick start:** `make start DIR=/path/to/data` (needs Docker), then open <http://localhost:3000>. Tests: `make check`.
+
+Design and decisions: [DESIGN.md](DESIGN.md). Retrieval evaluation: [eval/README.md](eval/README.md). Time spent: [TIMELOG.md](TIMELOG.md).
 
 ## Setup and running
 
@@ -26,13 +28,12 @@ make stop                                   # stops them
 
 The first build downloads the embedding model (`sentence-transformers/all-MiniLM-L6-v2`, about 90 MB) into the image; this is the only network use. At runtime the service is fully offline, and it refuses to start if the model is missing. Start-up embeds every company description once (a few seconds for a few hundred companies).
 
-- UI: <http://localhost:3000>. It opens the **Data** view: dataset health, every company, and each company's observation history, normalized USD values, conversion factors, metrics and findings.
+- UI: <http://localhost:3000>. It opens **Compare** (`/`): search a company, pick `k`, and get the comps table, with peers ranked by description similarity, their metrics, the evidence for each peer, peer-only summary statistics, the companies skipped and why, and a CSV export. Removing a peer re-requests the table, and the server recomputes the statistics.
+- **Data** (`/data`): dataset health, every company, and each company's observation history, normalized USD values, conversion factors, metrics and findings.
 - API: <http://localhost:8000/api/health>. The endpoints are described in [`docs/API.md`](docs/API.md).
 - **Using a different data file:** point `DIR` at another folder with the same two files. The data is mounted read-only and never copied into an image.
 
 Once everything is healthy, `make start` prints the URLs between two `****` lines and then follows the logs; Ctrl+C stops the services.
-
-- **Compare** (`/`): search a company, pick `k`, and get the comps table: peers ranked by description similarity with their metrics, the evidence for each peer, peer-only summary statistics, the companies skipped and why, CSV export. Removing a peer re-requests the table, and the statistics are recomputed by the server.
 
 Status: the data endpoints, peer selection (`/api/peers`) and comps tables (`/api/comps`, `/api/comps.csv`) are served, and the UI uses all of them. The input files are the whole dataset: there is no way to add or edit companies at runtime.
 
@@ -54,7 +55,7 @@ Where the brief is silent, the service assumes the following:
 12. **Money is in USD, and `fx_rates.json` must have base USD.** The glossary defines each rate as US dollars per one unit of the currency, so a file with any other `base` is rejected at start-up with a clear error. USD itself is 1.0: it is added if missing, a positive value other than 1.0 is an error, and an unusable USD value (zero, negative, not a number) is dropped like any bad rate, keeping 1.0. A rate that is zero, negative or not a number is dropped with an `invalid_fx_rate` finding. A currency with no usable rate is a data issue: values in it are blank, with an `unknown_currency` finding. Only ingestion converts currency.
 13. **One company → one exchange → one country.** Each country is assumed to have a single stock exchange, and each listing trades on one exchange, so `country:ticker` identifies a listing. The same ticker in two countries (e.g. `US:ABC` and `CA:ABC`) is treated as two different companies.
 14. **Share classes of one issuer are one company.** Listings in the same country whose issuer-level data is identical are merged; see [Share classes](#share-classes-disjoint-set-union).
-15. **Peers are chosen by meaning, with one local embedding model.** Descriptions are compared without the invented words of the company's own name (name words no other description uses, e.g. "Irovaiva" in "Irovaiva Air Group"; "Air" stays): look-alike invented names ("Irovaiva Air", "Irovaor Fibre") would otherwise make unrelated companies similar. The near-duplicate test keeps the names, since two listings of one company share theirs. Descriptions are compared with `sentence-transformers/all-MiniLM-L6-v2`, run locally. It was chosen over TF-IDF and two other models by the retrieval eval ([eval/README.md](eval/README.md)). One model does both ranking and duplicate detection: a hybrid (for example, TF-IDF for duplicates) is out of scope for now. The model is a required part of the service, and there is no fallback.
+15. **Peers are chosen by meaning, with one local embedding model.** Descriptions are compared without the invented words of the company's own name (name words no other description uses, e.g. "Zarqon" in "Zarqon Air Group"; "Air" stays): look-alike invented names ("Zarqon Air", "Zarquel Fibre") would otherwise make unrelated companies similar. The near-duplicate test keeps the names, since two listings of one company share theirs. Descriptions are compared with `sentence-transformers/all-MiniLM-L6-v2`, run locally. It was chosen over TF-IDF and two other models by the retrieval eval ([eval/README.md](eval/README.md)). One model does both ranking and duplicate detection: a hybrid (for example, TF-IDF for duplicates) is out of scope for now. The model is a required part of the service, and there is no fallback.
 16. **Two companies are near-duplicates at a description similarity of 0.88 or more** (or identical text), and are then never each other's peers. Hiding a genuine peer is treated as worse than showing a duplicate, so the cut is the lowest one that flags none of the labelled non-duplicates. These are the 40 most similar pairs in the supplied data (all genuine peers, the highest at 0.873) plus synthetic pairs. This threshold is the one rule tuned on the supplied pre-test data (an exception the owner made on 2026-11-22). Heavily reworded duplicate listings can still score below it and appear as peers.
 
 ## AI usage
@@ -76,9 +77,11 @@ Where the brief is silent, the service assumes the following:
 
 ## Requesting a comps table
 
-1. Find the company's key by text: `GET /api/companies?q=dorust` (key, ticker or name). Each result has a `key` such as `CA:DOLG`.
-2. Build the table: `GET /api/comps?target=CA:DOLG&k=10`. Add `exclude=US:AAAA,US:BBBB` to remove peers; the summary statistics are recomputed.
-3. Download it: `GET /api/comps.csv?target=CA:DOLG&k=10`.
+Keys and names below are placeholders: use any company in your data file.
+
+1. Find the company's key by text: `GET /api/companies?q=acme` (key, ticker or name). Each result has a `key` such as `US:ACME`.
+2. Build the table: `GET /api/comps?target=US:ACME&k=10`. Add `exclude=US:AAAA,US:BBBB` to remove peers; the summary statistics are recomputed.
+3. Download it: `GET /api/comps.csv?target=US:ACME&k=10`.
 
 `GET /api/peers?target=...` returns the same peers with the evidence for each (description similarity, classification and country match, revenue ratio) but no metrics. How peers are chosen is in [`docs/retrieval.md`](docs/retrieval.md).
 

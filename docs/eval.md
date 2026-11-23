@@ -62,7 +62,7 @@ Every company and description is invented. Each fixture has a builder script tha
 
 - **Aliases** are second listings of a company (another ticker, lightly reworded text, different numbers so the share-class merge leaves them apart). A returned alias scores as its original, and only the first of the two counts.
 - **Splits: 50/50 dev / held-out**, alternating within each business so both halves cover every business, with tags spread evenly.
-  - Iterate on dev. Held-out is scored once, when the owner calls a configuration final (done in experiments 6 and 7).
+  - Iterate on dev. Held-out is scored once, when the owner calls a configuration final (experiments 6 and 7). **Exception:** experiments 10–13 (look-alike names) scored held-out on every run. The choice was made on the independent dev split, but held-out was visible, so its numbers for 13 are weaker evidence.
   - Within a fixture, held-out shares its author and style with dev. That's why the independent fixture exists.
 
 ### Dedup pairs

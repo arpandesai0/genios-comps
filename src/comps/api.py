@@ -342,7 +342,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
         tags=["companies"],
         summary="Get one company by its exact key",
         description=(
-            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:IROV`, ignoring case (`gb:irov` works; "
+            "Exact lookup by the company key `COUNTRY:TICKER`, e.g. `GB:ZRQA`, ignoring case (`gb:zrqa` works; "
             "the response carries the canonical key). A bare ticker (`IROV`) "
             "or a name is not a key and returns 404: find the key with `GET /api/companies?q=` first. "
             "A share-class key resolves to its issuer, and the response carries the issuer's shown key. "
@@ -352,7 +352,7 @@ def create_app(snapshot_factory: Callable[[], Snapshot] | None = None) -> FastAP
     )
     def company(
         request: Request,
-        key: Annotated[str, Path(description="Company key `COUNTRY:TICKER`.", examples=["GB:IROV"])],
+        key: Annotated[str, Path(description="Company key `COUNTRY:TICKER`.", examples=["GB:ZRQA"])],
     ) -> Any:
         s = snap(request)  # read the snapshot once, so the company and the version always agree
         c = s.resolve(key, ignore_case=True)

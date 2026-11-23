@@ -56,7 +56,7 @@ load → validate/normalize → resolve entities → merge share classes → sna
 
 | Problem | Decision | Alternatives considered |
 |---|---|---|
-| Prices and financials in different currencies, and financials in thousands / millions / billions | Convert everything to **USD millions** in ingestion only; later stages are currency-agnostic | Converting in finance (two places to get wrong) |
+| Prices and financials in different currencies, and financials in millions or thousands | Convert everything to **USD millions** in ingestion only; later stages are currency-agnostic | Converting in finance (two places to get wrong) |
 | `fx_rates.json` has a `base` field | Must be USD (the glossary's definition); any other base is a blocking error | Accepting any base and converting through it (planned, then dropped as out of scope) |
 | A rate that is zero, negative or not a number; a currency with no rate | The rate is dropped (`invalid_fx_rate`); values in that currency are blank (`unknown_currency`) | Assuming 1.0 |
 | Implausibly large values (suspected unit errors) | **Used as given**, never rescaled: the supplied numbers are the source of truth | Heuristic rescaling (would rewrite data on a guess) |
@@ -85,7 +85,7 @@ load → validate/normalize → resolve entities → merge share classes → sna
 | Problem | Decision | Alternatives considered |
 |---|---|---|
 | How to rank | Cosine similarity of **local sentence embeddings** (MiniLM-L6, ONNX via fastembed) of business descriptions. It runs offline and is chosen by the eval: on the independent fixture, nDCG@10 rose from 0.46 to 0.73 over TF-IDF | TF-IDF (served first; misses paraphrases); bge-small and EmbeddingGemma (lower on the independent fixture; Gemma too slow to start); BM25 (lexical like TF-IDF); a hybrid (out of scope) |
-| **Invented company names** dominate the text ("Irovaiva Air Group" ≈ "Irovaor Fibre") | Ingestion derives a `business_description` without the distinctive name words (words no other description uses). Ranking uses it, and the analyst sees the original. Independent fixture 0.729 → 0.769; look-alike fixture 0.757 → 0.852 | Removing whole names (removed business words such as "Air", "Drilling"; −0.09); adding labels to the ranking (wrong labels would then move rankings) |
+| **Invented company names** dominate the text ("Zarqon Air Group" ≈ "Zarquel Fibre") | Ingestion derives a `business_description` without the distinctive name words (words no other description uses). Ranking uses it, and the analyst sees the original. Independent fixture 0.729 → 0.769; look-alike fixture 0.757 → 0.852 | Removing whole names (removed business words such as "Air", "Drilling"; −0.09); adding labels to the ranking (wrong labels would then move rankings) |
 | **Duplicate listings** of one company (not share classes: different numbers, reworded text) | Near-duplicates (similarity ≥ 0.88 on the description as supplied, or identical text) are never each other's peers; the higher-ranked one stays. The threshold is the lowest cut that flags no labelled non-duplicate. A false duplicate (hiding a real peer) counts as worse than a missed one | 0.95 (inherited from TF-IDF; let 5 double listings through) |
 | How many peers | The analyst picks `k` (1–50). The ranking is walked until `k` peers are found, skipping the target, near-duplicates, exclusions and companies without a description, each with a reason. No padding and no similarity floor: if it runs out, fewer are returned with a note | A fixed k; a similarity floor (would hide peers in thin universes) |
 | Why each peer | Evidence per peer: similarity, label and country match, revenue ratio, limitations. The model internals are not shown to the analyst | Showing matched terms (TF-IDF only; removed with embeddings) |
@@ -122,7 +122,7 @@ Found in the supplied pre-test file (485 records, 477 companies after merging) o
 | Exact duplicate records | 3 | collapsed | `exact_duplicate` |
 | Invented names that look alike across unrelated businesses | 5 | distinctive name words removed before ranking | (derived text, no finding) |
 | Name suffix differs between the name and the description ("Inc" vs "Corp") | 5 | handled by the word-level rule | none |
-| Synthetic only: wrong types, unknown currencies, bad FX rates, no ticker, no country, units in thousands/billions, overflowing values, empty text | 1–6 | per the stage tables above | see the [findings catalogue](docs/ingestion.md#findings-catalogue) |
+| Synthetic only: wrong types, unknown currencies, bad FX rates, no ticker, no country, units in thousands or an invalid unit such as billions, overflowing values, empty text | 1–6 | per the stage tables above | see the [findings catalogue](docs/ingestion.md#findings-catalogue) |
 
 ## How we know it works (acceptance criteria)
 
