@@ -57,6 +57,23 @@ Where the brief is silent, the service assumes the following:
 15. **Peers are chosen by meaning, with one local embedding model.** Descriptions are compared without the invented words of the company's own name (name words no other description uses, e.g. "Irovaiva" in "Irovaiva Air Group"; "Air" stays): look-alike invented names ("Irovaiva Air", "Irovaor Fibre") would otherwise make unrelated companies similar. The near-duplicate test keeps the names, since two listings of one company share theirs. Descriptions are compared with `sentence-transformers/all-MiniLM-L6-v2`, run locally. It was chosen over TF-IDF and two other models by the retrieval eval ([eval/README.md](eval/README.md)). One model does both ranking and duplicate detection: a hybrid (for example, TF-IDF for duplicates) is out of scope for now. The model is a required part of the service, and there is no fallback.
 16. **Two companies are near-duplicates at a description similarity of 0.88 or more** (or identical text), and are then never each other's peers. Hiding a genuine peer is treated as worse than showing a duplicate, so the cut is the lowest one that flags none of the labelled non-duplicates. These are the 40 most similar pairs in the supplied data (all genuine peers, the highest at 0.873) plus synthetic pairs. This threshold is the one rule tuned on the supplied pre-test data (an exception the owner made on 2026-11-22). Heavily reworded duplicate listings can still score below it and appear as peers.
 
+## AI usage
+
+**Every business and engineering decision was made by the human code owner.** That covers what counts as a peer, how duplicates and share classes are treated, which numbers feed the calculations, what is in or out of scope, which model is served and every threshold. The AI agents proposed options and recommendations, and the owner chose. Each decision is recorded with its date in [AGENTS.md §4](AGENTS.md#4-decision-log). The working rules the agents followed (ask, don't decide; small PRs; agents never merge) are in [AGENTS.md §2](AGENTS.md#2-how-to-work).
+
+**Where AI tools helped**
+- **Planning:** a first planning handoff (Codex) and stage-by-stage option lists with recommendations (Claude Code) for the owner to decide on.
+- **Implementation:** Claude Code wrote most of the Python service (ingestion, share-class merge, finance, retrieval, API), the tests, the eval harness and the docs. Codex built the first version of the Next.js UI against mocks.
+- **Independent test data:** the second ranking fixture, the look-alike-names fixture and the labelled near-duplicate pairs were written by a different model (Sonnet) that never saw the ranker or its scores. This keeps the eval from grading itself.
+- **Review:** every PR got a review from a smaller model (Sonnet). The authoring agent answered each comment and fixed or declined it with a reason, and the owner reviewed and merged by hand.
+- **Spot checks:** Sonnet sub-agents judged peer lists for 36 random companies in the supplied data by reading the descriptions ([method and results](eval/results/spotcheck_pretest_k5.md)).
+
+**How the output was checked**
+- **Tests on synthetic data only:** unit tests per rule, and an end-to-end acceptance fixture with one planted defect per company whose hand-derived `expected.json` must match exactly. `make check` (lint, types, tests) runs locally and in CI on every PR.
+- **The glossary as ground truth:** every formula, status and rounding rule was checked against the brief's glossary, which overrides any AI-written doc.
+- **Measurement, not claims:** each change to what is served came with a black-box eval run on fixed inputs, logged in an append-only experiment log ([eval/README.md](eval/README.md)). Regressions are reported next to gains, and estimates are never presented as measurements.
+- **Running it:** the owner ran the service on the supplied data and inspected results in the UI. Two problems the AI had missed came from this: a broken Compare page against the real API, and look-alike company names skewing peers. Both were fixed and measured.
+
 ## Requesting a comps table
 
 1. Find the company's key by text: `GET /api/companies?q=dorust` (key, ticker or name). Each result has a `key` such as `CA:DOLG`.
@@ -103,3 +120,14 @@ Settings: thresholds and defaults (stale-price days, embedding model, near-dupli
 CI runs four workflows on every pull request and push to `main`: `lint`, `typecheck`, `tests` (Python 3.11 and 3.12, with a coverage report) and `repo-hygiene` (notebooks cleared, no supplied data or local state committed).
 
 Optional: `pre-commit install` enables hooks that run ruff and strip notebook outputs on each commit (see `.pre-commit-config.yaml`).
+
+## What I'd do with more time
+
+Ranked by expected value for an analyst:
+
+1. **Make retrieval more agentic and web-search driven.** Much of the remaining ambiguity is better settled by an agent with tools than by fixed rules: what a company really does, whether two listings are the same issuer, whether a label is wrong, which peers an analyst would accept. Small language models (SLMs) could run locally to keep the service offline-friendly, with web search used where policy allows. Model-derived signals would stay marked as such, never treated as fact.
+2. **Reduce the geography leak.** When the ranker is wrong, the wrong peer shares the target's country more often than chance, because descriptions say "based in …". The fix would be stripping or down-weighting country phrases, measured on the eval's cross-country and geo-trap cases.
+3. **Catch heavily reworded duplicate listings.** Copies reworded enough to score below the 0.88 near-duplicate threshold still appear as peers. A dedicated duplicate model, or an agent check, could catch them without lowering the threshold and hiding real peers.
+4. **Harder evaluation on real-format data.** A random sample of the supplied data is easy, with about five near-identical companies per business. More planted hard cases are needed (mislabelled companies, boilerplate-heavy descriptions, thin universes), plus repeated runs to measure run-to-run variation.
+5. **Act on the findings, not just report them.** Today findings (missing values, conflicting records, stale prices, unknown currencies, share-class gaps) are developer intelligence: they explain what the service did with doubtful data. Many could be resolved instead, for example by agents that look up a missing value, settle which of two conflicting records is right, or confirm a stale price. Every fix would be recorded with its source and marked as model-derived.
+

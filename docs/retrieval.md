@@ -94,4 +94,3 @@ Ranking quality is measured by the eval ([eval.md](eval.md)), which runs the ser
 
 - **Geography leaks more than with TF-IDF.** When the ranker is wrong, the wrong peer shares the target's country more often than chance (lift about 2.4 vs 1.5 for TF-IDF), because descriptions say "based in …". Overall accuracy on those cases still rose (geo_trap nDCG@10 0.62 vs 0.31). Stripping country phrases is untested.
 - **Reworded duplicate listings** below 0.88 are shown as peers (see §2).
-- The derived label-conflict warning (a company whose description neighbours disagree with its label) is not built yet.

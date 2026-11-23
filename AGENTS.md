@@ -201,6 +201,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-23 | `make start` prints the URLs in a `****` banner only once the services are healthy, then follows the logs; the API healthcheck polls every second while starting, then once a minute. |
 | 2026-11-23 | **Rank on business descriptions:** ingestion derives `business_description` (the description without the distinctive words of the issuer's own names and aliases, i.e. name words no other company's description uses); ranking uses it, while the near-duplicate test uses the description as supplied (same model, two embeddings). The analyst sees the supplied description. Labels stay evidence, not ranking inputs. A look-alike-names fixture (Sonnet) measures it: experiment 13 (experiments 11–12, removing whole names, hurt descriptive names). |
 | 2026-11-23 | **Cleanup:** the manual-addition remnants (`origin`, `extra_records`, `manual_additions`) are removed from the code, and the non-USD base plan is dropped (USD base required). The derived label-conflict warning is not built. |
+| 2026-11-23 | **Hand-in docs:** `DESIGN.md` breaks problems down by stage; README adds AI usage (every business and engineering decision made by the human code owner) and What I'd do with more time (known gaps, more agentic, web-search and SLM-driven retrieval, and acting on findings rather than only reporting them); `TIMELOG.md` is reconstructed from PR merge times, compacted to two days of active time. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -211,8 +212,8 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 |---|---|
 | `AGENTS.md` | This file: working rules, architecture, decisions. |
 | `README.md` | Setup and running, how to point at another data file, how to request a comps table, assumptions, AI usage, ranked future work. |
-| `DESIGN.md` *(planned)* | Scope, the definition of a relevant peer, key decisions and alternatives, data problems and how each was handled, acceptance criteria. |
-| `TIMELOG.md` *(planned)* | Rough breakdown of the time actually spent. |
+| `DESIGN.md` | Scope, the definition of a relevant peer, key decisions and alternatives, data problems and how each was handled, acceptance criteria. |
+| `TIMELOG.md` | Rough breakdown of the time actually spent. |
 | `pyproject.toml` | Python package and pinned dependencies (`.[dev]` adds the test, lint and type-check tools; ruff and mypy are configured here). |
 | `Makefile` | Developer shortcuts: `install`, `lint`, `format`, `typecheck`, `test`, `check`, `experiment`, `model`, `start`, `stop`. |
 | `.pre-commit-config.yaml` | Optional local hooks: ruff check, ruff format, and nbstripout for notebook outputs. |
