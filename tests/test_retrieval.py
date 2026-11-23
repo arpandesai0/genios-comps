@@ -422,21 +422,37 @@ def _entity(name, description, aliases=()):
     )
 
 
-def test_business_description_removes_only_the_issuers_own_names():
+def test_business_description_removes_only_distinctive_name_words():
     from comps.ingest import business_description
 
     e = _entity(
         "Northwind Air Group",
-        "NORTHWIND AIR GROUP flies regional routes. Northwind Air Group's fleet is young; Northwind Airways (old name) "
-        "and Northwinder Ltd are unrelated words.",
-        aliases=("Northwind Air Group", "Northwind Airways", "NA"),
+        "NORTHWIND AIR GROUP flies regional routes. Northwind's fleet is young; Skyways Air is a rival.",
+        aliases=("Northwind Airways",),
     )
-    assert business_description(e) == (
-        "The company flies regional routes. The company's fleet is young; The company (old name) "
-        "and Northwinder Ltd are unrelated words."  # whole phrases only; "NA" is too short to remove
+    # "northwind" and "airways" appear in no other description; "air" and "group" do, so they stay
+    frequency = {"northwind": 1, "airways": 1, "air": 5, "group": 9}
+    assert (
+        business_description(e, frequency) == "AIR GROUP flies regional routes. fleet is young; Skyways Air is a rival."
     )
-    assert business_description(_entity("Acme", "   ")) == "   " and business_description(_entity("Acme", None)) is None
-    assert business_description(_entity(None, "No name at all.")) == "No name at all."
+    assert business_description(_entity("Acme", "   "), {}) == "   "
+    assert business_description(_entity("Acme", None), {}) is None
+    assert business_description(_entity(None, "No name at all."), {}) == "No name at all."
+
+
+@pytest.mark.parametrize(
+    ("name", "description", "expected"),
+    [
+        ("Haventet Pay Inc", "Haventet Pay Corp offers payments.", "Pay Corp offers payments."),  # suffix differs
+        ("AT&T Inc", "AT&T Inc sells phone plans.", "Inc sells phone plans."),  # regex characters are literal
+        ("Acme Corp", "Acme Corp.", None),  # only the name: nothing about the business
+    ],
+)
+def test_business_description_edge_cases(name, description, expected):
+    from comps.ingest import business_description
+
+    frequency = {"haventet": 1, "at&t": 1, "acme": 1, "pay": 3, "inc": 9, "corp": 9}
+    assert business_description(_entity(name, description), frequency) == expected
 
 
 def test_look_alike_names_do_not_make_companies_peers(tmp_path):
@@ -482,8 +498,7 @@ def test_duplicate_listings_are_still_caught_on_the_supplied_text(tmp_path):
     (tmp_path / "companies.json").write_text(json.dumps(universe))
     (tmp_path / "fx_rates.json").write_text(json.dumps(FX))
     s = build_snapshot(Settings(data_dir=tmp_path, ingest=IngestConfig()), TfidfRetriever())
-    # Without names, the genuine peer SKY reads identical to the target, yet it is not a duplicate: names differ.
-    assert s.dataset.entities["US:SKY"].business_description == s.dataset.entities["US:NWA"].business_description
+    # SKY has the same business text as the target, yet it is not a duplicate: the supplied names differ.
     assert s.duplicates.check("US:NWA", "US:SKY") is None
     assert s.duplicates.check("US:NWA", "US:NWAX") is not None
     from comps.service import find_peers
@@ -491,34 +506,6 @@ def test_duplicate_listings_are_still_caught_on_the_supplied_text(tmp_path):
     result = find_peers(s, "US:NWA", 2)
     assert [p.company.entity.key for p in result.peers] == ["US:SKY"]
     assert [(k.skip.key, k.skip.reason) for k in result.skipped] == [("US:NWAX", "near_duplicate_of_target")]
-
-
-@pytest.mark.parametrize(
-    ("name", "description", "expected"),
-    [
-        # a different legal suffix in the text than in the record name; the stem with a possessive
-        (
-            "Haventet Pay Inc",
-            "Haventet Pay Corp offers payments. Haventet Pay's app is popular.",
-            "The company offers payments. The company's app is popular.",
-        ),
-        (
-            "Acme Group",
-            "We are the Acme group, part of the ACME GROUP family.",
-            "We are The company, part of The company family.",
-        ),  # a leading "the" goes with the name
-        (
-            "AT&T Inc",
-            "AT&T Inc sells phone plans. AT&T also sells TV.",
-            "The company sells phone plans. The company also sells TV.",
-        ),  # regex characters are literal
-        ("Acme Corp", "Acme Corp.", None),  # only the name: nothing about the business
-    ],
-)
-def test_business_description_edge_cases(name, description, expected):
-    from comps.ingest import business_description
-
-    assert business_description(_entity(name, description)) == expected
 
 
 def test_a_description_that_is_only_the_name_gets_no_peers(tmp_path):

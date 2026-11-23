@@ -186,7 +186,8 @@ def build_dataset(
     # Share classes of one issuer become one company (disjoint-set union; see issuers.py).
     entities, parents = issuers.merge_share_classes(listings)
     # After the merge, so every class's name is removed from the issuer's description.
-    entities = {key: replace(e, business_description=business_description(e)) for key, e in entities.items()}
+    frequency = description_frequency(entities)
+    entities = {key: replace(e, business_description=business_description(e, frequency)) for key, e in entities.items()}
 
     # Freshness is measured from the latest valid price_date, so results don't depend on when the service runs.
     reference_date = max((e.latest.price_date for e in entities.values() if e.latest.price_date), default=None)
@@ -209,61 +210,68 @@ def build_dataset(
     )
 
 
-NAME_PLACEHOLDER = "The company"
-_MIN_NAME_LENGTH = 3  # never remove a one- or two-letter "name" from the text
-# Legal and group suffixes a description may use instead of the record's own ("Haventet Pay Corp" for the record
-# name "Haventet Pay Inc"). A name is matched with or without any of them.
-_SUFFIXES = (
-    "Incorporated",
-    "Inc",
-    "Corporation",
-    "Corp",
-    "Company",
-    "Co",
-    "Limited",
-    "Ltd",
-    "PLC",
-    "LLC",
-    "Group",
-    "Holdings",
-    "Holding",
-    "AG",
-    "SE",
-    "SA",
-    "NV",
-    "GmbH",
+_WORD = re.compile(r"[^\W_]+(?:[&.-][^\W_]+)*")
+_NAME_WORD = re.compile(rf"({_WORD.pattern})(?:['\u2019]s\b)?")
+_SUFFIXES = frozenset(
+    w.casefold()
+    for w in (
+        "Inc",
+        "Incorporated",
+        "Corp",
+        "Corporation",
+        "Co",
+        "Company",
+        "Ltd",
+        "Limited",
+        "PLC",
+        "LLC",
+        "Group",
+        "Holdings",
+        "Holding",
+        "AG",
+        "SE",
+        "SA",
+        "NV",
+        "GmbH",
+    )
 )
-_SUFFIX = rf"(?:,?\s+(?:{'|'.join(_SUFFIXES)})\.?)"
 
 
-def _stem(name: str) -> str:
-    """The name without trailing legal/group suffixes ("Irovaiva Air Group" -> "Irovaiva Air")."""
-    stem = name
-    while (shorter := re.sub(rf"{_SUFFIX}$", "", stem, flags=re.IGNORECASE)) != stem:
-        stem = shorter
-    return stem
+def _words(text: str) -> set[str]:
+    return {w.casefold() for w in _WORD.findall(text)}
 
 
-def business_description(e: Entity) -> str | None:
-    """``e.description`` with the issuer's own names replaced by "The company", for similarity only.
+def description_frequency(entities: Mapping[str, Entity]) -> dict[str, int]:
+    """For every word, the number of companies whose description contains it (case-insensitive)."""
+    df: dict[str, int] = {}
+    for e in entities.values():
+        for w in _words(e.description or ""):
+            df[w] = df.get(w, 0) + 1
+    return df
 
-    Descriptions usually open with the company's name ("Irovaiva Air Group operates a regional flight
-    network ..."). Embedding models split invented names into sub-word pieces, so two unrelated companies with
-    look-alike names ("Irovaiva", "Irovaor") would score as similar. Every name of the issuer (its name and
-    aliases, across share classes) is replaced as a whole phrase in any case, with any legal suffix
-    ("Inc", "Corp", "Group" ...) and a leading "the". Nothing else in the text changes, and the supplied
-    description is kept as is for display. A description that is only the name has no business text: None.
+
+def business_description(e: Entity, frequency: Mapping[str, int]) -> str | None:
+    """``e.description`` without the distinctive words of the issuer's own names, for similarity only.
+
+    Descriptions usually open with the company's invented name ("Irovaiva Air Group operates ..."). Embedding
+    models split invented words into sub-word pieces, so unrelated companies with look-alike names ("Irovaiva",
+    "Irovaor") score as similar. A word of the issuer's name or aliases is removed when no other company's
+    description contains it (``frequency`` <= 1): that is the invented part. Words other descriptions also use
+    ("Air", "Offshore", "Drilling") describe the business and stay. Nothing else changes; the supplied
+    description is kept for display. A description left with nothing but legal suffixes has no business
+    text: None.
     """
     if not e.description or not e.description.strip():
         return e.description
-    stems = {_stem(n.strip()) for n in (e.name, *e.aliases) if n}
-    stems = {s for s in stems if len(s) >= _MIN_NAME_LENGTH}
-    text = e.description
-    for stem in sorted(stems, key=lambda n: (-len(n), n)):
-        pattern = rf"(?<!\w)(?:the\s+)?{re.escape(stem)}{_SUFFIX}*(?!\w)"
-        text = re.sub(pattern, NAME_PLACEHOLDER, text, flags=re.IGNORECASE)
-    if not re.sub(rf"{NAME_PLACEHOLDER}|[\W_]", "", text, flags=re.IGNORECASE):
-        return None  # only the name (and punctuation): nothing about the business to compare
+    own = set().union(*(_words(n) for n in (e.name, *e.aliases) if n))
+    distinctive = {w for w in own if frequency.get(w, 0) <= 1 and w not in _SUFFIXES}
+    if not distinctive:
+        return e.description
+    # A removed word takes its possessive with it ("Irovaiva's fleet" -> "fleet").
+    text = _NAME_WORD.sub(lambda m: "" if m.group(1).casefold() in distinctive else m.group(0), e.description)
+    text = re.sub(r"\s+([,.;:)])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
+    if not (_words(text) - _SUFFIXES):
+        return None  # only the name (and suffixes or punctuation): nothing about the business to compare
     return text
 
 
