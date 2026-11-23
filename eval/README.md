@@ -1,6 +1,6 @@
 # Evaluation
 
-**Served: `sentence-transformers/all-MiniLM-L6-v2` embeddings, near-duplicate threshold 0.88** (experiment 6). It replaced TF-IDF after the runs below. nDCG@10 is the main metric (1.0 = every true peer, in the best order).
+**Served: `sentence-transformers/all-MiniLM-L6-v2` embeddings on business descriptions (each company's own names removed), near-duplicate threshold 0.88 on the descriptions as supplied** (experiment 11). Removing names lifted the look-alike-names fixture from 0.757 to 0.923 nDCG@10 on dev (0.782 to 0.884 held-out), with the other fixtures flat or better and no double listings; see [results/retrieval_business_descriptions.md](results/retrieval_business_descriptions.md). The table below is the earlier model choice; MiniLM replaced TF-IDF after these runs. nDCG@10 is the main metric (1.0 = every true peer, in the best order).
 
 | # | Configuration | Vector size | nDCG@10 independent fixture (dev / held-out) | nDCG@10 own fixture (dev / held-out) | Dedup recall ceiling, dev (best cut with no false duplicate) | Both copies of a company in one list (independent dev) | Start-up, 90 cos. | Request latency mean / p95 / max | Memory |
 |---|---|---|---|---|---|---|---|---|---|
@@ -36,5 +36,6 @@ make model                                  # download the configured embedding 
 | `runs/<NNN>/` | Captured `/api/peers` responses of each logged run, so any score can be recomputed without re-running. |
 | `fixtures/retrieval/` | 57-company universe with 0–3 labels, written by the same agent as the ranker. |
 | `fixtures/independent/` | 90-company universe, 18 businesses, written independently by a different model (Sonnet). |
+| `fixtures/lookalike/` | 70-company universe whose unrelated companies share invented name stems ("Velorin Air", "Velorix Fibre"), written independently by Sonnet. |
 | `fixtures/dedup/` | 160 labelled description pairs (64 duplicates) for the near-duplicate rule, also written by Sonnet. |
 | `results/` | Interpretations; `local_*` files come from the supplied data and are git-ignored. |

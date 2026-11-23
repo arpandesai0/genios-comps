@@ -199,6 +199,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-23 | **Thresholds come from a config file, not code:** `src/comps/settings.toml` holds the stale-price days, the default embedding model and one near-duplicate threshold per model; environment variables override. A model with no threshold stops start-up (no silent reuse of another model's value). |
 | 2026-11-23 | **Finish the UI** against the real API: Compare is always shown (no redirect to `/data`), uses `/api/comps`, shows `skipped` with reasons and `note`, and drops `method` / `shared_terms`. The API adapter serves the contract's currency-neutral names (`market_cap_m`, `enterprise_value_m`, `normalized`) and `currency`. The geography leak is left as is (out of time). |
 | 2026-11-23 | `make start` prints the URLs in a `****` banner only once the services are healthy, then follows the logs; the API healthcheck polls every second while starting, then once a minute. |
+| 2026-11-23 | **Rank on business descriptions:** ingestion derives `business_description` (the description with the issuer's own names and aliases replaced by "The company"); ranking uses it, while the near-duplicate test uses the description as supplied (same model, two embeddings). The analyst sees the supplied description. Labels stay evidence, not ranking inputs. A look-alike-names fixture (Sonnet) measures it: experiment 11. |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map
@@ -235,7 +236,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `web/` | Next.js + shadcn/ui front end: Compare (`/`) and Data (`/data`). It talks to the API over HTTP only; `npm run dev` without `NEXT_PUBLIC_USE_MOCKS=0` uses synthetic mocks that follow the same contract. |
 | `tests/` | Pytest suite using synthetic data only (finance, ingestion, resolution, retrieval invariants, API). |
 | `tests/fixtures/planted_defects/` | End-to-end acceptance fixture: a synthetic universe with one planted defect per company, and the hand-derived `expected.json` that `tests/test_planted_defects.py` must match exactly. |
-| `eval/fixtures/` | `retrieval/` (first universe), `independent/` (written by a different model) and `dedup/` (labelled pairs): builders, inputs and golden labels. |
+| `eval/fixtures/` | `retrieval/` (first universe), `independent/` (written by a different model), `lookalike/` (look-alike invented names, also by a different model) and `dedup/` (labelled pairs): builders, inputs and golden labels. |
 | `eval/run.py`, `eval/score.py`, `eval/README.md` | Black-box eval: run a commit's API on the fixtures, capture `/api/peers`, score against golden labels. The README opens with the results table. |
 | `eval/experiments.py`, `eval/experiments.json`, `eval/runs/` | Append-only experiment log (pretty-printed JSON) and each run's captured output (`make experiment DESC=...`). |
 | `eval/results/` | Machine-readable results for each evaluated configuration, plus interpretations. `local_*` files (from the real data) are git-ignored. |
