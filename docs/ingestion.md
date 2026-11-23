@@ -21,7 +21,7 @@ All examples below use invented companies. The supplied data is never committed.
 | `DATA_DIR` | `/data` | Folder that holds `companies.json` and `fx_rates.json`. Point it at another folder to use a different data file of the same format. |
 | `STALE_AFTER_DAYS` | `90` (from [`src/comps/settings.toml`](../src/comps/settings.toml)) | A latest price older than this many days before the reference date (the latest valid `price_date` in the data) gets a `stale_price` warning. |
 
-The input files are the whole dataset: there are no runtime additions (owner decision 2026-11-22). *(The code still accepts `extra_records`; it is removed in a follow-up PR.)*
+The input files are the whole dataset: there are no runtime additions (owner decision 2026-11-22).
 
 ## Steps
 

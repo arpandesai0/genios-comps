@@ -13,7 +13,6 @@ from typing import Any, Literal
 
 Severity = Literal["error", "limitation", "warning", "info"]
 FindingSource = Literal["validation", "derived"]
-Origin = Literal["file", "manual"]
 
 SEVERITIES: tuple[Severity, ...] = ("error", "limitation", "warning", "info")
 
@@ -59,7 +58,6 @@ class Observation:
     """One supplied record's point-in-time values, after validation and normalization."""
 
     record_id: str
-    origin: Origin
     source_index: int  # position in the input; used for deterministic tie-breaks
     price_date: date | None
     original: Mapping[str, Any]  # the record exactly as supplied
@@ -156,7 +154,6 @@ class Dataset:
     record_count: int
     entities: Mapping[str, Entity]  # shown key -> issuer, ordered by key
     findings: tuple[Finding, ...]  # dataset-level findings (cross-record checks, fx issues)
-    metadata: Mapping[str, Any] = field(default_factory=dict)
     # Disjoint-set parent pointer of every listing key: its issuer's shown key (a shown key points to itself).
     parents: Mapping[str, str] = field(default_factory=dict)
 
