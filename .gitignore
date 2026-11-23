@@ -3,7 +3,7 @@ data/
 README.brief.md
 GLOSSARY.md
 # local state
-.venv/
+.venv
 __pycache__/
 *.pyc
 .pytest_cache/
