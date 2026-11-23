@@ -66,8 +66,9 @@ def test_dedup_scoring_finds_the_strictest_cut_without_false_duplicates():
 def test_runner_ignores_service_settings_from_the_shell(monkeypatch, tmp_path):
     monkeypatch.setenv("EMBEDDING_MODEL", "leaked/model")
     monkeypatch.setenv("NEAR_DUPLICATE_THRESHOLD", "0.5")
+    monkeypatch.setenv("CONFIG_FILE", "/leaked/settings.toml")
     env = run.service_env(tmp_path, {"MODEL_CACHE_DIR": "/c"}, tmp_path / "data")
-    assert "EMBEDDING_MODEL" not in env and "NEAR_DUPLICATE_THRESHOLD" not in env
+    assert not {"EMBEDDING_MODEL", "NEAR_DUPLICATE_THRESHOLD", "CONFIG_FILE"} & env.keys()
     assert env["MODEL_CACHE_DIR"] == "/c" and env["DATA_DIR"] == str(tmp_path / "data")
     assert env["PYTHONPATH"] == str(tmp_path / "src")
 

@@ -23,7 +23,7 @@ Defaults live in the config file [`src/comps/settings.toml`](../src/comps/settin
 | Setting | Default | Meaning |
 |---|---|---|
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional vectors, ~90 MB) | the one model loaded per process; chosen by the eval ([eval.md](eval.md)) |
-| `NEAR_DUPLICATE_THRESHOLD` | the model's value in the config file (`0.88` for MiniLM) | similarity at or above which two companies are near-duplicates (§2); must be in (0, 1]. The config file holds **one tuned value per model** (`[retrieval.near_duplicate_threshold]`); a model with no value there stops start-up unless this variable is set |
+| `NEAR_DUPLICATE_THRESHOLD` | the model's value in the config file (`0.88` for MiniLM) | similarity at or above which two companies are near-duplicates (§2); must be in (0, 1]. The config file holds **one tuned value per model** (`[retrieval.near_duplicate_threshold]`); a model with no value there stops start-up unless this variable is set (`make start` passes it to the API container) |
 | `MODEL_CACHE_DIR` | `~/.cache/comps-models`; `/models` in the image | where the model is downloaded to and loaded from |
 | `MODEL_OFFLINE` | off; `1` in the image | never download: fail if the model is not in the cache (`1`/`true`/`yes`/`on`, any case) |
 

@@ -8,6 +8,8 @@ services:
         EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}  # empty = the model in src/comps/settings.toml
     environment:
       DATA_DIR: /data
+      # Needed when EMBEDDING_MODEL names a model with no threshold in src/comps/settings.toml.
+      NEAR_DUPLICATE_THRESHOLD: ${NEAR_DUPLICATE_THRESHOLD:-}
     volumes:
       - ${DIR:?Set DIR to a folder containing companies.json and fx_rates.json}:/data:ro
     ports:

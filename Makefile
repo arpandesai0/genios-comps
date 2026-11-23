@@ -29,7 +29,7 @@ check: lint typecheck test
 # Usage: make experiment DESC="what it tests" [COMMIT=<sha>] [MODEL=<embedding model>] [THRESHOLD=<near-duplicate>] [HELD_OUT=1]
 # A MODEL with no threshold in src/comps/settings.toml needs THRESHOLD.
 experiment:
-	@test -n "$$DESC" || { echo 'usage: make experiment DESC="what this run tests" [COMMIT=sha] [MODEL=name]'; exit 2; }
+	@test -n "$$DESC" || { echo 'usage: make experiment DESC="what this run tests" [COMMIT=sha] [MODEL=name] [THRESHOLD=x]'; exit 2; }
 	$(BIN)/python eval/run.py --commit "$${COMMIT:-HEAD}" --desc "$$DESC" $${MODEL:+--set "EMBEDDING_MODEL=$$MODEL"} $${THRESHOLD:+--set "NEAR_DUPLICATE_THRESHOLD=$$THRESHOLD"} $${HELD_OUT:+--held-out}
 
 # Download the configured embedding model (EMBEDDING_MODEL; default in src/comps/settings.toml) into MODEL_CACHE_DIR.

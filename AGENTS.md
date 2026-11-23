@@ -197,7 +197,6 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
 | 2026-11-22 | **One PR for the embedding stage** (contract, retriever, evals, serving, docs). |
 | 2026-11-22 | `make start` takes `SERVICES` (default: all compose services); naming services starts only those, e.g. `SERVICES=api` for local testing and evals without the front end. |
 | 2026-11-23 | **Thresholds come from a config file, not code:** `src/comps/settings.toml` holds the stale-price days, the default embedding model and one near-duplicate threshold per model; environment variables override. A model with no threshold stops start-up (no silent reuse of another model's value). |
-| 2026-11-23 | **Finish the UI** against the real API (Compare page wired, fields renamed to the contract). The geography leak is left as is (out of time). |
 | 2026-11-21 | **Updated:** UI headings and labels use Title Case (e.g. “Data & Integrity”, “Dataset Health”), superseding the earlier sentence-case choice. Preserve acronyms, company names and exact technical identifiers. |
 
 ## 5. Directory map

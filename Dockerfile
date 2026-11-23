@@ -7,7 +7,7 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN pip install -r requirements.lock
 # The embedding model is required and the service runs offline: download it now, at build time, before
-# the source is copied so code changes don't re-download it. Any failure fails the build. At runtime
+# the source is copied so code changes don't re-download it (an edit to settings.toml does). Any failure fails the build. At runtime
 # MODEL_OFFLINE=1 forbids downloads, so a missing model stops start-up instead of falling back.
 # The model is the one in src/comps/settings.toml, unless `EMBEDDING_MODEL=<name> make start ...` overrides it
 # (compose passes it as a build arg).

@@ -12,11 +12,16 @@ DEFAULT_CONFIG_FILE = Path(__file__).with_name("settings.toml")
 
 
 def read_config(path: Path = DEFAULT_CONFIG_FILE) -> dict[str, Any]:
-    """The config file as a dict; a missing or malformed file raises, so start-up fails loudly."""
-    with path.open("rb") as f:
-        return tomllib.load(f)
+    """The config file as a dict; a missing or malformed file raises ValueError, so start-up fails loudly."""
+    try:
+        with path.open("rb") as f:
+            return tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as e:
+        raise ValueError(f"Cannot read the config file {path}: {e}") from None
 
 
+# The shipped file's values, used as the dataclass defaults (e.g. in tests). The service reads its settings
+# through load_settings(), which honours CONFIG_FILE and the environment.
 _DEFAULTS = read_config()
 # Served when EMBEDDING_MODEL is not set; its near-duplicate threshold comes from the same file.
 DEFAULT_EMBEDDING_MODEL: str = _DEFAULTS["retrieval"]["embedding_model"]
@@ -72,6 +77,8 @@ def _threshold(value: object, source: str) -> float:
 
 
 def _days(value: object, source: str) -> int:
+    if isinstance(value, bool | float):  # a TOML true or 90.5 is not silently truncated
+        raise ValueError(f"{source} must be a whole number of days; got {value!r}")
     try:
         d = int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError):
@@ -84,14 +91,15 @@ def _days(value: object, source: str) -> int:
 def _near_duplicate(env: dict[str, str], config: dict[str, Any], model: str, config_file: Path) -> float:
     if env.get("NEAR_DUPLICATE_THRESHOLD"):
         return _threshold(env["NEAR_DUPLICATE_THRESHOLD"], "NEAR_DUPLICATE_THRESHOLD")
-    per_model = config.get("retrieval", {}).get("near_duplicate_threshold", {})
-    if model not in per_model:
+    # Model names are matched ignoring case, as fastembed does.
+    per_model = {k.lower(): v for k, v in config.get("retrieval", {}).get("near_duplicate_threshold", {}).items()}
+    if model.lower() not in per_model:
         raise ValueError(
             f"No near-duplicate threshold for the embedding model {model!r}: each model needs its own tuned "
             f"value. Add it under [retrieval.near_duplicate_threshold] in {config_file}, or set "
             "NEAR_DUPLICATE_THRESHOLD."
         )
-    return _threshold(per_model[model], f"near_duplicate_threshold for {model!r} in {config_file}")
+    return _threshold(per_model[model.lower()], f"near_duplicate_threshold for {model!r} in {config_file}")
 
 
 def load_settings(env: dict[str, str] | None = None) -> Settings:
@@ -108,7 +116,9 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     return Settings(
         data_dir=Path(env.get("DATA_DIR", "/data")).expanduser(),
         ingest=IngestConfig(
-            stale_after_days=_days(env.get("STALE_AFTER_DAYS") or default_days, "stale_after_days"),
+            stale_after_days=_days(env["STALE_AFTER_DAYS"], "STALE_AFTER_DAYS")
+            if env.get("STALE_AFTER_DAYS")
+            else _days(default_days, f"stale_after_days in {config_file}"),
         ),
         retrieval=RetrievalConfig(
             model=model,
