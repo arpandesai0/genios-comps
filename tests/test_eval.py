@@ -95,6 +95,7 @@ def test_pair_score_reads_peers_and_skipped():
     [
         ("retrieval", "build_fixture", ("companies.json", "fx_rates.json", "labels.json")),
         ("independent", "build_fixture", ("companies.json", "fx_rates.json", "labels.json")),
+        ("lookalike", "build_fixture", ("companies.json", "fx_rates.json", "labels.json")),
         ("dedup", "build_pairs", ("pairs.json",)),
     ],
 )
@@ -115,7 +116,7 @@ def _snapshot(data_dir: Path):
     return build_snapshot(Settings(data_dir=data_dir, ingest=IngestConfig()), TfidfRetriever())
 
 
-@pytest.mark.parametrize("name", ["retrieval_v1", "independent"])
+@pytest.mark.parametrize("name", ["retrieval_v1", "independent", "lookalike"])
 def test_retrieval_labels_cover_every_company_and_splits_are_disjoint(name):
     fixture = FIXTURES[name]
     spec = json.loads((fixture.path / "labels.json").read_text())

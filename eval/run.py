@@ -63,6 +63,7 @@ FIXTURES = (
     Fixture("retrieval_v1", HERE / "fixtures" / "retrieval", "retrieval", 10),
     Fixture("independent", HERE / "fixtures" / "independent", "retrieval", 10),
     Fixture("dedup", HERE / "fixtures" / "dedup", "dedup", 50),
+    Fixture("lookalike", HERE / "fixtures" / "lookalike", "retrieval", 10),
 )
 
 Get = Callable[[str, Mapping[str, Any]], Any]
