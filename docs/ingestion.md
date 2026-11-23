@@ -51,7 +51,7 @@ These problems **block** the whole dataset (`DatasetError`), and the service won
 | `rates` missing or not an object | blocking error |
 | Currency code `"jpy"` | read as `JPY` |
 | Rate that is zero, negative or not a number, e.g. `"GBP": 0` | rate dropped, plus finding `invalid_fx_rate` (limitation). Values in GBP can't be converted. |
-| `USD` listed at anything other than 1.0 | blocking error |
+| `USD` listed at a positive value other than 1.0 | blocking error (an unusable USD value is dropped as above, and USD stays 1.0) |
 | `USD` not listed | added as 1.0 |
 
 ### 3. Validate and normalize each record

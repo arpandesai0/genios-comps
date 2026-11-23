@@ -105,7 +105,7 @@ These steps run in sequence: the snapshot/service layer (needs ingestion, financ
        → issuers with observation history + findings
                                   ↓
           Immutable Snapshot (versioned by input-file hash)
-     entities · findings · embedding index (EMBEDDING_MODEL) · derived label-conflict warnings
+     entities · findings · embedding index (EMBEDDING_MODEL)
                                   ↓
      Resolve (service.search): key / ticker / name → every match; the analyst chooses
                                   ↓
@@ -222,7 +222,7 @@ Items marked *(planned)* don't exist yet. Update this table when you add or remo
 | `src/comps/models.py` | Shared plain data types (entity, observation, finding, metric value). This is the contract between stages; change it with care. |
 | `src/comps/ingest.py` | Load, validate, and normalize to USD; entity resolution by `country:ticker`; findings. |
 | `src/comps/issuers.py` | Share-class merge: a disjoint-set union groups listings with identical issuer-level data into one issuer, re-rooted at the shown key; `Dataset.parents` maps every listing key to it. |
-| `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (The derived label-conflict warning is planned; it needs retrieval.) |
+| `src/comps/quality.py` | Checks across companies, on issuers: shared names, stale price dates. (A derived label-conflict warning is not built: decision 2026-11-23.) |
 | `src/comps/finance.py` | Glossary formulas, ok/NM/missing states, peer summary statistics, display rounding. |
 | `src/comps/retrieval/` | `Retriever` / `Index` interface (`base.py`), the served embedding ranker (`embedding.py`), the earlier TF-IDF ranker used by the tests (`tfidf.py`), and the near-duplicate test and k-filling peer selection (`select.py`). |
 | `docs/retrieval.md` | How peers are chosen: index, walk and skip reasons, evidence, example, known gaps. |

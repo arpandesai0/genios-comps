@@ -219,7 +219,7 @@ Data-health overview.
 {
   dataset_version: string;
   currency: string;                          // dataset currency (see Conventions)
-  fx: { base: string };                      // base currency as given in fx_rates.json
+  fx: { base: string };                      // always "USD": ingestion rejects any other base
   reference_date: string | null;             // latest valid price_date in the data (stale-price checks measure from it); null if no record has a valid date
   source: { data_dir: string; files: { name: string; sha256: string }[] };
   counts: { records: number; entities: number };   // entities = issuers, share classes merged
