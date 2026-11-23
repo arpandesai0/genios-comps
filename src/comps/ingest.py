@@ -185,6 +185,8 @@ def build_dataset(
     listings = resolve_entities(normalized)
     # Share classes of one issuer become one company (disjoint-set union; see issuers.py).
     entities, parents = issuers.merge_share_classes(listings)
+    # After the merge, so every class's name is removed from the issuer's description.
+    entities = {key: replace(e, business_description=business_description(e)) for key, e in entities.items()}
 
     # Freshness is measured from the latest valid price_date, so results don't depend on when the service runs.
     reference_date = max((e.latest.price_date for e in entities.values() if e.latest.price_date), default=None)
@@ -205,6 +207,28 @@ def build_dataset(
         metadata={"manual_records": len(extra_records)},
         parents=parents,
     )
+
+
+NAME_PLACEHOLDER = "The company"
+_MIN_NAME_LENGTH = 3  # never remove a one- or two-letter "name" from the text
+
+
+def business_description(e: Entity) -> str | None:
+    """``e.description`` with the issuer's own names replaced by "The company", for similarity only.
+
+    Descriptions usually open with the company's name ("Irovaiva Air Group operates a regional flight
+    network ..."). Embedding models split invented names into sub-word pieces, so two unrelated companies with
+    look-alike names ("Irovaiva", "Irovaor") would score as similar. Every name of the issuer (its name and
+    aliases, across share classes) is replaced, longest first, as a whole phrase in any case. Nothing else in
+    the text changes, and the supplied description is kept as is for display.
+    """
+    if not e.description or not e.description.strip():
+        return e.description
+    names = {n.strip() for n in (e.name, *e.aliases) if n and len(n.strip()) >= _MIN_NAME_LENGTH}
+    text = e.description
+    for name in sorted(names, key=lambda n: (-len(n), n)):
+        text = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", NAME_PLACEHOLDER, text, flags=re.IGNORECASE)
+    return text
 
 
 def _version(files, companies, fx, extra_records) -> str:

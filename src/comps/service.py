@@ -89,7 +89,12 @@ def build_snapshot(settings: Settings, retriever: Retriever | None = None) -> Sn
         companies[key] = CompanyView(
             entity=entity, metrics=metrics, findings=entity.findings + entity.latest.findings + others + raised
         )
-    documents = {key: e.description for key, e in dataset.entities.items() if e.description and e.description.strip()}
+    # Retrieval compares business descriptions (own names removed in ingestion); see ingest.business_description.
+    documents = {
+        key: e.business_description
+        for key, e in dataset.entities.items()
+        if e.business_description and e.business_description.strip()
+    }
     cfg = settings.retrieval
     if retriever is None:
         retriever = EmbeddingRetriever(cfg.model, cache_dir=cfg.cache_dir, offline=cfg.offline)

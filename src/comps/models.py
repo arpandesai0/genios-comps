@@ -103,6 +103,10 @@ class Entity:
     text_history: tuple[TextVersion, ...] = ()
     findings: tuple[Finding, ...] = ()
     share_classes: tuple[ShareClass, ...] = ()  # shown class first; empty for a single listing
+    # The description with the issuer's own names (name and aliases) replaced by "The company", set by ingestion.
+    # Retrieval compares this, so invented names that look alike don't make unrelated companies similar; the
+    # analyst always sees `description` as supplied.
+    business_description: str | None = None
 
     @property
     def latest(self) -> Observation:
